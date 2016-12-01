@@ -1,0 +1,492 @@
+#ifndef MY_VARIABLES_INCLUDED
+#define MY_VARIABLES_INCLUDED
+#include<cmath>
+#include<fstream>
+#include "StringBasics.h"
+#include<vector>
+#include <omp.h>
+#include <unordered_set>
+#include "assert.h"
+using namespace std;
+
+
+
+class OutputFormatVariable
+{
+public:
+
+
+    int vcfBuffer;
+    bool        unphasedOutput;
+    bool GT,DS,GP,HDS;
+    String OutPrefix;
+    bool onlyrefmarkers;
+    bool gzip,RsId,nobgzip,meta;
+//    vector<bool> format;
+    String formatString;
+    String formatStringForVCF;
+    bool verbose;
+    int PrintBuffer;
+
+    bool memUsage;
+
+    bool vcfOutput,doseOutput,hapOutput,TypedOnly;
+
+    bool CheckValidity()
+    {
+        string formatPiece,formatTemp=formatString.c_str();
+        char *end_str1;
+
+
+        for(char * pch = strtok_r ((char*)formatTemp.c_str(),",", &end_str1);
+            pch!=NULL;
+            pch = strtok_r (NULL, ",", &end_str1))
+        {
+
+            formatPiece=(string)pch;
+
+            if(formatPiece.compare("GT")==0)
+                {
+                    GT=true;
+                }
+            else if(formatPiece.compare("DS")==0)
+                {
+                    DS=true;
+                }
+            else if(formatPiece.compare("GP")==0)
+                {
+                    GP=true;
+                }
+            else if(formatPiece.compare("HDS")==0)
+                {
+                    HDS=true;
+                }
+            else
+            {
+                cout << " Cannot identify handle for \"--format\" parameter : "<<formatPiece<<endl;
+                cout << " Available handles GT, DS and GP (for genotype, dosage and posterior probability). \n\n";
+                cout << " Type \"--help\" for more help.\n\n";
+                return false;
+            }
+        }
+
+
+        if(meta)
+        {
+            vcfOutput=true;
+            HDS=true;
+        }
+
+
+        doseOutput=false;
+        hapOutput=false;
+
+        if(PrintBuffer<=100)
+        {
+            cout << " Invalid input for \"--PrintBuffer\" = "<<PrintBuffer<<"\n";;
+            cout << " Buffer for writing output files should be at least 1,000 characters long !!! \n\n";
+            return false;
+        }
+
+
+        bool colonIndex=false;
+        if(GT)
+        {
+            formatStringForVCF+="GT";
+            colonIndex=true;
+        }
+        if(DS)
+        {
+            formatStringForVCF+= (colonIndex?":DS":"DS");
+            colonIndex=true;
+        }
+        if(HDS)
+        {
+            formatStringForVCF+= (colonIndex?":HDS":"HDS");
+            colonIndex=true;
+        }
+        if(GP)
+        {
+            formatStringForVCF+= (colonIndex?":GP":"GP");
+            colonIndex=true;
+        }
+
+
+        if(vcfBuffer<1)
+        {
+            cout << " Invalid input for \"--vcfBuffer\" = "<<vcfBuffer<<"\n";;
+            cout << " Value must be a positive integer !!! \n\n";
+            return false;
+        }
+
+        if(nobgzip)
+            gzip=false;
+
+        return true;
+
+    };
+
+
+    OutputFormatVariable()
+    {
+        memUsage=false;
+        formatStringForVCF="";
+        unphasedOutput=false;
+        OutPrefix="Minimac4.Output";
+        verbose=false;
+        vcfBuffer=200;
+        nobgzip=false;
+        meta=false;
+        PrintBuffer = 10000000;
+
+        formatString = "GT,DS";
+        GT=false;
+        DS=false;
+        GP=false;
+        HDS=false;
+
+
+        hapOutput=false;
+        doseOutput=false;
+        vcfOutput=true;
+        gzip=true;
+        RsId=false;
+        TypedOnly=false;
+
+    };
+
+
+};
+
+
+
+class ModelVariable
+{
+public:
+
+    bool        processReference,  updateModel ;
+    double      probThreshold;
+    bool lowMemory;
+    int rounds, states;
+    int transFactor;
+    int cisFactor ;
+    int cpus=1;
+
+    ModelVariable()
+    {
+        processReference = false;
+        updateModel = false;
+        probThreshold = 0.01;
+        lowMemory = false;
+        rounds = 5;
+        states = 200;
+        transFactor = 3;
+        cisFactor = 2;
+        cpus=1;
+        #ifdef _OPENMP
+            cpus=5;
+        #endif
+
+
+
+    };
+    bool CheckValidity()
+    {
+
+        if(processReference)
+        {
+
+            cout<<" NOTE: Since \"--processReference\" is ON, all options under \"Target Haplotypes\" \n";
+            cout<<"       and \"Starting Parameters\" will be ignored !!!\n";
+            cout<<"       Program will only estimate parameters and create M3VCF file.\n";
+            cout<<"       No imputation will be performed, hence other parameters are unnecessary !!!"<<endl<<endl;
+
+            cout<<" NOTE: If \"--processReference\" is ON, Parameter Estimation will be done by default ! \n";
+            cout<<"       Use \"--rounds 0\" to AVOID Parameter Estimation !!!\n"<<endl<<endl;
+
+            if(updateModel)
+            {
+
+                cout<<" Handle \"--updateModel\" does NOT work with handle \"--processReference\" !!! \n";
+                cout<<" Type \"--help\" for more help.\n\n";
+                return false;
+            }
+
+        }
+
+        if(updateModel)
+        {
+
+            cout<<" NOTE: Handle \"--updateModel\" works only on M3VCF files ! \n";
+            cout<<"       Program will NOT run if \"--refHaps\" is a VCF file !!!\n"<<endl;
+
+            if(rounds<=0)
+            {
+                cout << " Invalid input for \"--rounds\" = "<<rounds<<"\n";;
+                cout << " Value must be POSITIVE if \"--updateModel\" is ON !!! \n\n";
+                return false;
+            }
+            if(states<=0)
+            {
+                cout << " Invalid input for \"--states\" = "<<states<<"\n";;
+                cout << " Value must be POSITIVE if \"--updateModel\" is ON !!! \n\n";
+                return false;
+            }
+        }
+
+        if(rounds<0)
+        {
+            cout << " Invalid input for \"--rounds\" = "<<rounds<<"\n";;
+            cout << " Value must be non-negative !!! \n\n";
+            return false;
+        }
+        if(states<0)
+        {
+            cout << " Invalid input for \"--states\" = "<<states<<"\n";;
+            cout << " Value must be non-negative !!! \n\n";
+            return false;
+        }
+        if(probThreshold<0.0 || probThreshold>1.0)
+        {
+            cout << " Invalid input for \"--probThreshold\" = "<<probThreshold<<"\n";;
+            cout << " Value must be between 0.0 and 1.0 (inclusive) !!! \n\n";
+            return false;
+        }
+
+
+
+        if(lowMemory)
+        {
+            cout<<" Low Memory Version of Minimac3 initiated  !!! \n"<<endl;
+        }
+
+
+
+        #ifdef _OPENMP
+            omp_set_num_threads(cpus);
+        #else
+            cpus=1;
+        #endif
+
+        return true;
+    };
+
+
+};
+
+
+
+class HaplotypeDataVariables
+{
+    public:
+
+        int ChunkSize, ChunkWindow;
+        double ChunkLengthMb, ChunkOverlapMb;
+
+        bool passOnly, ignoreDuplicates, allowRefDuplicates;
+        String MyChromosome;
+
+        String chr;
+        int start, end, window;
+         String CHR;
+    int START;
+    int END;
+    int WINDOW;
+    double minRatio;
+
+
+        HaplotypeDataVariables()
+        {
+            ChunkLengthMb=20.0;
+            ChunkSize=50000;
+            ChunkWindow=1000;
+            ChunkOverlapMb=3.0;
+            chr = "";
+            passOnly=false;
+            start = 0;
+            end = 0;
+            window = 0;
+            MyChromosome="";
+            ignoreDuplicates=false;
+            allowRefDuplicates=false;
+            minRatio=0.1;
+        };
+
+        bool CheckValidity()
+        {
+            if(ChunkLengthMb<=0.001)
+            {
+                cout << " Invalid input for \"--ChunkLengthMb\" = "<<ChunkLengthMb<<"\n";;
+                cout << " Chunk Length must be at least 0.001 Mb (~1Kb) long !!! \n\n";
+                return false;
+            }
+
+            if(ChunkLengthMb>300)
+            {
+                cout << " Invalid input for \"--ChunkLengthMb\" = "<<ChunkLengthMb<<"\n";;
+                cout << " Chunk Length cannot be longer than 300Mb (greater than length of chromosome 2) !!! \n\n";
+                return false;
+            }
+
+            if(ChunkOverlapMb<=0.001)
+            {
+                cout << " Invalid input for \"--ChunkOverlapMb\" = "<<ChunkOverlapMb<<"\n";;
+                cout << " Chunk Length Overlap must be at least 0.001 Mb (~1Kb) long !!! \n\n";
+                return false;
+            }
+
+            if(ChunkOverlapMb>300)
+            {
+                cout << " Invalid input for \"--ChunkOverlapMb\" = "<<ChunkOverlapMb<<"\n";;
+                cout << " Chunk Length Overlap cannot be longer than 300Mb (greater than length of chromosome 2) !!! \n\n";
+                return false;
+            }
+
+
+            if(ChunkOverlapMb>(ChunkLengthMb/3.0))
+            {
+                ChunkOverlapMb=(ChunkLengthMb/3.0);
+                cout<<" NOTE: By Default \"--ChunkLengthMb\" must be at least 3 times the \"--ChunkOverlapMb\" \n";
+                cout<<"       Value of \"--ChunkOverlapMb\" reduced to = "<< ChunkOverlapMb <<"\n";
+            }
+
+            if(minRatio<=0.0 || minRatio >= 1.0)
+            {
+                cout << " Invalid input for \"--minRatio\" = "<<minRatio<<"\n";;
+                cout << " Value must be strictly in between 0 and 1 !!! \n\n";
+                return false;
+            }
+
+
+            if(window<0)
+            {
+                cout << " Invalid input for \"--window\" = "<<window<<"\n";;
+                cout << " Value must be non-negative !!! \n\n";
+                return false;
+            }
+
+            if(start<0)
+            {
+                cout << " Invalid input for \"--start\" = "<<start<<"\n";;
+                cout << " Value must be non-negative !!! \n\n";
+                return false;
+            }
+            if(end<0)
+            {
+                cout << " Invalid input for \"--end\" = "<<end<<"\n";;
+                cout << " Value must be non-negative !!! \n\n";
+                return false;
+            }
+            if(start>0 && end> 0 && start>=end)
+            {
+                cout << " Invalid Input !!!\n Value of \"--start\" must be less than value of \"--end\"."<<endl;
+                cout << " User Input \"--start\" = "<<start<<" and \"--end\" = " <<end<<" \n\n";
+                return false;
+            }
+            if(chr!="")
+            {
+                if(start==0)
+                {
+                    cout << "\n Non-zero value of \"--start\" required parameter if using \"--chr\" parameter.\n";
+                    cout << " Try --help for more information.\n\n";
+                    return false;
+                }
+                if(end==0)
+                {
+                    cout << "\n Non-zero value of \"--end\" required parameter if using \"--chr\" parameter.\n";
+                    cout << " Try --help for more information.\n\n";
+                    return false;
+                }
+                if(window==0)
+                {
+                    window=500000;
+                    cout<<" NOTE: Default \"--window\" parameter to be used = 500000\n";
+                }
+            }
+            if(start>0)
+            {
+                if(chr=="")
+                {
+                    cout << "\n Missing \"--chr\", a required parameter if using \"--start\" parameter.\n";
+                    cout << " Try --help for more information.\n\n";
+                    return false;
+                }
+                if(end==0)
+                {
+                    cout << "\n Non-zero value of \"--end\" required parameter if using \"--start\" parameter.\n";
+                    cout << " Try --help for more information.\n\n";
+                    return false;
+                }
+            }
+            if(end>0)
+            {
+                if(chr=="")
+                {
+                    cout << "\n Missing \"--chr\", a required parameter if using \"--end\" parameter.\n";
+                    cout << " Try --help for more information.\n\n";
+                    return false;
+                }
+                if(start==0)
+                {
+                    cout << "\n Non-zero value of \"--start\" required parameter if using \"--end\" parameter.\n";
+                    cout << " Try --help for more information.\n\n";
+                    return false;
+                }
+            }
+            if(window>0)
+            {
+
+                if(chr=="")
+                {
+                    cout << "\n Missing \"--chr\", a required parameter if using \"--end\" parameter.\n";
+                    cout << " Try --help for more information.\n\n";
+                    return false;
+                }
+                if(start==0 && end==0)
+                {
+                    cout << "\n Missing \"--start\" or  \"--end\", a required parameter if using \"--window\" parameter.\n";
+                    cout << " Try --help for more information.\n\n";
+                    return false;
+                }
+            }
+            else
+            {
+                if(start>0 || end>0)
+                 {
+                    cout<<" NOTE: No \"--window\" parameter provided  !!! \n";
+                    cout<<"       No buffer region will be used on either side of the chunk"<<endl<<endl;
+                }
+            }
+
+
+            CHR=chr;
+            START=start;
+            END=end;
+            WINDOW=window;
+            if (CHR!="" && WINDOW > 0)
+            {
+                if (START-WINDOW < 0)
+                    START = 0;
+                else
+                    START -= WINDOW;
+
+                END += WINDOW;
+            }
+
+            return true;
+
+        };
+
+};
+
+class AllVariable
+{
+public:
+
+    OutputFormatVariable myOutFormat;
+    ModelVariable myModelVariables;
+    HaplotypeDataVariables myHapDataVariables;
+
+};
+
+#endif // MY_VARIABLES_INCLUDED
