@@ -1,4 +1,4 @@
-Minimac3 is a lower memory and more computationally efficient
+Minimac4 is a lower memory and more computationally efficient
 implementation of the genotype imputation algorithms in 
 minimac and minimac2.
 
