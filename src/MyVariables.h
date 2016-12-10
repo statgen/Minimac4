@@ -170,7 +170,7 @@ public:
     int rounds, states;
     int transFactor;
     int cisFactor ;
-    int cpus=1;
+    int cpus;
 
     ModelVariable()
     {
