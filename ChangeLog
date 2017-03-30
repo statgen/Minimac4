@@ -1,215 +1,27 @@
 This file contains the set of changes that have gone into this program.
 
 --------------------------------------------------------------------------
-Minimac3 Changes:
+Minimac4 Changes:
 --------------------------------------------------------------------------
---------------------------------------------------------------------------
-
-
-Version : 1.0.13
-Author  : Sayantan Das
-Date    : October 15, 2015
-
-        Updated the format of info file to report only REF and ALT 
-        alleles instead of Major and Minor allele. The ALT_Frq and
-        MAF can be compared to find minor allele. The usual .dose
-        and .hapDose file have been updated to report alternate al-
-        -llele dosage and NOT major allele dosage, like earlier ve-
-        -rsions of minimac. Also mended a bug related to variants
-        that were typed only, while using --allTypedVariants option.
-        Finally, added acknowledgements to David Hinds, for his
-        immense help in making the code faster.
-
---------------------------------------------------------------------------
-
-Version : 1.0.12
-Author  : Sayantan Das
-Date    : September 5, 2015
-
-        Added --allTypedVariants option which adds variants which were
-	typed ONLY to the imputed output files and imputes any missing
-	values in such variants to the MAF. Also fixed a bug with chr-
-	-omosome X only male samples.
-
---------------------------------------------------------------------------
-
-Version : 1.0.11
-Author  : Sayantan Das
-Date    : April 21, 2015
-
-        Implemented parallel threading for processReference. Moved all
-	haplotype data from char vector to bool vector. Implemented
-	David's patch and similar other division-removal techniques.
-	Also added legacy parameter unphased for unphased output.
-
---------------------------------------------------------------------------
-
-Version : 1.0.10
-Author  : Sayantan Das
-Date    : February 27, 2015
-
-        Add parameter --log which will output a log file (BUT not print 
-        on the screen). Also added legacy parameter --myChromosome whi-
-        will enable users to use special chromosomes (apart from 1-22 
-        and X)
-
---------------------------------------------------------------------------
-
-Version : 1.0.8, 1.0.9
-Author  : Sayantan Das
-Date    : February 20, 2015
-
-        Removed dependcies on boost directory. Converted all double to fl-
-        oat. Had to change the main imputation formula to work well for l-
-        arge values. Also updated Rsq calulation formual to avoid underfl-
-        as a result of using float. Made minor changes to memory allocati-
-        on so as to remove all 2-d or 3-d look-ups. Updated a loop to rem-
-        ove repeat allocation, similar to minimac2. Now it is faster and 
-        uses much lesser memory.
-
---------------------------------------------------------------------------
-
-Version : 1.0.7
-Author  : Sayantan Das
-Date    : January 31, 2015
-
-        Fixed minor bugs and made thigsn ready for final release !!!
-
---------------------------------------------------------------------------
-
-Version : 1.0.6
-Author  : Sayantan Das
-Date    : November 4, 2014
-
-        Mended some minor bugs.
-
---------------------------------------------------------------------------
-
-Version : 1.0.5
-Author  : Sayantan Das
-Date    : October 3, 2014
-
-        Implemented chromosome X imputation (both PAR and non-PAR). Also
-	added bgzip option to enable tabix options.
-
---------------------------------------------------------------------------
-
-Version : 1.0.4
-Author  : Sayantan Das
-Date    : September 19, 2014
-
-        Improved the chuking option for the compressed files. Updated name
-	OPTM to M3VCF (Minimac3 VCF). Changed handle to --processReference.
-	Added the option to add parameter estimates within M3VCF files wh-
-	-ich can be used for later runs. Added a new handle --updateModel
-	that will allow users to update these estimates using the target
-	panel as well, if and when they think necessary.
-
 --------------------------------------------------------------------------
 
 Version : 1.0.2
 Author  : Sayantan Das
-Date    : August 28, 2014
+Date    : March 3, 2017
 
-        Mended a bug related to --vcfoutput option when used with --gzip 
-	option. Also added a option --format to manage handles in the
-	FORMAT field for output VCF files.
-
+        Updated the implementation of chromosome X so as to allow both 
+	males and females to imputed together on non-PAR. Also implemented
+	meta-imputation empirical dosage part.
+	
 --------------------------------------------------------------------------
 
 Version : 1.0.1
 Author  : Sayantan Das
-Date    : August 6, 2014
+Date    : Dec 5, 2016
 
-        Added the --window option that will allow a buffer region around
-	chunks. Also implemented this --start, --end and --window option
-	on OPTM files. Minimac3 will, thus, be able to handle chunks on 
-	OPTM files as well. However, it will not perform the optimal all-
-	-ocation again but just extract the chunk from the given file.
+        First version of minimac4. Lots of new features including 
+	automated chunking, improved multi-threading, faster algorithm,
+	efficient file I/O
 
 --------------------------------------------------------------------------
 
-Version : 1.0.0
-Author  : Sayantan Das
-Date    : July 21, 2014
-
-        Added the --vcfOutput option that will output the dosage in VCF
-	format as well. Improved it by allowing to flush out VCF files
-	after every 200 samples to save memory. Also implemented openmp
-	to allow parallel computing.
-
---------------------------------------------------------------------------
-
-Version : 0.7.1
-Author  : Sayantan Das
-Date    : June 8, 2014
-
-        Added the --golden option that can calculate the actual R-square
-	if the true/hard genotypes are provided in a vcf file. Made minor 
-	editions for debugging.
-
---------------------------------------------------------------------------
-
-Version : 0.6.2
-Author  : Sayantan Das
-Date    : June 8, 2014
-
-        Edited bug in VCF packing part that was giving slightly less opt-
-	mized configurations. 
-
---------------------------------------------------------------------------
-
-Version : 0.6.1
-Author  : Sayantan Das
-Date    : June 7, 2014
-
-        Worked on an important bug that gave memory overflow in large sa-
-	mples. Name changed to Minimac3. Added utility for VCF output fo-
-	rmat that would enable users to easy data manipulation. 
-
---------------------------------------------------------------------------
-
-Version	: 0.5.1
-Author	: Sayantan Das
-Date	: April 9, 2014
-
-    	Removed futher bugs. Modified to use lesser memory and run faster.
-	The Unique.cpp file was updated according to Goncalo's packVcf so-
-	ftware. Target Data is being read more effeciently. Scaffolding
-	done locally during imputation. Changed name to Minimac2.
-
---------------------------------------------------------------------------
-
-
-Version	: 0.4.1
-Author	: Sayantan Das
-Date	: March 14 2014 
-
-    	Removed bug with --sample. Added lots of other options like --chr,
-	--start, --end, --rounds, --states etc. Added data structure for 
-	variant type. Added structure so as NOT to use haplotype data after 
-	reading it once. Now the code uses the reduced haplotype structure
-	once it has read the data. This was uses lesser memory.
-
---------------------------------------------------------------------------
-
-Version	: 0.2.1
-Author	: Sayantan Das
-Date	: January 29 2014
-
-	Improved on the speed in parameter estimation part by NOT calcula-
-	ting the optimal allocation everytime, instead update it from the
-	original allocation. Updated to use --refSnps for reference, use
-	--vcfTarget for target files.
-    
---------------------------------------------------------------------------
-
-Version	: 0.1.1
-Author	: Sayantan Das
-Date	: May 25 2013
-
-    	Started working on the basis of code of minimac. Implemented State
-	Space Reduction Method for HMM calculations. Implemented the Para-
-	meter Estimation part and Optimal Allocation part. 
-
---------------------------------------------------------------------------
