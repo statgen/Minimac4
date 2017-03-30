@@ -49,8 +49,7 @@ void Imputation::ImputeThisChunk(int ChunkId, HaplotypeSet &FullrHap, HaplotypeS
             int MMIndexId=0;
 
             pair <int, int> SwapDosageData;
-            int hapId= tgwasHap.CummulativeSampleNoHaplotypes[SampleId];
-            //(2*SampleId);
+            int hapId=(2*SampleId);
 
             vector<float> PrevRightFoldedProb,CurrentRightProb,CurrentNoRecoRightProb,recomProb;
             DosageData *ThisSamplePartialDosageData;

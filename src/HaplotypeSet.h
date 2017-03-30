@@ -58,7 +58,6 @@ class HaplotypeSet
         vector<bool> Targetmissing;
         vector<string> individualName;
 		vector<int> SampleNoHaplotypes;
-		vector<int> CummulativeSampleNoHaplotypes;
 		vector<int> *SampleNoHaplotypesPointer;
 		vector<variant> VariantList;
 		vector<variant> TypedOnlyVariantList;
@@ -196,14 +195,8 @@ bool ReadBlockHeaderSummary(string &line, ReducedHaplotypeInfoSummary &tempBlock
 void GetVariantInfoFromBlock(IFILE m3vcfxStream, ReducedHaplotypeInfoSummary &tempBlock,int &NoMarkersImported);
 bool ReadBlockHeader(string &line, ReducedHaplotypeInfo &tempBlocktoCheck);
 void ReadThisBlock(IFILE m3vcfxStream, int blockIndex, ReducedHaplotypeInfo &tempBlock);
-
-bool BasicCheckForM3VCFReferenceHaplotypes(String &Reffilename, AllVariable& MyAllVariable);
-bool BasicCheckForTargetHaplotypes(String &VCFFileName, String TypeofFile, AllVariable& MyAllVariable);
-bool BasicCheckForVCFReferenceHaplotypes(String &VCFFileName, String TypeofFile, AllVariable& MyAllVariable);
-
-
-
-bool GetVariantInfofromVCFFile(String &VCFFileName, String TypeofFile, AllVariable& MyAllVariable);
+bool BasicCheckForReferenceHaplotypes(String &Reffilename,String &Recomfilename, String &Errorfilename, AllVariable& MyAllVariable);
+bool BasicCheckForTargetHaplotypes(String &Tarfilename, AllVariable& MyAllVariable);
 bool ScaffoldGWAStoReference(HaplotypeSet &rHap, AllVariable& MyAllVariable);
 void GetSummary(IFILE m3vcfxStream);
 bool ReadM3VCFChunkingInformation(String &Reffilename,string checkChr);

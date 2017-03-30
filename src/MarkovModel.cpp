@@ -190,7 +190,9 @@ void MarkovModel::FindPosteriorProbWithThreshold( int group, int position,
     for (int i=0; i<noReducedStatesCurrent;)
     {
         bool hp = TempHap[i];
+
         float pp=0.0;
+
         pp= value[i] + (hp? Palt:Pref);
 
         i++;
@@ -199,6 +201,7 @@ void MarkovModel::FindPosteriorProbWithThreshold( int group, int position,
             pp += value[i];
             i++;
         }
+
         if(hp)
             Palt = pp ;
         else
@@ -207,7 +210,18 @@ void MarkovModel::FindPosteriorProbWithThreshold( int group, int position,
 
 
     ptotal=Pref+Palt;
+
+//    bool mle = false;
+//    if(Pref<Palt)
+//    {
+//        mle=true;
+//    }
+//    imputedDose[CurrentTypedSite] += imputedHap[CurrentTypedSite]= (Palt / ptotal);
+
     (*DosageHap)[CurrentTypedSite] =  (Palt / ptotal);
+
+//    imputedAlleleNumber[CurrentTypedSite] = mle;
+
 
 
     if(!CurrentObsMissing)
@@ -230,9 +244,12 @@ void MarkovModel::FindPosteriorProbWithThreshold( int group, int position,
         }
 
         ptotal =Pref+Palt;
+//        leaveOneOut[CurrentTypedSite] = Palt / ptotal;
         (*LooDosageHap)[position] =  (Palt / ptotal);
 
     }
+
+
 
 
     if(MyAllVariables->myModelVariables.probThreshold>0.0)
@@ -240,9 +257,12 @@ void MarkovModel::FindPosteriorProbWithThreshold( int group, int position,
         sum=1.0/sum;
         int Index=0;
         NoBestMatchHaps=0;
+    //    double tempSum=0.0;
+//        tempMaxVal=0.0;
         for (int i=0; i<noReducedStatesCurrent;i++)
         {
             double tempVal=value[i]*sum;
+    //        tempSum+=tempVal;
             if(tempVal >= MyAllVariables->myModelVariables.probThreshold)
             {
                 BestMatchHaps[Index++]=i;
@@ -290,11 +310,18 @@ void MarkovModel::unfoldProbabilitiesWithThreshold(int bridgeIndex,
 
     vector<float> &LeftPrev=junctionLeftProb[bridgeIndex];
     vector<float> &RightPrev=PrevjunctionRightProb;
+
+//    double sum=0.0,sum2=0.0;
     double ThisLeftProb,ThisRightProb;
+
+    SummedProb=1.0/SummedProb;
+//    int COUNT=0;
+//    int FullRefIndex=0;
+//    double MaxVal=0.0;
+
 
     for (int index=0; index<NoBestMatchHaps; index++)
     {
-
 
         int i=BestMatchHaps[index];
 
@@ -305,11 +332,17 @@ void MarkovModel::unfoldProbabilitiesWithThreshold(int bridgeIndex,
             ThisLeftProb = Leftadj_rec[index] + Leftadj_norec[index]*LeftPrev[UnMappedIndex];
             ThisRightProb = Rightadj_rec[index] + Rightadj_norec[index]*RightPrev[UnMappedIndex];
             probHapFullAverage[NoBestMatchFullRefHaps]=ThisLeftProb*ThisRightProb;
-
             BestMatchFullRefHaps[NoBestMatchFullRefHaps]=UnMappedIndex;
             NoBestMatchFullRefHaps++;
         }
     }
+
+
+//cout<<" POSI = "<<position<<"\t"<<NoBestMatchHaps<<"\t"<<noReducedStatesCurrent<<endl;
+//cout<<" POSI\t"<<NoBestMatchHaps<<"\t"<<NoBestMatchFullRefHaps<<"\t"<<thisInfo.RepSize<<"\t"<<refCount<<endl;
+
+
+// cout<<" POSI\t"<<sum2 <<"\t"<<tempMaxVal<<"\t"<< MaxVal <<"\t"<<NoBestMatchHaps<<"\t"<<COUNT<<"\t"<<thisInfo.RepSize<<endl;
 
 }
 void MarkovModel::unfoldProbabilitiesAllProb(int bridgeIndex,
@@ -634,7 +667,7 @@ void MarkovModel::initializeMatricesNew()
     FoldedProbValue.resize(rHapFull->maxRepSize);
     pREF.resize(rHapFull->maxBlockSize);
     pALT.resize(rHapFull->maxBlockSize);
-    probHapFullAverage.resize(rHapFull->numHaplotypes);
+    probHapFullAverage.resize(rHapFull->numMarkers);
 
 
 

@@ -92,7 +92,6 @@ int main(int argc, char ** argv)
 
 
 		BEGIN_LEGACY_PARAMETERS()
-		LONG_PARAMETER("constantParam", &MyModelVariables.constantParam)
 		LONG_INTPARAMETER("printBuffer", &MyOutFormat.PrintBuffer)
 		LONG_PARAMETER("verbose", &MyOutFormat.verbose)
 		LONG_DOUBLEPARAMETER("minRatioPercent", &MyHapDataVariables.minRatio)

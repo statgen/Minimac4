@@ -87,7 +87,7 @@ class Analysis
 
 
         // Printing Text Variables
-        char *VcfPrintStringPointer, *LooVcfPrintStringPointer, *InfoPrintStringPointer, *DosePrintStringPointer;
+        char *VcfPrintStringPointer, *InfoPrintStringPointer, *DosePrintStringPointer;
         int VcfPrintStringLength, InfoPrintStringLength, DosePrintStringLength;
 
 
@@ -131,7 +131,7 @@ Analysis()
 
 void AppendtoMainVcf(int ChunkNo, int MaxIndex);
 
-void AppendtoMainLooVcfFaster(int ChunkNo, int MaxIndex);
+void AppendtoMainLOOVcf(int ChunkNo, int MaxIndex);
 
 void AppendtoMainVcfFaster(int ChunkNo, int MaxIndex);
 
@@ -140,7 +140,8 @@ void MemDisplay();
 
  void GetNumChunks();
 
-                String                  RunEstimation(String &Reffilename, String &Recomfilename, String &Errorfilename);
+
+
                 String                  AnalyzeExperiment(String &Reffilename, String &Tarfilename, String &Recomfilename,String &Errorfilename, AllVariable& MyAllVariable);
                 String                  CheckValidity(String &Reffilename, String &Tarfilename, String &Recomfilename, String &Errorfilename);
                 String                  RunAnalysis(String &Reffilename, String &Tarfilename, String &Recomfilename, String &Errorfilename);
@@ -154,17 +155,11 @@ void MemDisplay();
                 void                    InitializeTargetFileStream(String &Tarfilename);
                 void                    InitializeRefChunkData(HaplotypeSet &ThisRefPanel);
                 void                    InitializeTargetChunkData(HaplotypeSet &ThisTarPanel);
-
                 bool                    CreateChunks();
-                bool                    CreateChunksForParamEstimation();
                 void                    InitializeChunkVariables();
                 void                    CreateChunksFromReference();
-                void                    CreateChunksFromVCFReference();
                 void                    ImportChunksToTarget();
                 bool                    CheckChunkValidityandPrintChunk();
-                bool                    CheckChunkValidityForParamEstimationandPrintChunk();
-
-
                 void                    CreatePrintIndices(int ChunkNo, HaplotypeSet &ThisRefPanel, HaplotypeSet &ThisTarPanel);
                 void                    GetCurrentPanelReady(int ChunkNo, HaplotypeSet &ThisRefPanel, HaplotypeSet &ThisRefChipOnlyPanel, HaplotypeSet &ThisTarPanel,Imputation &thisDataFast);
 

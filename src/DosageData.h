@@ -54,9 +54,7 @@ class DosageData
 
         // Printing Text Variables
         char *PrintStringPointer;
-        char *PrintEmpStringPointer;
         int PrintStringLength;
-        int PrintEmpStringLength;
 
 
         double size()
@@ -80,8 +78,10 @@ class DosageData
 
 
 
-void PrintDiploidLooDosage(float &x, float &y, bool a, bool b);
-void PrintHaploidLooDosage(float &x, bool a);
+void PrintHaploidLooDosage(bool a, float &x);
+void PrintDiploidLooDosage(bool a, bool b, float &x, float &y);
+
+
 
         void InitializePartialDosageData(HaplotypeSet &tarInitializer, int MaxNoSamples,
                                              int MaxNoRefVariants, int MaxNoTarVariants,
