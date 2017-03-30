@@ -241,8 +241,8 @@ void HaplotypeSet::CreateAfterUncompressSummary()
 
 void printErr(String filename)
 {
-    cout<<" Error in M3VCF File !!! "<<endl;
-    cout<<" Please re-construct the following [.m3vcf] file using Minimac4 and try again ..."<<endl;
+    cout<<"\n ERROR !!! \n Error in M3VCF File !!! "<<endl;
+    cout<<" Please re-construct the following [.m3vcf] file using Minimac3/4 and try again ..."<<endl;
     cout<< " [ "<< filename<<" ] "<<endl;
     cout<<" Contact author if problem still persists : sayantan@umich.edu "<<endl;
     cout<<" Program Exiting ..."<<endl<<endl;
@@ -269,7 +269,7 @@ void HaplotypeSet::InvertUniqueIndexMap()
 
 
 void HaplotypeSet::CreateSiteSummary()
-{
+ {
     NoBlocks=(int)ReducedStructureInfoSummary.size();
     maxBlockSize=0;
     maxRepSize=0;
@@ -311,6 +311,7 @@ void HaplotypeSet::getm3VCFSampleNames(string line)
 
     individualName.clear();
     SampleNoHaplotypes.clear();
+    CummulativeSampleNoHaplotypes.clear();
     numSamples=0;
     numHaplotypes=0;
 
@@ -345,15 +346,20 @@ void HaplotypeSet::getm3VCFSampleNames(string line)
             }
             else
             {
-                cout<<endl<<" Error in Sample Name consistency !!! "<<endl<<endl;
+                cout<<endl<<"\n ERROR !!! \n Inconsistent Sample Name !!! "<<endl<<endl;
                 cout<<" Haplotype Number suffix cannot be more than 2 ..."<<endl;
                 cout<<" Erroneous Sample Name found : "<<tempString<<endl;
                 printErr(inFileName);
             }
-
         }
         pch = strtok_r (NULL,"\t", &end_str1);
     }
+
+    CummulativeSampleNoHaplotypes.resize(numSamples,0);
+
+    for(int i=1;i<numSamples;i++)
+        CummulativeSampleNoHaplotypes[i]+=CummulativeSampleNoHaplotypes[i-1]+SampleNoHaplotypes[i-1];
+
 }
 
 
@@ -397,7 +403,7 @@ bool HaplotypeSet::ReadBlockHeaderSummary(string &line, ReducedHaplotypeInfoSumm
 
 void HaplotypeSet::GetVariantInfoFromBlock(IFILE m3vcfxStream, ReducedHaplotypeInfoSummary &tempBlock, int &NoMarkersImported)
 {
-
+    string currID, rsID;
     string line;
     int blockEnterFlag=0;
     const char* tabSep="\t";
@@ -415,18 +421,38 @@ void HaplotypeSet::GetVariantInfoFromBlock(IFILE m3vcfxStream, ReducedHaplotypeI
         {
             StartedThisPanel=true;
 
+            currID=BlockPiecesforVarInfo[0]+":"+BlockPiecesforVarInfo[1]+":"+BlockPiecesforVarInfo[3]+":"+BlockPiecesforVarInfo[4];
+            rsID = BlockPiecesforVarInfo[2];
+            if(rsID==".")
+                rsID=currID;
+
             variant tempVariant;
-            tempVariant.assignValues(BlockPiecesforVarInfo[2],BlockPiecesforVarInfo[0],atoi(BlockPiecesforVarInfo[1].c_str()));
+            tempVariant.assignValues(currID,rsID,BlockPiecesforVarInfo[0],atoi(BlockPiecesforVarInfo[1].c_str()));
             tempVariant.assignRefAlt(BlockPiecesforVarInfo[3],BlockPiecesforVarInfo[4]);
             VariantList.push_back(tempVariant);
 
-            stringstream strs1;
-            strs1<<(tempVariant.bp);
 
             string Info=BlockPiecesforVarInfo[7];
+
             double tempRecom=GetRecom(Info);
             double tempError=GetError(Info);
-            if(tempRecom!=-3.0)
+
+            if(tempRecom==-3.0)
+            {
+                if(MyAllVariables->myModelVariables.constantParam)
+                {
+                    Recom.push_back(0.01);
+                    Error.push_back(0.001);
+                }
+                else
+                {
+                    cout << "\n ERROR !!! \n No parameter estimates found in M3VCF file !!!"<<endl;
+                    cout << " Please use M3VCF file with parameter estimates OR use handle \"--constantParam\" to override this check ... "<<endl;
+                    cout << "\n Program Exiting ... \n\n";
+                    abort();
+                }
+            }
+            else
             {
                 Recom.push_back(tempRecom);
                 Error.push_back(tempError);
@@ -511,15 +537,76 @@ void HaplotypeSet::ReadThisBlock(IFILE m3vcfxStream,
 
 
 
-bool HaplotypeSet::BasicCheckForReferenceHaplotypes(String &Reffilename,
-                                      String &Recomfilename,
-                                      String &Errorfilename,
-                                      AllVariable& MyAllVariable)
+bool HaplotypeSet::BasicCheckForTargetHaplotypes(String &VCFFileName,
+                                                 String TypeofFile,
+                                                 AllVariable& MyAllVariable)
+{
+    MyAllVariables=&MyAllVariable;
+    std::cout << "\n Checking "<<TypeofFile<<" haplotype file : "<<VCFFileName << endl;
+
+    string FileType=DetectFileType(VCFFileName);
+
+    if(FileType.compare("NA")==0)
+    {
+        cout << "\n ERROR !!! \n Program could NOT open file : " << VCFFileName << endl;
+        cout << "\n Program Exiting ... \n\n";
+        return false;
+    }
+    else if(FileType.compare("vcf")!=0)
+    {
+        cout << "\n ERROR !!! \n GWAS File provided by \"--haps\" must be a VCF file !!! \n";
+        cout << " Please check the following file : "<<VCFFileName<<endl;
+        cout << "\n Program Exiting ... \n\n";
+        return false;
+    }
+
+    return GetVariantInfofromVCFFile(VCFFileName, TypeofFile, MyAllVariable);
+}
+
+
+bool HaplotypeSet::BasicCheckForVCFReferenceHaplotypes(String &VCFFileName,
+                                                       String TypeofFile,
+                                                       AllVariable& MyAllVariable)
+{
+    MyAllVariables=&MyAllVariable;
+    std::cout << "\n Checking Reference haplotype file : "<<VCFFileName << endl;
+
+    string FileType=DetectFileType(VCFFileName);
+
+     if(FileType.compare("NA")==0)
+    {
+        cout << "\n ERROR !!! \n Program could NOT open file : " << VCFFileName << endl;
+        cout << "\n Program Exiting ... \n\n";
+        return false;
+    }
+
+    if(FileType.compare("vcf")!=0)
+    {
+        cout << "\n ERROR !!! \n If \"--processReference\" is ON,";
+        cout << " Reference  File provided by \"--refHaps\" must be a VCF file !!! \n";
+        cout << " Please check the following file : "<<VCFFileName<<endl;
+        cout << "\n Program Exiting ... \n\n";
+        return false;
+    }
+
+    if(MyAllVariables->myModelVariables.rounds==0)
+    {
+
+        cout <<"\n NOTE: User has specified \"--rounds\" = 0 !!!\n";
+        cout<<"       No parameter estimation will be done on VCF file.\n";
+        cout<<"       Program will use default estimates leading to possibly inaccurate estimates."<<endl;
+    }
+
+    return GetVariantInfofromVCFFile(VCFFileName, TypeofFile, MyAllVariable);
+}
+
+
+bool HaplotypeSet::BasicCheckForM3VCFReferenceHaplotypes(String &Reffilename,
+                                                    AllVariable& MyAllVariable)
 
 {
     MyAllVariables=&MyAllVariable;
     UpdateParameterList();
-    ModelVariable &MyModelVariables=MyAllVariables->myModelVariables;
     std::cout << "\n Checking Reference haplotype file : "<<Reffilename << endl;
     inFileName=Reffilename;
 
@@ -527,121 +614,52 @@ bool HaplotypeSet::BasicCheckForReferenceHaplotypes(String &Reffilename,
 
     if(refFileType.compare("NA")==0)
     {
-        cout << "\n Program could NOT open file : " << Reffilename << endl;
+        cout << "\n ERROR !!! \n Program could NOT open file : " << Reffilename << endl;
         cout << "\n Program Exiting ... \n\n";
         return false;
     }
 
     if(refFileType.compare("Invalid")==0)
     {
-        cout << "\n Reference File provided by \"--refHaps\" must be a VCF/M3VCF file !!! \n";
+        cout << "\n ERROR !!! \n Reference File provided by \"--refHaps\" must be a M3VCF file !!! \n";
         cout << " Please check the following file : "<<Reffilename<<endl;
         cout << "\n Program Exiting ... \n\n";
         return false;
     }
-    else if(refFileType.compare("m3vcf")==0)
+
+    if(refFileType.compare("vcf")==0)
     {
-//        cout<<"\n Reference File Format = M3VCF (Minimac3 VCF File) "<<endl;
-//
-//        cout <<"\n NOTE: For M3VCF reference files, if parameter estimates are found in the file, \n";
-//           cout<<"       they will be used by default (RECOMMENDED !). If the user has reasons\n";
-//           cout<<"       to believe that updating the parameters would increase accuracy, they\n";
-//         cout<<"       should use handle \"--updateModel\" (not required in typical GWAS studies).\n";
-//           cout<<"       If estimates are NOT available in file, it will estimate by default."<<endl;
 
-
-        if(MyModelVariables.rounds==0)
-        {
-
-//            cout <<"\n NOTE: User has specified \"--rounds\" = 0 !!!\n";
-//            cout<<"       Please verify that the M3VCF file has parameter estimates in it.\n";
-//            cout<<"       Otherwise program will use default estimates leading to possibly inaccurate estimates."<<endl;
-
-
-        }
-        else
-        {
-            if(!MyModelVariables.updateModel)
-            {
-//             cout <<"\n NOTE: For M3VCF files, if estimates are available in file \n";
-//                cout<<"       value of \"--rounds\" will be ignored unless user has\n";
-//                cout<<"       \"--updateModel\" ON (since, otherwise estimates are\n";
-//                cout<<"       not going to be updated and value of \"--rounds\" would\n";
-//                cout<<"       not make sense) !!!"<<endl;
-
-            }
-        }
-
-
+        cout << "\n ERROR !!! \n VCF Format detected ...";
+        cout << "\n For usual imputation, Reference File provided by \"--refHaps\" must be a M3VCF file !!! \n";
+        cout << " Use handle \"--processReference\" to convert VCF to M3VCF file ...";
+        cout << "\n Program Exiting ... \n\n";
+        return false;
     }
-    else if(refFileType.compare("vcf")==0)
-    {
-        cout<<"\n Reference File Format = VCF (Variant Call Format)"<<endl;
-
-        cout <<"\n NOTE: For VCF files, parameter estimation will be done by default (unless \"--rounds\" = 0)."<< endl;
-
-        if(MyModelVariables.updateModel && Recomfilename=="" && Errorfilename=="")
-        {
-            cout << "\n Handle \"--updateModel\" does NOT work for VCF reference file.\n";
-            cout << " This works only for M3VCF files or when \"--rec\" or \"--err\" is provided.\n";
-            cout << " For VCF files, parameter estimation will be done by default (unless \"--rounds\" = 0).\n";
-            cout << " Please turn OFF \"--updateModel\" or use M3VCF file.\n";
-            cout << " Try --help for more information.\n\n";
-            return false;
-        }
-
-        if(MyModelVariables.rounds==0)
-        {
-
-            cout <<"\n NOTE: User has specified \"--rounds\" = 0 !!!\n";
-            cout<<"       No parameter estimation will be done on VCF file.\n";
-            cout<<"       Program will use default estimates leading to possibly inaccurate estimates."<<endl;
-        }
-    }
-
-
 	return true;
 
 }
 
 
-bool HaplotypeSet::BasicCheckForTargetHaplotypes(String &Tarfilename, AllVariable& MyAllVariable)
+
+bool HaplotypeSet::GetVariantInfofromVCFFile(String &VCFFileName, String TypeofFile, AllVariable& MyAllVariable)
 {
-    MyAllVariables=&MyAllVariable;
-    std::cout << "\n Checking target/GWAS haplotype file : "<<Tarfilename << endl;
-
-    string FileType=DetectFileType(Tarfilename);
-
-    if(FileType.compare("NA")==0)
-    {
-        cout<<"\n Following File File Not Available : "<<Tarfilename<<endl<<endl;
-        return false;
-    }
-    else if(FileType.compare("vcf")!=0)
-    {
-        cout << "\n Target File provided by \"--haps\" must be a VCF file !!! \n";
-        cout << " Please check the following file : "<<Tarfilename<<endl;
-        return false;
-    }
-
-
-
 	VcfFileReader inFile;
 	VcfHeader header;
 	VcfRecord record;
-    inFileName=Tarfilename;
+    inFileName=VCFFileName;
 
 	inFile.setSiteOnly(true);
-    inFile.open(Tarfilename, header);
+    inFile.open(VCFFileName, header);
 
 
     numSamples=header.getNumSamples();
     if(numSamples==0)
     {
-        cout << "\n No samples found in Target File : "<<Tarfilename<<endl;
+        cout << "\n ERROR !!! \n No samples found in "<< TypeofFile <<" File : "<<VCFFileName<<endl;
 		cout << " Please check the file properly..\n";
-		cout << " Program Aborting ... "<<endl;
-		return false;
+		cout << "\n Program Exiting ... \n\n";
+        return false;
     }
 
     for (int i = 0; i < numSamples; i++)
@@ -675,9 +693,9 @@ bool HaplotypeSet::BasicCheckForTargetHaplotypes(String &Tarfilename, AllVariabl
             {
                 if(!CheckValidChrom(cno))
                 {
-                    cout << "\n Error !!! Target VCF File contains chromosome : "<<cno<<endl;
-                    cout << " VCF File can only contain chromosomes 1-22 and X !!! "<<endl;
-                    cout << " Program Aborting ... "<<endl;
+                    cout << "\n ERROR !!! \n "<< TypeofFile <<" VCF File contains chromosome : "<<cno<<endl;
+                    cout << " VCF File can only contain chromosomes 1-22, X(23), Y(24) !!! "<<endl;
+                    cout << "\n Program Exiting ... \n\n";
                     return false;
                 }
                 fixCno=cno;
@@ -685,9 +703,9 @@ bool HaplotypeSet::BasicCheckForTargetHaplotypes(String &Tarfilename, AllVariabl
             }
             else if(fixCno!=cno)
             {
-                cout << "\n Error !!! Target VCF File contains multiple chromosomes : "<<cno<<", "<<fixCno<<", ... "<<endl;
+                cout << "\n ERROR !!! \n "<< TypeofFile <<" VCF File contains multiple chromosomes : "<<cno<<", "<<fixCno<<", ... "<<endl;
                 cout << " Please use VCF file with single chromosome !!! "<<endl;
-                cout << " Program Aborting ... "<<endl;
+                cout << "\n Program Exiting ... \n\n";
                 return false;
             }
 
@@ -737,24 +755,22 @@ bool HaplotypeSet::BasicCheckForTargetHaplotypes(String &Tarfilename, AllVariabl
             stringstream strs3,strs4;
             strs3<<(cno);
             strs4<<(bp);
-            currID=(string)strs3.str()+":"+(string)strs4.str();
+            currID=(string)strs3.str()+":"+(string)strs4.str()+":"+refAllele+":"+altAllele;
             if(id==".")
                 id=currID;
             if(prevID==currID)
             {
-                if(refAllele==PrefrefAllele && altAllele==PrevaltAllele)
+                duplicates++;
+                if(MyAllVariable.myOutFormat.verbose){cout << " WARNING !!! Duplicate Variant found chr:"<<cno<<":"<<bp<<" with identical REF = "<<refAllele <<" and ALT = "<<altAllele <<"\n";}
+                if(!(MyAllVariable.myHapDataVariables.ignoreDuplicates))
                 {
-                    duplicates++;
-                    if(MyAllVariable.myOutFormat.verbose){cout << " WARNING !!! Duplicate Variant found chr:"<<cno<<":"<<bp<<" with identical REF = "<<refAllele <<" and ALT = "<<altAllele <<"\n";}
-                    if(!(MyAllVariable.myHapDataVariables.ignoreDuplicates))
-                    {
-                        cout << "\n ERROR !!! Duplicate Variant found chr:"<<cno<<":"<<bp<<" with identical REF = "<<refAllele <<" and ALT = "<<altAllele <<"\n";
-                        cout<<"\n Use handle \"--ignoreDuplicates\" to ignore duplicate instances ... "<<endl;
-                        cout << " Program Aborting ... "<<endl;
-                        return false;
-                    }
-                    flag=1;
+                    cout << "\n ERROR !!! \n Duplicate Variant found chr:"<<cno<<":"<<bp<<" with identical REF = "<<refAllele <<" and ALT = "<<altAllele <<"\n";
+                    cout<<"\n Use handle \"--ignoreDuplicates\" to ignore duplicate instances ... "<<endl;
+                    cout << "\n Program Exiting ... \n\n";
+                    return false;
                 }
+                flag=1;
+
 
             }
             prevID=currID;
@@ -764,43 +780,7 @@ bool HaplotypeSet::BasicCheckForTargetHaplotypes(String &Tarfilename, AllVariabl
 
         // Check length of SNPs REF/ALT allele
         {
-            if (strlen(refAllele.c_str()) == 1 && strlen(altAllele.c_str()) == 1)
-            {
-                switch (refAllele[0])
-                {
-                    case 'A': case 'a': ; break;
-                    case 'C': case 'c': ; break;
-                    case 'G': case 'g': ; break;
-                    case 'T': case 't': ; break;
-                    case 'D': case 'd': ; break;
-                    case 'I': case 'i': ; break;
-                    case 'R': case 'r': ; break;
-                    default:
-                    {
-                            if(MyAllVariable.myOutFormat.verbose){cout << " WARNING !!! Reference allele for SNP "<<id<<" is "<<refAllele<<". Will be ignored ..." <<endl;}
-                            flag=1;
-                            inconsistent++;
-                    }
-                }
-                if(flag==0)
-                    switch (altAllele[0])
-                    {
-                        case '0':  ; break;
-                        case 'A': case 'a': ; break;
-                        case 'C': case 'c': ; break;
-                        case 'G': case 'g': ; break;
-                        case 'T': case 't': ; break;
-                        case 'D': case 'd': ; break;
-                        case 'I': case 'i': ; break;
-                        case 'R': case 'r': ; break;
-                        default:
-                        {
-                            if(MyAllVariable.myOutFormat.verbose){cout << " WARNING !!! Alternate allele for SNP "<<id<<" is "<<altAllele<<". Will be ignored ..." <<endl;}
-                            flag=1;
-                            inconsistent++;
-                        }
-                    }
-            }
+            // Removed this to allow '-' and '.' in the GWAS Panel
         }
 
         if(flag==0)
@@ -824,17 +804,18 @@ bool HaplotypeSet::BasicCheckForTargetHaplotypes(String &Tarfilename, AllVariabl
 
     if(numActualRecords==0)
     {
-        cout << "\n No variants found in Target File : "<<Tarfilename<<endl;
+        cout << "\n ERROR !!! \n No variants found in "<< TypeofFile <<" File : "<<VCFFileName<<endl;
 		cout << " Please check the file properly..\n";
-		cout << " Program Aborting ... "<<endl;
-		return false;
+		cout << "\n Program Exiting ... \n\n";
+        return false;
     }
 
 
     inFile.close();
     SampleNoHaplotypes.resize(numSamples,2);
+    CummulativeSampleNoHaplotypes.resize(numSamples,0);
 
-    inFile.open(Tarfilename, header);
+    inFile.open(VCFFileName, header);
     inFile.setSiteOnly(false);
     inFile.readRecord(record);
     int tempHapCount=0;
@@ -842,12 +823,14 @@ bool HaplotypeSet::BasicCheckForTargetHaplotypes(String &Tarfilename, AllVariabl
     {
         if(record.getNumGTs(i)==0)
         {
-            std::cout << "\n Empty Value for Individual : " << individualName[i] << " at First Marker  " << endl;
+            std::cout << "\n ERROR !!! \n Empty Value for Individual : " << individualName[i] << " at First Marker  " << endl;
             std::cout << " Most probably a corrupted VCF file. Please check input VCF file !!! " << endl;
+            cout << "\n Program Exiting ... \n\n";
             return false;
         }
         else
         {
+            CummulativeSampleNoHaplotypes[i]=tempHapCount;
             SampleNoHaplotypes[i]=(record.getNumGTs(i));
             tempHapCount+=SampleNoHaplotypes[i];
         }
@@ -872,10 +855,10 @@ bool HaplotypeSet::BasicCheckForTargetHaplotypes(String &Tarfilename, AllVariabl
 
     if(numReadRecords==0)
     {
-        cout << "\n No variants left to imported from Target/GWAS File "<<endl;
+        cout << "\n ERROR !!! \n No variants left to imported from "<< TypeofFile <<" File "<<endl;
 		cout << " Please check the filtering conditions properly ...\n";
-		cout << " Program Aborting ... "<<endl;
-		return false;
+		cout << "\n Program Exiting ... \n\n";
+        return false;
     }
 
     return true;
@@ -1003,7 +986,7 @@ bool HaplotypeSet::ScaffoldGWAStoReference(HaplotypeSet &rHap, AllVariable& MyAl
     rHap.RefTypedTotalCount=GWASOnlycounter+rHap.numMarkers;
     if(rHap.RefTypedTotalCount!=(int)rHap.RefTypedIndex.size())
     {
-        cout<<endl<<endl<<" Error in Code Construction [ERROR: 007] !!! "<<endl;
+        cout<<endl<<endl<<" ERROR in Code Construction [ERROR: 007] !!! "<<endl;
         cout<<" Please Contact author with ERROR number urgently : sayantan@umich.edu "<<endl;
         cout<<" Program Exiting ..."<<endl<<endl;
         abort();
@@ -1030,10 +1013,10 @@ bool HaplotypeSet::ScaffoldGWAStoReference(HaplotypeSet &rHap, AllVariable& MyAl
 	if (numOverlapMarkers == 0)
 	{
 
-		cout << "\n No overlap between Target and Reference markers !!!\n";
+		cout << "\n ERROR !!! \n No overlap between Target and Reference markers !!!\n";
 		cout << " Please check for consistent marker identifer in reference and target input files..\n";
-		cout << " Program Aborting ... \n";
-		return false;
+		cout << "\n Program Exiting ... \n\n";
+        return false;
 
 	}
 	return true;
@@ -1104,9 +1087,9 @@ bool HaplotypeSet::ReadM3VCFChunkingInformation(String &Reffilename,string check
         GetSummary(m3vcfxStream);
         if(numSamples==0)
         {
-            cout << "\n No samples found in M3VCF Input File  : "<<Reffilename<<endl;
+            cout << "\n ERROR !!! \n No samples found in M3VCF Input File  : "<<Reffilename<<endl;
             cout << " Please check the file properly..\n";
-            cout << " Program Aborting ... "<<endl;
+            cout << "\n Program Exiting ... \n\n";
             return false;
         }
 
@@ -1133,10 +1116,10 @@ bool HaplotypeSet::ReadM3VCFChunkingInformation(String &Reffilename,string check
             {
                if(finChromosome!=checkChr)
                {
-                    cout << "\n Reference Panel is on chromosome "<<finChromosome<<" which is ";
+                    cout << "\n ERROR !!! \n Reference Panel is on chromosome "<<finChromosome<<" which is ";
                     cout <<" different from chromosome "<< checkChr<<" of the GWAS panel  "<<endl;
                     cout << " Please check the file properly..\n";
-                    cout << " Program Aborting ... "<<endl;
+                    cout << "\n Program Exiting ... \n\n";
                     return false;
 
                }
@@ -1154,10 +1137,10 @@ bool HaplotypeSet::ReadM3VCFChunkingInformation(String &Reffilename,string check
 
     if (numMarkers == 0)
 	{
-        cout << "\n No variants left to imported from reference haplotype file "<<endl;
+        cout << "\n ERROR !!! \n No variants left to imported from reference haplotype file "<<endl;
 		cout << " Please check the filtering conditions OR the file properly ...\n";
-		cout << " Program Aborting ... "<<endl;
-		return false;
+		cout << "\n Program Exiting ... \n\n";
+        return false;
     }
 
     ifclose(m3vcfxStream);
@@ -1179,7 +1162,7 @@ bool HaplotypeSet::CheckValidChrom(string chr)
         return true;
 
     string temp[]={"1","2","3","4","5","6","7","8","9","10","11"
-                    ,"12","13","14","15","16","17","18","19","20","21","22","X"};
+                    ,"12","13","14","15","16","17","18","19","20","21","22","23","X","Y"};
     std::vector<string> ValidChromList (temp, temp + sizeof(temp) / sizeof(string) );
 
     for(int counter=0;counter<(int)ValidChromList.size();counter++)
@@ -1200,7 +1183,7 @@ void HaplotypeSet::writem3vcfFile(String filename,bool &gzip)
     ifprintf(m3vcffile, "##n_blocks=%d\n",NoBlocks);
     ifprintf(m3vcffile, "##n_haps=%d\n",numHaplotypes);
     ifprintf(m3vcffile, "##n_markers=%d\n",numMarkers);
-    if(finChromosome=="X")
+    if(finChromosome=="X" || finChromosome=="23")
         ifprintf(m3vcffile, "##chrxRegion=%s\n",PseudoAutosomal?"PseudoAutosomal":"NonPseudoAutosomal");
     ifprintf(m3vcffile, "##<Note=This is NOT a VCF File and cannot be read by vcftools>\n");
     ifprintf(m3vcffile, "#CHROM\t");
@@ -1509,7 +1492,7 @@ int HaplotypeSet::GetNumVariants(string &input)
     else
     {
         abort();
-        cout<<endl<<endl<<" Error in M3VCF File [Error Code : 3278] !!! "<<endl;
+        cout<<endl<<endl<<" ERROR !!! \n ERROR in M3VCF File [ERROR Code : 3278] !!! "<<endl;
         cout<<" Please Contact author with ERROR number : sayantan@umich.edu "<<endl;
         cout<<" Program Exiting ..."<<endl<<endl;
         abort();
@@ -1520,7 +1503,6 @@ int HaplotypeSet::GetNumReps(string &input)
 {
     const char *equalSep="=",*semicolSep=";";
 
-
     string PrefixString = FindTokenWithPrefix(input.c_str(),semicolSep, "REPS=");
     if(PrefixString!="")
     {
@@ -1530,7 +1512,7 @@ int HaplotypeSet::GetNumReps(string &input)
     }
     else
     {
-        cout<<endl<<endl<<" Error in M3VCF File [Error Code : 1472] !!! "<<endl;
+        cout<<endl<<endl<<" ERROR !!! \n ERROR in M3VCF File [ERROR Code : 1472] !!! "<<endl;
         cout<<" Please Contact author with ERROR number : sayantan@umich.edu "<<endl;
         cout<<" Program Exiting ..."<<endl<<endl;
         abort();

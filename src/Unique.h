@@ -27,9 +27,10 @@ public:
         bp=BP;
         chr=CHR;
     };
-    void assignValues(string &id,string &CHR,int BP)
+    void assignValues(string &id,string &Rsid,string &CHR,int BP)
     {
         name=id;
+        rsid=Rsid;
         bp=BP;
         chr=CHR;
     };

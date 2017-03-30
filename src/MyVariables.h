@@ -11,6 +11,7 @@ using namespace std;
 
 
 
+
 class OutputFormatVariable
 {
 public:
@@ -18,7 +19,7 @@ public:
 
     int vcfBuffer;
     bool        unphasedOutput;
-    bool GT,DS,GP,HDS;
+    bool GT,DS,GP,HDS,SD;
     String OutPrefix;
     bool onlyrefmarkers;
     bool gzip,RsId,nobgzip,meta;
@@ -43,6 +44,7 @@ public:
             pch = strtok_r (NULL, ",", &end_str1))
         {
 
+
             formatPiece=(string)pch;
 
             if(formatPiece.compare("GT")==0)
@@ -61,11 +63,15 @@ public:
                 {
                     HDS=true;
                 }
+            else if(formatPiece.compare("SD")==0)
+                {
+                    SD=true;
+                }
             else
             {
-                cout << " Cannot identify handle for \"--format\" parameter : "<<formatPiece<<endl;
+                cout << " ERROR !!! \n Cannot identify handle for \"--format\" parameter : "<<formatPiece<<endl;
                 cout << " Available handles GT, DS and GP (for genotype, dosage and posterior probability). \n\n";
-                cout << " Type \"--help\" for more help.\n\n";
+                cout<<" Program Exiting ..."<<endl<<endl;
                 return false;
             }
         }
@@ -83,12 +89,13 @@ public:
 
         if(PrintBuffer<=100)
         {
-            cout << " Invalid input for \"--PrintBuffer\" = "<<PrintBuffer<<"\n";;
+            cout << " ERROR !!! \n Invalid input for \"--PrintBuffer\" = "<<PrintBuffer<<"\n";;
             cout << " Buffer for writing output files should be at least 1,000 characters long !!! \n\n";
+            cout<<" Program Exiting ..."<<endl<<endl;
             return false;
         }
 
-
+//        SD=true;
         bool colonIndex=false;
         if(GT)
         {
@@ -110,12 +117,18 @@ public:
             formatStringForVCF+= (colonIndex?":GP":"GP");
             colonIndex=true;
         }
+        if(SD)
+        {
+            formatStringForVCF+= (colonIndex?":SD":"SD");
+            colonIndex=true;
+        }
 
 
         if(vcfBuffer<1)
         {
-            cout << " Invalid input for \"--vcfBuffer\" = "<<vcfBuffer<<"\n";;
+            cout << " ERROR !!! \n Invalid input for \"--vcfBuffer\" = "<<vcfBuffer<<"\n";;
             cout << " Value must be a positive integer !!! \n\n";
+            cout<<" Program Exiting ..."<<endl<<endl;
             return false;
         }
 
@@ -144,6 +157,7 @@ public:
         DS=false;
         GP=false;
         HDS=false;
+        SD=false;
 
 
         hapOutput=false;
@@ -159,21 +173,22 @@ public:
 };
 
 
-
 class ModelVariable
 {
 public:
 
     bool        processReference,  updateModel ;
     double      probThreshold;
+    bool constantParam;
     bool lowMemory;
     int rounds, states;
     int transFactor;
     int cisFactor ;
-    int cpus=1;
+    int cpus;
 
     ModelVariable()
     {
+        constantParam=false;
         processReference = false;
         updateModel = false;
         probThreshold = 0.01;
@@ -207,8 +222,8 @@ public:
             if(updateModel)
             {
 
-                cout<<" Handle \"--updateModel\" does NOT work with handle \"--processReference\" !!! \n";
-                cout<<" Type \"--help\" for more help.\n\n";
+                cout<<" ERROR !!! \n Handle \"--updateModel\" does NOT work with handle \"--processReference\" !!! \n";
+                cout<<" Program Exiting ..."<<endl<<endl;
                 return false;
             }
 
@@ -222,34 +237,39 @@ public:
 
             if(rounds<=0)
             {
-                cout << " Invalid input for \"--rounds\" = "<<rounds<<"\n";;
+                cout << " ERROR !!! \n Invalid input for \"--rounds\" = "<<rounds<<"\n";;
                 cout << " Value must be POSITIVE if \"--updateModel\" is ON !!! \n\n";
+                cout<<" Program Exiting ..."<<endl<<endl;
                 return false;
             }
             if(states<=0)
             {
-                cout << " Invalid input for \"--states\" = "<<states<<"\n";;
+                cout << " ERROR !!! \n Invalid input for \"--states\" = "<<states<<"\n";;
                 cout << " Value must be POSITIVE if \"--updateModel\" is ON !!! \n\n";
+                cout<<" Program Exiting ..."<<endl<<endl;
                 return false;
             }
         }
 
         if(rounds<0)
         {
-            cout << " Invalid input for \"--rounds\" = "<<rounds<<"\n";;
+            cout << " ERROR !!! \n Invalid input for \"--rounds\" = "<<rounds<<"\n";;
             cout << " Value must be non-negative !!! \n\n";
+            cout<<" Program Exiting ..."<<endl<<endl;
             return false;
         }
         if(states<0)
         {
-            cout << " Invalid input for \"--states\" = "<<states<<"\n";;
+            cout << " ERROR !!! \n Invalid input for \"--states\" = "<<states<<"\n";;
             cout << " Value must be non-negative !!! \n\n";
+            cout<<" Program Exiting ..."<<endl<<endl;
             return false;
         }
         if(probThreshold<0.0 || probThreshold>1.0)
         {
-            cout << " Invalid input for \"--probThreshold\" = "<<probThreshold<<"\n";;
+            cout << " ERROR !!! \n Invalid input for \"--probThreshold\" = "<<probThreshold<<"\n";;
             cout << " Value must be between 0.0 and 1.0 (inclusive) !!! \n\n";
+            cout<<" Program Exiting ..."<<endl<<endl;
             return false;
         }
 
@@ -273,7 +293,6 @@ public:
 
 
 };
-
 
 
 class HaplotypeDataVariables
@@ -316,29 +335,33 @@ class HaplotypeDataVariables
         {
             if(ChunkLengthMb<=0.001)
             {
-                cout << " Invalid input for \"--ChunkLengthMb\" = "<<ChunkLengthMb<<"\n";;
+                cout << " ERROR !!! \n Invalid input for \"--ChunkLengthMb\" = "<<ChunkLengthMb<<"\n";;
                 cout << " Chunk Length must be at least 0.001 Mb (~1Kb) long !!! \n\n";
+                cout<<" Program Exiting ..."<<endl<<endl;
                 return false;
             }
 
             if(ChunkLengthMb>300)
             {
-                cout << " Invalid input for \"--ChunkLengthMb\" = "<<ChunkLengthMb<<"\n";;
+                cout << " ERROR !!! \n Invalid input for \"--ChunkLengthMb\" = "<<ChunkLengthMb<<"\n";;
                 cout << " Chunk Length cannot be longer than 300Mb (greater than length of chromosome 2) !!! \n\n";
+                cout<<" Program Exiting ..."<<endl<<endl;
                 return false;
             }
 
             if(ChunkOverlapMb<=0.001)
             {
-                cout << " Invalid input for \"--ChunkOverlapMb\" = "<<ChunkOverlapMb<<"\n";;
+                cout << " ERROR !!! \n Invalid input for \"--ChunkOverlapMb\" = "<<ChunkOverlapMb<<"\n";;
                 cout << " Chunk Length Overlap must be at least 0.001 Mb (~1Kb) long !!! \n\n";
+                cout<<" Program Exiting ..."<<endl<<endl;
                 return false;
             }
 
             if(ChunkOverlapMb>300)
             {
-                cout << " Invalid input for \"--ChunkOverlapMb\" = "<<ChunkOverlapMb<<"\n";;
+                cout << " ERROR !!! \n Invalid input for \"--ChunkOverlapMb\" = "<<ChunkOverlapMb<<"\n";;
                 cout << " Chunk Length Overlap cannot be longer than 300Mb (greater than length of chromosome 2) !!! \n\n";
+                cout<<" Program Exiting ..."<<endl<<endl;
                 return false;
             }
 
@@ -352,49 +375,54 @@ class HaplotypeDataVariables
 
             if(minRatio<=0.0 || minRatio >= 1.0)
             {
-                cout << " Invalid input for \"--minRatio\" = "<<minRatio<<"\n";;
+                cout << " ERROR !!! \n Invalid input for \"--minRatio\" = "<<minRatio<<"\n";;
                 cout << " Value must be strictly in between 0 and 1 !!! \n\n";
+                cout<<" Program Exiting ..."<<endl<<endl;
                 return false;
             }
 
 
             if(window<0)
             {
-                cout << " Invalid input for \"--window\" = "<<window<<"\n";;
+                cout << " ERROR !!! \n Invalid input for \"--window\" = "<<window<<"\n";;
                 cout << " Value must be non-negative !!! \n\n";
+                cout<<" Program Exiting ..."<<endl<<endl;
                 return false;
             }
 
             if(start<0)
             {
-                cout << " Invalid input for \"--start\" = "<<start<<"\n";;
+                cout << " ERROR !!! \n Invalid input for \"--start\" = "<<start<<"\n";;
                 cout << " Value must be non-negative !!! \n\n";
+                cout<<" Program Exiting ..."<<endl<<endl;
                 return false;
             }
             if(end<0)
             {
-                cout << " Invalid input for \"--end\" = "<<end<<"\n";;
+                cout << " ERROR !!! \n Invalid input for \"--end\" = "<<end<<"\n";;
                 cout << " Value must be non-negative !!! \n\n";
+                cout<<" Program Exiting ..."<<endl<<endl;
                 return false;
             }
             if(start>0 && end> 0 && start>=end)
             {
-                cout << " Invalid Input !!!\n Value of \"--start\" must be less than value of \"--end\"."<<endl;
+                cout << " ERROR !!! \n Invalid Input !!!\n Value of \"--start\" must be less than value of \"--end\"."<<endl;
                 cout << " User Input \"--start\" = "<<start<<" and \"--end\" = " <<end<<" \n\n";
+                cout<<" Program Exiting ..."<<endl<<endl;
                 return false;
             }
             if(chr!="")
             {
                 if(start==0)
                 {
-                    cout << "\n Non-zero value of \"--start\" required parameter if using \"--chr\" parameter.\n";
-                    cout << " Try --help for more information.\n\n";
+                    cout << "\n ERROR !!! \n Non-zero value of \"--start\" required parameter if using \"--chr\" parameter.\n";
+                    cout<<" Program Exiting ..."<<endl<<endl;
                     return false;
                 }
                 if(end==0)
                 {
-                    cout << "\n Non-zero value of \"--end\" required parameter if using \"--chr\" parameter.\n";
-                    cout << " Try --help for more information.\n\n";
+                    cout << "\n ERROR !!! \n Non-zero value of \"--end\" required parameter if using \"--chr\" parameter.\n";
+                    cout<<" Program Exiting ..."<<endl<<endl;
                     return false;
                 }
                 if(window==0)
@@ -407,14 +435,14 @@ class HaplotypeDataVariables
             {
                 if(chr=="")
                 {
-                    cout << "\n Missing \"--chr\", a required parameter if using \"--start\" parameter.\n";
-                    cout << " Try --help for more information.\n\n";
+                    cout << "\n ERROR !!! \n Missing \"--chr\", a required parameter if using \"--start\" parameter.\n";
+                    cout<<" Program Exiting ..."<<endl<<endl;
                     return false;
                 }
                 if(end==0)
                 {
-                    cout << "\n Non-zero value of \"--end\" required parameter if using \"--start\" parameter.\n";
-                    cout << " Try --help for more information.\n\n";
+                    cout << "\n ERROR !!! \n Non-zero value of \"--end\" required parameter if using \"--start\" parameter.\n";
+                    cout<<" Program Exiting ..."<<endl<<endl;
                     return false;
                 }
             }
@@ -422,14 +450,14 @@ class HaplotypeDataVariables
             {
                 if(chr=="")
                 {
-                    cout << "\n Missing \"--chr\", a required parameter if using \"--end\" parameter.\n";
-                    cout << " Try --help for more information.\n\n";
+                    cout << "\n ERROR !!! \n Missing \"--chr\", a required parameter if using \"--end\" parameter.\n";
+                    cout<<" Program Exiting ..."<<endl<<endl;
                     return false;
                 }
                 if(start==0)
                 {
-                    cout << "\n Non-zero value of \"--start\" required parameter if using \"--end\" parameter.\n";
-                    cout << " Try --help for more information.\n\n";
+                    cout << "\n ERROR !!! \n Non-zero value of \"--start\" required parameter if using \"--end\" parameter.\n";
+                    cout<<" Program Exiting ..."<<endl<<endl;
                     return false;
                 }
             }
@@ -438,14 +466,14 @@ class HaplotypeDataVariables
 
                 if(chr=="")
                 {
-                    cout << "\n Missing \"--chr\", a required parameter if using \"--end\" parameter.\n";
-                    cout << " Try --help for more information.\n\n";
+                    cout << "\n ERROR !!! \n Missing \"--chr\", a required parameter if using \"--end\" parameter.\n";
+                    cout<<" Program Exiting ..."<<endl<<endl;
                     return false;
                 }
                 if(start==0 && end==0)
                 {
-                    cout << "\n Missing \"--start\" or  \"--end\", a required parameter if using \"--window\" parameter.\n";
-                    cout << " Try --help for more information.\n\n";
+                    cout << "\n ERROR !!! \n Missing \"--start\" or  \"--end\", a required parameter if using \"--window\" parameter.\n";
+                    cout<<" Program Exiting ..."<<endl<<endl;
                     return false;
                 }
             }
@@ -479,6 +507,7 @@ class HaplotypeDataVariables
 
 };
 
+
 class AllVariable
 {
 public:
@@ -488,5 +517,8 @@ public:
     HaplotypeDataVariables myHapDataVariables;
 
 };
+
+
+
 
 #endif // MY_VARIABLES_INCLUDED

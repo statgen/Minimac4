@@ -4,15 +4,13 @@
 
 
 
-
  String Analysis::RunAnalysis(String &Reffilename, String &Tarfilename, String &Recomfilename, String &Errorfilename)
 {
     int time_prev=time(0);
 
 
-    if (!referencePanel.BasicCheckForReferenceHaplotypes(Reffilename,Recomfilename,Errorfilename,*MyAllVariables))
+    if (!referencePanel.BasicCheckForM3VCFReferenceHaplotypes(Reffilename,*MyAllVariables))
     {
-        cout << "\n Program Exiting ... \n\n";
         return "Reference.Panel.Load.Error";
     }
 	if (!referencePanel.ReadM3VCFChunkingInformation(Reffilename,targetPanel.finChromosome))
@@ -109,6 +107,8 @@
 
 
         AppendtoMainVcfFaster(i,thisDataFast.TotalNovcfParts);
+        if(MyAllVariables->myOutFormat.meta)
+            AppendtoMainLooVcfFaster(i,thisDataFast.TotalNovcfParts);
         PrintInfoFile(i);
 
         time_load = time(0) - time_prev;
@@ -214,6 +214,96 @@ void Analysis::PrintInfoFile(int ChunkNo)
 }
 
 
+void Analysis::AppendtoMainLooVcfFaster(int ChunkNo, int MaxIndex)
+{
+
+    VcfPrintStringLength=0;
+
+    int time_prev = time(0);
+
+    int RefStartPos =  MyRefVariantNumber[ChunkNo][0];
+
+    vector<IFILE> vcfLoodosepartialList(MaxIndex);
+
+    for(int i=1;i<=MaxIndex;i++)
+    {
+        string tempFileIndex(MyAllVariables->myOutFormat.OutPrefix);
+        stringstream strs,strs1;
+        strs<<(i);
+        strs1<<(ChunkNo+1);
+        tempFileIndex+=(".chunk."+(string)(strs1.str())+".empiricalDose.vcf.part." +
+                         (string)(strs.str()));
+        vcfLoodosepartialList[i-1] = ifopen(tempFileIndex.c_str(), "r");
+    }
+    string line;
+    int i=0;
+    for (int index = 0; index < CurrentRefPanel.RefTypedTotalCount; index++)
+    {
+        if(CurrentRefPanel.RefTypedIndex[index]==-1)
+        {
+
+            if(i>=CurrentRefPanel.PrintStartIndex && i <= CurrentRefPanel.PrintEndIndex)
+            {
+
+                if(!CurrentRefPanel.Targetmissing[i])
+                {
+                    variant &tempVariant = referencePanel.VariantList[i+RefStartPos];
+
+                    VcfPrintStringLength+=sprintf(VcfPrintStringPointer + VcfPrintStringLength,"%s\t%d\t%s\t%s\t%s\t.\tPASS",
+                         tempVariant.chr.c_str(),
+                         tempVariant.bp,
+                         MyAllVariables->myOutFormat.RsId?tempVariant.rsid.c_str():tempVariant.name.c_str(),
+                         tempVariant.refAlleleString.c_str(),
+                         tempVariant.altAlleleString.c_str());
+                    VcfPrintStringLength+=sprintf(VcfPrintStringPointer + VcfPrintStringLength,"\tTYPED\tGT:LDS");
+
+                    for(int j=1;j<=MaxIndex;j++)
+                    {
+                        line.clear();
+                        vcfLoodosepartialList[j-1]->readLine(line);
+                        VcfPrintStringLength+=sprintf(VcfPrintStringPointer + VcfPrintStringLength,"%s",line.c_str());
+
+                    }
+                    VcfPrintStringLength+=sprintf(VcfPrintStringPointer + VcfPrintStringLength,"\n");
+
+                }
+
+            }
+            i++;
+        }
+
+        if(VcfPrintStringLength > 0.9 * (float)(MyAllVariables->myOutFormat.PrintBuffer))
+        {
+            ifprintf(vcfLoodosepartial,"%s",VcfPrintStringPointer);
+            VcfPrintStringLength=0;
+        }
+
+    }
+
+    if(VcfPrintStringLength > 0)
+    {
+        ifprintf(vcfLoodosepartial,"%s",VcfPrintStringPointer);
+        VcfPrintStringLength=0;
+    }
+
+
+    for(int i=1;i<=MaxIndex;i++)
+    {
+        ifclose(vcfLoodosepartialList[i-1]);
+        string tempFileIndex(MyAllVariables->myOutFormat.OutPrefix);
+        stringstream strs,strs1;
+        strs<<(i);
+        strs1<<(ChunkNo+1);
+        tempFileIndex+=(".chunk."+(string)(strs1.str())+".empiricalDose.vcf.part." +
+                         (string)(strs.str()));
+        remove(tempFileIndex.c_str());
+    }
+
+    TimeToWrite+=( time(0) - time_prev);
+
+}
+
+
 
 void Analysis::AppendtoMainVcfFaster(int ChunkNo, int MaxIndex)
 {
@@ -242,14 +332,6 @@ void Analysis::AppendtoMainVcfFaster(int ChunkNo, int MaxIndex)
     int i=0;
     for (int index = 0; index < CurrentRefPanel.RefTypedTotalCount; index++)
     {
-//
-//        if(index%100000==0)
-//        {
-//            printf("    Merging marker %d of %d [%.1f%%] to VCF File ...", index + 1, CurrentRefPanel.RefTypedTotalCount,100*(double)(index + 1)/(int)CurrentRefPanel.RefTypedTotalCount);
-//            cout<<endl;
-//        }
-//
-
         if(CurrentRefPanel.RefTypedIndex[index]==-1)
         {
 
@@ -347,12 +429,12 @@ void Analysis::AppendtoMainVcfFaster(int ChunkNo, int MaxIndex)
     {
         ifclose(vcfdosepartialList[i-1]);
         string tempFileIndex(MyAllVariables->myOutFormat.OutPrefix);
-        stringstream strs;
+        stringstream strs,strs1;
         strs<<(i);
-        tempFileIndex+=(".dose.vcf.part." +
-                        (string)(strs.str())+
-                        (MyAllVariables->myOutFormat.gzip ? ".gz" : ""));
-//        remove(tempFileIndex.c_str());
+        strs1<<(ChunkNo+1);
+        tempFileIndex+=(".chunk."+(string)(strs1.str())+".dose.vcf.part." +
+                         (string)(strs.str()));
+        remove(tempFileIndex.c_str());
     }
 
     TimeToWrite+=( time(0) - time_prev);
@@ -511,12 +593,25 @@ void Analysis::readVcfFileChunk(int ChunkNo, HaplotypeSet &ThisTargetPanel)
             {
 
 //                assert( (ThisnumtoBeWrittenRecords + PrevChunkFilledTillTar) < MaxGwasMarkerSize);
-                int haplotype_index;
+                int haplotype_index=0;
                 for (int i = 0; i<(targetPanel.numSamples); i++)
                 {
 
-                    haplotype_index=(2*i);
-                    for (int j = 0; j<record.getNumGTs(i); j++)
+                    //haplotype_index=(2*i);
+
+                    if(targetPanel.SampleNoHaplotypes[i]!=record.getNumGTs(i))
+                    {
+                        cout << "\n ERROR !!! Sample "<< targetPanel.individualName[i]<<" changes its ploidy at variant ";
+                        cout << referencePanel.VariantList[targetPanel.knownPosition[importReadIndex]].name << endl;
+                        if(targetPanel.finChromosome=="X" || targetPanel.finChromosome=="23" )
+                        {
+                            cout<<" Please impute PAR and non-PAR regions on chromosome X separately !!! "<<endl<<endl;
+                        }
+                        else
+                            cout << " Most probably a corrupted VCF file. Please check input VCF file !!! " << endl;
+                        abort();
+                    }
+                    for (int j = 0; j<targetPanel.SampleNoHaplotypes[i]; j++)
                     {
 
 //                        assert(haplotype_index<targetPanel.numHaplotypes);
@@ -589,9 +684,21 @@ void Analysis::readVcfFileChunk(int ChunkNo, HaplotypeSet &ThisTargetPanel)
                 for (int i = 0; i<(targetPanel.numSamples); i++)
                 {
 
-                    haplotype_index=(2*i);
+                    //haplotype_index=(2*i);
 
-                    for (int j = 0; j<record.getNumGTs(i); j++)
+                    if(targetPanel.SampleNoHaplotypes[i]!=record.getNumGTs(i))
+                    {
+                        cout << "\n ERROR !!! GWAS Sample "<< targetPanel.individualName[i]<<" changes its ploidy at variant ";
+                        cout << tempVar.name <<endl;
+                        if(targetPanel.finChromosome=="X" || targetPanel.finChromosome=="23")
+                        {
+                            cout<<" Please impute PAR and non-PAR regions on chromosome X separately !!! "<<endl<<endl;
+                        }
+                        else
+                            cout << " Most probably a corrupted VCF file. Please check input VCF file !!! " <<endl<<endl;
+                        abort();
+                    }
+                    for (int j = 0; j<targetPanel.SampleNoHaplotypes[i]; j++)
                     {
 
 //                        assert(haplotype_index<targetPanel.numHaplotypes);
@@ -688,27 +795,24 @@ void Analysis::OpenStreamOutputFiles()
         ifprintf(vcfdosepartial,"##filedate=%d.%d.%d\n",(now->tm_year + 1900),(now->tm_mon + 1) ,now->tm_mday);
         ifprintf(vcfdosepartial,"##source=Minimac4.v%s\n",VERSION);
         ifprintf(vcfdosepartial,"##contig=<ID=%s>\n",referencePanel.finChromosome.c_str());
-
-
-
-
-
         ifprintf(vcfdosepartial,"##INFO=<ID=AF,Number=1,Type=Float,Description=\"Estimated Alternate Allele Frequency\">\n");
         ifprintf(vcfdosepartial,"##INFO=<ID=MAF,Number=1,Type=Float,Description=\"Estimated Minor Allele Frequency\">\n");
         ifprintf(vcfdosepartial,"##INFO=<ID=R2,Number=1,Type=Float,Description=\"Estimated Imputation Accuracy (R-square)\">\n");
         ifprintf(vcfdosepartial,"##INFO=<ID=ER2,Number=1,Type=Float,Description=\"Empirical (Leave-One-Out) R-square (available only for genotyped variants)\">\n");
-        ifprintf(vcfdosepartial,"##INFO=<ID=IMPUTED,Number=0,Type=Flag,Description=\"Imputed marker that was NOT genotyped\">\n");
-        ifprintf(vcfdosepartial,"##INFO=<ID=TYPED,Number=0,Type=Flag,Description=\"Genotyped marker that was ALSO imputed\">\n");
-        ifprintf(vcfdosepartial,"##INFO=<ID=TYPED_ONLY,Number=0,Type=Flag,Description=\"Genotyped marker that was NOT imputed\">\n");
+        ifprintf(vcfdosepartial,"##INFO=<ID=IMPUTED,Number=0,Type=Flag,Description=\"Marker was imputed but NOT genotyped\">\n");
+        ifprintf(vcfdosepartial,"##INFO=<ID=TYPED,Number=0,Type=Flag,Description=\"Marker was genotyped AND imputed\">\n");
+        ifprintf(vcfdosepartial,"##INFO=<ID=TYPED_ONLY,Number=0,Type=Flag,Description=\"Marker was genotyped but NOT imputed\">\n");
 
         if(MyAllVariables->myOutFormat.GT)
             ifprintf(vcfdosepartial,"##FORMAT=<ID=GT,Number=1,Type=String,Description=\"Genotype\">\n");
         if(MyAllVariables->myOutFormat.DS)
             ifprintf(vcfdosepartial,"##FORMAT=<ID=DS,Number=1,Type=Float,Description=\"Estimated Alternate Allele Dosage : [P(0/1)+2*P(1/1)]\">\n");
-         if(MyAllVariables->myOutFormat.HDS)
+        if(MyAllVariables->myOutFormat.HDS)
             ifprintf(vcfdosepartial,"##FORMAT=<ID=HDS,Number=1,Type=String,Description=\"Estimated Haploid Alternate Allele Dosage \">\n");
         if(MyAllVariables->myOutFormat.GP)
             ifprintf(vcfdosepartial,"##FORMAT=<ID=GP,Number=3,Type=Float,Description=\"Estimated Posterior Probabilities for Genotypes 0/0, 0/1 and 1/1 \">\n");
+        if(MyAllVariables->myOutFormat.SD)
+            ifprintf(vcfdosepartial,"##FORMAT=<ID=SD,Number=1,Type=Float,Description=\"Variance of Posterior Genotype Probabilities\">\n");
 
 
         ifprintf(vcfdosepartial,"#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT");
@@ -724,17 +828,16 @@ void Analysis::OpenStreamOutputFiles()
     if(MyAllVariables->myOutFormat.meta)
     {
 
-        vcfLoodosepartial = ifopen(MyAllVariables->myOutFormat.OutPrefix + ".maskedDose.vcf" + (gzip ? ".gz" : ""), "wb", gzip ?InputFile::BGZF:InputFile::UNCOMPRESSED);
+        vcfLoodosepartial = ifopen(MyAllVariables->myOutFormat.OutPrefix + ".empiricalDose.vcf" + (gzip ? ".gz" : ""), "wb", gzip ?InputFile::BGZF:InputFile::UNCOMPRESSED);
         ifprintf(vcfLoodosepartial,"##fileformat=VCFv4.1\n");
         time_t t = time(0);
         struct tm * now = localtime( & t );
         ifprintf(vcfLoodosepartial,"##filedate=%d.%d.%d\n",(now->tm_year + 1900),(now->tm_mon + 1) ,now->tm_mday);
         ifprintf(vcfLoodosepartial,"##source=Minimac4.v%s\n",VERSION);
         ifprintf(vcfLoodosepartial,"##contig=<ID=%s>\n",referencePanel.finChromosome.c_str());
-
+        ifprintf(vcfLoodosepartial,"##INFO=<ID=TYPED,Number=0,Type=Flag,Description=\"Marker was genotyped AND imputed\">\n");
         ifprintf(vcfLoodosepartial,"##FORMAT=<ID=GT,Number=1,Type=String,Description=\"Genotyped alleles from Array\">\n");
-        ifprintf(vcfLoodosepartial,"##FORMAT=<ID=LDS,Number=1,Type=Float,Description=\"Estimated Alternate Allele Dosage assuming site was NOT genotyped : [P(0/1)+2*P(1/1)]\">\n");
-
+        ifprintf(vcfLoodosepartial,"##FORMAT=<ID=LDS,Number=1,Type=String,Description=\"Leave-one-out Imputed Dosage : Estimated Haploid Alternate Allele Dosage assuming site was NOT genotyped \">\n");
         ifprintf(vcfLoodosepartial,"#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT");
 
         for(int Id=0;Id<targetPanel.numSamples;Id++)
@@ -848,13 +951,13 @@ void Analysis::CloseStreamOutputFiles()
     if(MyAllVariables->myOutFormat.vcfOutput)
     {
         ifclose(vcfdosepartial);
-        cout<<" VCF information written to              : "<< MyAllVariables->myOutFormat.OutPrefix + ".dose.vcf" + (gzip ? ".gz" : "")<<endl;
+        cout<<" Imputed VCF information written to      : "<< MyAllVariables->myOutFormat.OutPrefix + ".dose.vcf" + (gzip ? ".gz" : "")<<endl;
     }
 
     if(MyAllVariables->myOutFormat.meta)
     {
         ifclose(vcfLoodosepartial);
-        cout<<" Loo Dosage VCF written to               : "<< MyAllVariables->myOutFormat.OutPrefix + ".maskedDose.vcf" + (gzip ? ".gz" : "")<<endl;
+        cout<<" Empirical Dosage VCF written to         : "<< MyAllVariables->myOutFormat.OutPrefix + ".empiricalDose.vcf" + (gzip ? ".gz" : "")<<endl;
     }
 
     if(MyAllVariables->myOutFormat.doseOutput)
@@ -1242,407 +1345,126 @@ void Analysis::GetCurrentPanelReady(int ChunkNo, HaplotypeSet &ThisRefPanel,
  }
 
 
- void Analysis::InitializeRefChunkData(HaplotypeSet &ThisRefPanel)
- {
+ String Analysis::RunEstimation(String &Reffilename, String &Recomfilename, String &Errorfilename)
+{
+    int time_prev=time(0);
 
 
-    int NoRefHaps=referencePanel.numHaplotypes;
+//	if (!targetPanel.ScaffoldGWAStoReference(referencePanel,*MyAllVariables))
+//	{
+//		cout << "\n Program Exiting ... \n\n";
+//		return "Reference.Panel.Load.Error";
+//	}
+//
+//
+    cout<<"\n ------------------------------------------------------------------------------"<<endl;
+    cout<<"                           CHUNKING INFORMATION                           "<<endl;
+    cout<<" ------------------------------------------------------------------------------"<<endl;
 
-    ThisRefPanel.numHaplotypes=NoRefHaps;
-    ThisRefPanel.numSamples=referencePanel.numSamples;
-    ThisRefPanel.SampleNoHaplotypes=referencePanel.SampleNoHaplotypes;
-    ThisRefPanel.individualName=referencePanel.individualName;
-    ThisRefPanel.maxBlockSize=referencePanel.maxBlockSize;
-    ThisRefPanel.maxRepSize=referencePanel.maxRepSize;
-    ThisRefPanel.ReducedStructureInfo.resize(MaxInfoVectorSize);
-    ThisRefPanel.MyAllVariables=MyAllVariables;
-
-
-	ThisRefPanel.MapRefToTar.resize(MaxRefMarkerSize);
-	ThisRefPanel.MapTarToRef.resize(MaxGwasMarkerSize);
-
-	int Mem=0;
-    for(int i=0;i<MaxInfoVectorSize;i++)
-    {
-        ThisRefPanel.ReducedStructureInfo[i].uniqueIndexMap.resize(NoRefHaps);
-        ThisRefPanel.ReducedStructureInfo[i].uniqueCardinality.resize(referencePanel.maxRepSize);
-        ThisRefPanel.ReducedStructureInfo[i].InvuniqueCardinality.resize(referencePanel.maxRepSize);
-        ThisRefPanel.ReducedStructureInfo[i].TransposedUniqueHaps.resize(referencePanel.maxBlockSize);
-
-        for(int j=0;j<referencePanel.maxBlockSize;j++)
-            ThisRefPanel.ReducedStructureInfo[i].TransposedUniqueHaps[j].resize(referencePanel.maxRepSize);
-
-        Mem+=ThisRefPanel.ReducedStructureInfo[i].size();
-    }
-
-	ThisRefPanel.Targetmissing.resize(MaxRefMarkerSize);
-
-    ThisRefPanel.MarkerToReducedInfoMapper.resize(MaxRefMarkerSize);
-    ThisRefPanel.Recom.resize(MaxRefMarkerSize);
-    ThisRefPanel.Error.resize(MaxRefMarkerSize);
-    ThisRefPanel.AlleleFreq.resize(MaxRefMarkerSize);
- }
-
-
- void Analysis::InitializeRefChipOnlyChunkData(HaplotypeSet &ThisRefPanel)
- {
-
-    int NoRefHaps=referencePanel.numHaplotypes;
-
-    ThisRefPanel.numHaplotypes=NoRefHaps;
-    ThisRefPanel.numSamples=referencePanel.numSamples;
-    ThisRefPanel.MyAllVariables=MyAllVariables;
-
-    ThisRefPanel.MarkerToReducedInfoMapper.resize(MaxGwasMarkerSize);
-    ThisRefPanel.Recom.resize(MaxGwasMarkerSize);
-    ThisRefPanel.Error.resize(MaxGwasMarkerSize);
-    ThisRefPanel.AlleleFreq.resize(MaxGwasMarkerSize);
- }
-
- void Analysis::InitializeTargetChipOnlyChunkData(HaplotypeSet &ThisTarPanel)
- {
-
-    int tempnumHaplotypes=targetPanel.numHaplotypes;
-
-    ThisTarPanel.MyAllVariables=MyAllVariables;
-    ThisTarPanel.numHaplotypes=targetPanel.numHaplotypes;
-    ThisTarPanel.numSamples=targetPanel.numSamples;
-    ThisTarPanel.SampleNoHaplotypesPointer=&targetPanel.SampleNoHaplotypes;
-    ThisTarPanel.SampleNoHaplotypes=targetPanel.SampleNoHaplotypes;
-    ThisTarPanel.individualName=targetPanel.individualName;
-
-    ThisTarPanel.haplotypesUnscaffolded.resize(tempnumHaplotypes);
-	ThisTarPanel.MissingSampleUnscaffolded.resize(tempnumHaplotypes);
-
-
-	if(MyAllVariables->myOutFormat.TypedOnly)
-    {
-        ThisTarPanel.GWASOnlyhaplotypesUnscaffolded.resize(tempnumHaplotypes);
-        ThisTarPanel.GWASOnlyMissingSampleUnscaffolded.resize(tempnumHaplotypes);
-    }
-
-
-
-	for (int i = 0; i<tempnumHaplotypes; i++)
+    if (!CreateChunksForParamEstimation())
 	{
-		ThisTarPanel.haplotypesUnscaffolded[i].resize(MaxGwasMarkerSize, false);
-        ThisTarPanel.MissingSampleUnscaffolded[i].resize(MaxGwasMarkerSize, false);
-        if(MyAllVariables->myOutFormat.TypedOnly)
-        {
-            ThisTarPanel.TypedOnlyVariantList.resize(MaxTypedOnlyMarkerSize);
-            ThisTarPanel.GWASOnlyhaplotypesUnscaffolded[i].resize(MaxTypedOnlyMarkerSize, false);
-            ThisTarPanel.GWASOnlyMissingSampleUnscaffolded[i].resize(MaxTypedOnlyMarkerSize, false);
-        }
+		cout << "\n Program Exiting ... \n\n";
+		return "Chunk.Create.Error";
+
 	}
 
+//
+//    InitializeRefFileStream(Reffilename);
+//    InitializeTargetFileStream(Tarfilename);
+//    TimeToRead+=( time(0) - time_prev);
+//
+//
+//    if(!MyAllVariables->myOutFormat.memUsage)
+//    {
+//        cout<<" ------------------------------------------------------------------------------"<<endl;
+//        cout<<"                           MAIN IMPUTATION ANALYSIS                            "<<endl;
+//        cout<<" ------------------------------------------------------------------------------"<<endl;
+//
+//        std::cout << "\n Starting imputation analysis of "<<noChunks <<" chunk(s) ... "  << endl;
+//    }
+//    else
+//    {
+//        cout<<" ------------------------------------------------------------------------------"<<endl;
+//        cout<<"                             MEMORY USAGE ANALYSIS                             "<<endl;
+//        cout<<" ------------------------------------------------------------------------------"<<endl;
+//    }
+//
+//
+//    OpenStreamOutputFiles();
+//
+//    Imputation thisDataFast(MyAllVariables,dosages, hapdose, haps,vcfdosepartial,info,stats);
+//
+//    thisDataFast.MainMarkovModel.resize(MyAllVariables->myModelVariables.cpus);
+//
+//    if(MyAllVariables->myOutFormat.vcfBuffer >= targetPanel.numSamples)
+//        MyAllVariables->myOutFormat.vcfBuffer=targetPanel.numSamples;
+//
+//    thisDataFast.InitializeOutputFiles(targetPanel, MyAllVariables->myOutFormat.vcfBuffer, MaxRefMarkerSize, MaxGwasMarkerSize);
+//    if(MyAllVariables->myOutFormat.memUsage)
+//    {
+//
+//        cout<<" Estimating Memory based on a single chunk ..."<< endl;
+//
+//        readm3vcfFileChunk(0, CurrentRefPanel);
+//        readVcfFileChunk(0, CurrentTarPanelChipOnly);
+//        GetCurrentPanelReady(0, CurrentRefPanel, CurrentRefPanelChipOnly, CurrentTarPanelChipOnly, thisDataFast);
+//        cout<<endl;
+//
+//        DosageMem = thisDataFast.Dosagesize();
+//        ProbMem = thisDataFast.Probsize();
+//        MemDisplay();
+//        return "Success";
+//    }
+//
+//    for(int i=0;i<noChunks;i++)
+//    {
+//         int time_prev = time(0), time_load;
+//
+//        cout<<"\n -------------------------------------------"<<endl;
+//        cout<<" Analyzing Chunk "<<i+1<<"/"<<noChunks<<" ["<<referencePanel.finChromosome<<":"<< MyChunks[i][0]<<"-"<<MyChunks[i][3]<<"]"<< endl;
+//        cout<<" -------------------------------------------"<<endl;
+//
+//        readm3vcfFileChunk(i, CurrentRefPanel);
+//        readVcfFileChunk(i, CurrentTarPanelChipOnly);
+//        GetCurrentPanelReady(i, CurrentRefPanel, CurrentRefPanelChipOnly, CurrentTarPanelChipOnly, thisDataFast);
+//
+//
+//
+//
+//
+//        thisDataFast.ImputeThisChunk(i, CurrentRefPanel, CurrentTarPanelChipOnly, CurrentRefPanelChipOnly);
+//
+////abort();
+//        TimeToImpute+=(thisDataFast.TimeToImpute);
+//        TimeToWrite+=(thisDataFast.TimeToWrite);
+//        TimeToCompress+=(thisDataFast.TimeToCompress);
+//
+//
+//        AppendtoMainVcfFaster(i,thisDataFast.TotalNovcfParts);
+//        if(MyAllVariables->myOutFormat.meta)
+//            AppendtoMainLooVcfFaster(i,thisDataFast.TotalNovcfParts);
+//        PrintInfoFile(i);
+//
+//        time_load = time(0) - time_prev;
+//        cout << "\n Time taken for this chunk = " << time_load << " seconds."<<endl;
+//
+//
+//
+//    }
+//
+//
+////    if(MyAllVariables->myHapDataVariables.end==0 && MyAllVariables->myOutFormat.TypedOnly)
+////        assert(FileReadIndex==targetPanel.importIndexListSize);
+////    asserassertt(OverCount==targetPanel.numOverlapMarkers);
+////    assert(TypOnlyCount==targetPanel.numTypedOnlyMarkers);
+////    assert(RefCOUNT==referencePanel.NoBlocks);
+//
+//    CloseStreamOutputFiles();
 
-	ThisTarPanel.GWASOnlyAlleleFreq.resize(MaxTypedOnlyMarkerSize);
-	ThisTarPanel.FlankRegionStart.resize(MaxGwasMarkerSize);
-	ThisTarPanel.FlankRegionEnd.resize(MaxGwasMarkerSize);
-
- }
-
-
-
-
-
-void Analysis::InitializeChunkVariables()
-{
-    int i;
-    MyChunks.resize(noChunks);
-    MyChunksInfoNumber.resize(noChunks+1); // extra element added just to reduce checks later on
-    MyRefVariantNumber.resize(noChunks+1); // extra element added just to reduce checks later on
-    MyTargetVariantNumber.resize(noChunks+1); // extra element added just to reduce checks later on
-    MyTypdedOnlyVariantNumber.resize(noChunks+1); // extra element added just to reduce checks later on
-    MyRatio.resize(noChunks+1,-1.0); // extra element added just to reduce checks later on
-
-
-    for(i=0;i<(noChunks);i++)
-    {
-        MyChunks[i].resize(4);
-        MyChunksInfoNumber[i].resize(3);
-        MyRefVariantNumber[i].resize(3);
-        MyTargetVariantNumber[i].resize(3,-3);
-        MyTypdedOnlyVariantNumber[i].resize(3,-3);
-    }
-
-    MyChunksInfoNumber[i].resize(1,99999999); // extra element added just to reduce checks later on
-    MyRefVariantNumber[i].resize(1,99999999); // extra element added just to reduce checks later on
-    MyTargetVariantNumber[i].resize(1,99999999);  // extra element added just to reduce checks later on
-    MyTypdedOnlyVariantNumber[i].resize(1,99999999);  // extra element added just to reduce checks later on
-
-
+    return "Success";
 
 
 }
-
-
-void Analysis::CreateChunksFromReference()
-{
-    vector<ReducedHaplotypeInfoSummary> &RefInfo=referencePanel.ReducedStructureInfoSummary;
-    vector<variant> &VarList=referencePanel.VariantList;
-    vector<int> &InfoMapper=referencePanel.MarkerToReducedInfoMapper;
-    int NoMarkers=referencePanel.numMarkers;
-
-    int i=0,index;
-    MyChunksInfoNumber[0][0]=0;
-    MyRefVariantNumber[0][0]=0;
-    MyChunks[0][0]=VarList[0].bp;
-    MyChunks[0][1]=VarList[0].bp;
-
-
-    if(noChunks>1)
-    {
-
-        MyChunksInfoNumber[0][1]=InfoMapper[0 + MyHapDataVariables->ChunkSize + MyHapDataVariables->ChunkWindow];
-        MyRefVariantNumber[0][1]= RefInfo[MyChunksInfoNumber[0][1]].endIndex ;
-
-        MyChunks[0][2]=VarList[0 + MyHapDataVariables->ChunkSize].bp;
-        MyChunks[0][3]=VarList[MyRefVariantNumber[0][1]].bp;
-
-
-        for(i=1;i<(noChunks-1);i++)
-        {
-            index=(i*MyHapDataVariables->ChunkSize);
-
-            MyChunksInfoNumber[i][0]=InfoMapper[index-MyHapDataVariables->ChunkWindow];
-            MyChunksInfoNumber[i][1]=InfoMapper[index+MyHapDataVariables->ChunkSize+MyHapDataVariables->ChunkWindow];
-
-            MyRefVariantNumber[i][0]=RefInfo[MyChunksInfoNumber[i][0]].startIndex;
-            MyRefVariantNumber[i][1]= RefInfo[MyChunksInfoNumber[i][1]].endIndex;
-
-            MyChunks[i][0]=VarList[MyRefVariantNumber[i][0]].bp;
-            MyChunks[i][1]=MyChunks[i-1][2]+1;
-            MyChunks[i][2]=VarList[index+MyHapDataVariables->ChunkSize].bp;
-            MyChunks[i][3]=VarList[MyRefVariantNumber[i][1]].bp;
-
-        }
-
-    index=(i*MyHapDataVariables->ChunkSize);
-
-    MyChunksInfoNumber[i][0]=InfoMapper[index-MyHapDataVariables->ChunkWindow];
-    MyRefVariantNumber[i][0]=RefInfo[MyChunksInfoNumber[i][0]].startIndex;
-
-    MyChunks[i][0]=VarList[MyRefVariantNumber[i][0]].bp;
-    MyChunks[i][1]=MyChunks[i-1][2]+1;
-
-    }
-
-    MyChunks[i][2]=VarList[NoMarkers-1].bp;
-    MyChunks[i][3]=VarList[NoMarkers-1].bp;
-    MyChunksInfoNumber[i][1]=InfoMapper[NoMarkers-1];
-    MyRefVariantNumber[i][1]=NoMarkers-1;
-
-
-    for(int i=0;i<noChunks;i++)
-    {
-        MyChunksInfoNumber[i][2] = MyChunksInfoNumber[i][1] - MyChunksInfoNumber[i][0] + 1;
-        MyRefVariantNumber[i][2] = MyRefVariantNumber[i][1] - MyRefVariantNumber[i][0] + 1;
-    }
-
-}
-
-
-void Analysis::ImportChunksToTarget()
-{
-    OverCount =0;
-    TypOnlyCount = 0;
-    RefCOUNT = 0;
-
-    int i=0;
-    for(int CurrentChunkNo=0; CurrentChunkNo<noChunks; CurrentChunkNo++)
-    {
-        while(i<targetPanel.numOverlapMarkers && targetPanel.OverlapOnlyVariantList[i].bp < MyChunks[CurrentChunkNo][0] )
-        {
-            i++;
-        }
-        MyTargetVariantNumber[CurrentChunkNo][0]=i;
-
-        while(i<targetPanel.numOverlapMarkers && targetPanel.OverlapOnlyVariantList[i].bp <= MyChunks[CurrentChunkNo][3] )
-        {
-            i++;
-        }
-        MyTargetVariantNumber[CurrentChunkNo][1]=i-1;
-        i=MyTargetVariantNumber[CurrentChunkNo][0];
-    }
-
-//    assert(MyTargetVariantNumber[noChunks-1][1]==(targetPanel.numOverlapMarkers-1));  // Last position of Target Panel indexed should be number of overlapping markers
-
-        i=0;
-        for(int CurrentChunkNo=0; CurrentChunkNo<noChunks; CurrentChunkNo++)
-        {
-            if(CurrentChunkNo>0)
-            {
-                while(i<targetPanel.numTypedOnlyMarkers && targetPanel.TypedOnlyVariantList[i].bp < MyChunks[CurrentChunkNo][0] )
-                {
-                    i++;
-                }
-            }
-            MyTypdedOnlyVariantNumber[CurrentChunkNo][0]=i;
-
-            while(i<targetPanel.numTypedOnlyMarkers && targetPanel.TypedOnlyVariantList[i].bp <= MyChunks[CurrentChunkNo][3] )
-            {
-                i++;
-            }
-            MyTypdedOnlyVariantNumber[CurrentChunkNo][1]=i-1;
-            i=MyTypdedOnlyVariantNumber[CurrentChunkNo][0];
-
-        }
-        MyTypdedOnlyVariantNumber[noChunks-1][1]=targetPanel.numTypedOnlyMarkers-1;
-
-
-    for(int i=0;i<noChunks;i++)
-    {
-        MyTargetVariantNumber[i][2]=0;
-        MyTypdedOnlyVariantNumber[i][2]=0;
-
-        MyTargetVariantNumber[i][2] = ( MyTargetVariantNumber[i][1] + 1 > MyTargetVariantNumber[i][0]? MyTargetVariantNumber[i][1] + 1 - MyTargetVariantNumber[i][0]: 0 );
-        MyTypdedOnlyVariantNumber[i][2] = ( MyTypdedOnlyVariantNumber[i][1] + 1 >MyTypdedOnlyVariantNumber[i][0]? MyTypdedOnlyVariantNumber[i][1] + 1 - MyTypdedOnlyVariantNumber[i][0]: 0 );
-    }
-
-}
-
-
-bool Analysis::CheckChunkValidityandPrintChunk()
-{
-
-    int MinRefMarkerSize=MyRefVariantNumber[0][2], InIndex=0;
-    int MinGwasMarkerSize=MyTargetVariantNumber[0][2], MaIndex=0;
-    float minRatio=100.0,raIndex=0;
-
-    MaxInfoVectorSize=0;
-    MaxRefMarkerSize=0;
-    MaxGwasMarkerSize=0;
-    MaxTypedOnlyMarkerSize=0;
-
-    cout<<" No   LeftBuffer      LeftEnd   RightPoint  RightBuffer       #Sites(GWAS/Ref/%)"<<endl;
-    cout<<" -------------------------------------------------------------------------------"<<endl;
-
-    for(int i=0;i<noChunks;i++)
-    {
-        if( MyChunksInfoNumber[i][2]  > MaxInfoVectorSize )
-              MaxInfoVectorSize = MyChunksInfoNumber[i][2];
-
-        if( MyRefVariantNumber[i][2]  > MaxRefMarkerSize )
-              MaxRefMarkerSize = MyRefVariantNumber[i][2];
-        if( MyRefVariantNumber[i][2]  < MinRefMarkerSize )
-        {
-          InIndex=i;
-          MinRefMarkerSize = MyRefVariantNumber[i][2];
-        }
-
-
-        if( MyTargetVariantNumber[i][2]  > MaxGwasMarkerSize )
-              MaxGwasMarkerSize = MyTargetVariantNumber[i][2];
-        if( MyTargetVariantNumber[i][2]  < MinGwasMarkerSize )
-        {
-            MaIndex=i;
-            MinGwasMarkerSize = MyTargetVariantNumber[i][2];
-        }
-
-        if( MyTypdedOnlyVariantNumber[i][2]  > MaxTypedOnlyMarkerSize )
-              MaxTypedOnlyMarkerSize = MyTypdedOnlyVariantNumber[i][2];
-
-
-        if(MyTargetVariantNumber[i][2] >0 && MyRefVariantNumber[i][2] > 0 )
-        {
-            MyRatio[i]=100.0*(float)MyTargetVariantNumber[i][2]/(float)MyRefVariantNumber[i][2];
-            if(minRatio>MyRatio[i])
-            {
-                minRatio=MyRatio[i];
-                raIndex=i;
-            }
-        }
-
-
-        cout<<setw(3)<<i+1<<"  "
-        <<setw(11)<<MyChunks[i][0]<<"  "
-        <<setw(11)<<MyChunks[i][1]<<"  "
-        <<setw(11)<<MyChunks[i][2]<<"  "
-        <<setw(11)<<MyChunks[i][3]<<"  "
-        <<setw(7)<<MyTargetVariantNumber[i][2]<<"/"
-        <<setw(8)<<MyRefVariantNumber[i][2]<<"/";
-
-        if(MyRatio[i]==-1.0)
-            cout<<"  nan";
-        else
-            printf(" %2.2f",MyRatio[i]);
-        cout<<"%"<< endl;
-    }
-       cout<<endl<<endl;
-
-
-    if(MinRefMarkerSize==0)
-    {
-        cout<<"\n ERROR !!! ERROR !!! ERROR !!! "<<endl;
-        cout<<" Chunk "<< InIndex+1<<" has 0 variants from the reference panel in it ... "<<endl;
-        cout<<" Please increase the value of \"--chunkSize\" to analyze larger chunks ..." <<endl<<endl;
-        return false;
-
-    }
-    if(MinGwasMarkerSize==0)
-    {
-        cout<<"\n ERROR !!! ERROR !!! ERROR !!! "<<endl;
-        cout<<" Chunk "<< MaIndex+1<<" has 0 variants from the GWAS panel in it ... "<<endl;
-        cout<<" Please increase the value of \"--chunkSize\" to analyze larger chunks ..." <<endl<<endl;
-        cout<<" Program Exiting ... "<<endl<<endl;
-        return false;
-
-    }
-    if(minRatio<(MyAllVariables->myHapDataVariables.minRatio))
-    {
-        cout<<"\n ERROR !!! ERROR !!! ERROR !!! "<<endl;
-        cout<<" Chunk "<< raIndex+1<<" has less than "<<MyAllVariables->myHapDataVariables.minRatio <<"\% of variants from the GWAS panel overlapping with the reference panel ... "<<endl;
-        cout<<" Please increase the value of \"--chunkSize\" to analyze larger chunks "<<endl;
-        cout<<" or decrease the value of \"--minRatio\" = " <<MyAllVariables->myHapDataVariables.minRatio <<endl<<endl;
-        return false;
-
-    }
-    return true;
-
-}
-
-
- bool Analysis::CreateChunks()
-{
-
-    GetNumChunks();
-
-    std::cout << "\n Chunking region into "<<noChunks <<" chunk(s) with atleast "<<
-    MyHapDataVariables->ChunkSize <<" variants in each chunk ... "  << endl<<endl;
-    std::cout << " Details of chunks is given below ..."  << endl<<endl;
-
-    InitializeChunkVariables();
-    CreateChunksFromReference();
-    ImportChunksToTarget();
-
-    return CheckChunkValidityandPrintChunk();
-
-}
-
-
-
- void Analysis::GetNumChunks()
- {
-
-    int NoMarkers=referencePanel.numMarkers;
-    int StartPos = referencePanel.VariantList[0].bp;
-    int EndPos = referencePanel.VariantList[NoMarkers-1].bp;
-
-    int noOverLaps = ((int)(EndPos-StartPos)/(int)(1000000 *MyAllVariables->myHapDataVariables.ChunkOverlapMb));
-    if(noOverLaps==0)
-        noOverLaps=1;
-
-    MyHapDataVariables->ChunkWindow=(NoMarkers/noOverLaps);
-
-    noChunks = ((int)(EndPos-StartPos)/(int)(1000000 *MyAllVariables->myHapDataVariables.ChunkLengthMb));
-    if(noChunks==0)
-        noChunks=1;
-
-    MyHapDataVariables->ChunkSize=(NoMarkers/noChunks);
-
-    return;
- }
 
 
 
@@ -1664,8 +1486,14 @@ bool Analysis::CheckChunkValidityandPrintChunk()
     if(mysuccessresult!="Success")
         return mysuccessresult;
 
-    mysuccessresult=RunAnalysis(Reffilename, Tarfilename, Recomfilename, Errorfilename);
-
+    if(!MyModelVariables->processReference)
+    {
+        mysuccessresult=RunAnalysis(Reffilename, Tarfilename, Recomfilename, Errorfilename);
+    }
+    else
+    {
+        mysuccessresult=RunEstimation(Reffilename, Recomfilename, Errorfilename);
+    }
     if(mysuccessresult!="Success")
         return mysuccessresult;
 
@@ -1704,11 +1532,18 @@ bool Analysis::CheckChunkValidityandPrintChunk()
 
         if (Tarfilename == "")
         {
-            cout <<" Missing \"--haps\", a required parameter (for imputation).\n";
+            cout <<" ERROR !!! \n Missing \"--haps\", a required parameter (for imputation).\n";
             cout <<" OR use \"--processReference\" to just process the reference panel.\n";
-            cout<< " Type \"--help\" for more help.\n\n";
+            cout << "\n Program Exiting ... \n\n";
             return "Command.Line.Error";
         }
+    }
+    else
+    {
+        cout <<" ERROR !!! \n Currently Minimac4 does NOT support \"--processReference\" "<<endl;
+        cout <<" Please contact author at [sayantan@umich.edu] for updated information ... "<<
+        cout << "\n Program Exiting ... \n\n";
+        return "Command.Line.Error";
     }
 
     cout<<" ------------------------------------------------------------------------------"<<endl;
@@ -1719,100 +1554,19 @@ bool Analysis::CheckChunkValidityandPrintChunk()
 
 	if(!MyAllVariables->myModelVariables.processReference)
     {
-	    if (!targetPanel.BasicCheckForTargetHaplotypes(Tarfilename, *MyAllVariables))
+	    if (!targetPanel.BasicCheckForTargetHaplotypes(Tarfilename, "GWAS", *MyAllVariables))
         {
-            cout << "\n Program Exiting ... \n\n";
             return "Target.Panel.Load.Error";
+        }
+    }
+    else
+    {
+	    if (!referencePanel.BasicCheckForVCFReferenceHaplotypes(Reffilename, "Reference", *MyAllVariables))
+        {
+            return "Reference.Panel.Load.Error";
         }
     }
 
     return "Success";
 
 }
-
-
-//
-//
-//
-//void Analysis::AppendtoMainLOOVcf(int ChunkNo, int MaxIndex)
-//{
-//
-//    int RefStartPos =  MyRefVariantNumber[ChunkNo][0];
-//    printf("\n Appending chunk to final output LOO VCF File :  %s ",(MyAllVariables->myOutFormat.OutPrefix + ".maskedDose.vcf" + (MyAllVariables->myOutFormat.gzip ? ".gz" : "")).c_str() );
-//    cout<<endl<<endl;
-//
-//    vector<IFILE> vcfdosepartialList(MaxIndex);
-//
-//    for(int i=1;i<=MaxIndex;i++)
-//    {
-//        string tempFileIndex(MyAllVariables->myOutFormat.OutPrefix);
-//        stringstream strs,strs1;
-//        strs<<(i);
-//        strs1<<(ChunkNo+1);
-//        tempFileIndex+=(".chunk."+(string)(strs1.str())+".maskedDose.vcf.part." +
-//                         (string)(strs.str()));
-//        vcfdosepartialList[i-1] = ifopen(tempFileIndex.c_str(), "r");
-//    }
-//    string line;
-//    int i=0;
-//    for (int index = 0; index < CurrentRefPanel.RefTypedTotalCount; index++)
-//    {
-//        if(CurrentRefPanel.RefTypedIndex[index]==-1)
-//        {
-//
-//            if(i>=CurrentRefPanel.PrintStartIndex && i <= CurrentRefPanel.PrintEndIndex)
-//            {
-//
-//                if(!CurrentRefPanel.Targetmissing[i])
-//                {
-//
-//                    variant &tempVariant = referencePanel.VariantList[i+RefStartPos];
-//
-//                    ifprintf(vcfLoodosepartial,"%s\t%d\t%s\t%s\t%s\t.\tPASS",
-//                     tempVariant.chr.c_str(),
-//                     tempVariant.bp,
-//                     MyAllVariables->myOutFormat.RsId?tempVariant.rsid.c_str():tempVariant.name.c_str(),
-//                     tempVariant.refAlleleString.c_str(),
-//                     tempVariant.altAlleleString.c_str());
-//
-//                    ifprintf(vcfLoodosepartial,";GENOTYPED");
-//
-//
-//                    double freq = stats.AlleleFrequency(i);
-//
-//                    ifprintf(vcfLoodosepartial,"\t.");
-//
-//
-//                    ifprintf(vcfLoodosepartial,"\tGT:LDS");
-//                    for(int j=1;j<=MaxIndex;j++)
-//                    {
-//                        line.clear();
-//                        vcfdosepartialList[j-1]->readLine(line);
-//                        ifprintf(vcfLoodosepartial,"%s",line.c_str());
-//
-//                    }
-//                     ifprintf(vcfLoodosepartial,"\n");
-//                }
-//            }
-//
-//            i++;
-//        }
-//    }
-//
-//    for(int i=1;i<=MaxIndex;i++)
-//    {
-//        ifclose(vcfdosepartialList[i-1]);
-//        string tempFileIndex(MyAllVariables->myOutFormat.OutPrefix);
-//        stringstream strs;
-//        strs<<(i);
-//        tempFileIndex+=(".maskedDose.vcf.part." +
-//                        (string)(strs.str())+
-//                        (MyAllVariables->myOutFormat.gzip ? ".gz" : ""));
-////        remove(tempFileIndex.c_str());
-//    }
-//
-//    printf("\n Appending Finished ..." );
-//    cout<<endl <<endl;
-//}
-//
-

@@ -7,8 +7,7 @@ using namespace std;
 
 
 
-void ImputationStatistics::NewUpdate(HaplotypeSet &rHap,HaplotypeSet &tHap, int hapId,
-                                     vector<float> *doses, vector<float> *loo)
+void ImputationStatistics::NewUpdate(HaplotypeSet &rHap,HaplotypeSet &tHap, int hapId, vector<float> *doses, vector<float> *loo)
 {
     for (int i = 0; i < numRefMarkers; i++)
     {
@@ -27,7 +26,7 @@ void ImputationStatistics::NewUpdate(HaplotypeSet &rHap,HaplotypeSet &tHap, int 
     {
         if(!rHap.Targetmissing[i])
         {
-            assert(index<tHap.numMarkers);
+//            assert(index<tHap.numMarkers);
             if(!MissUnScaff[index])
             {
                 bool observed=UnScaff[index];
@@ -40,17 +39,13 @@ void ImputationStatistics::NewUpdate(HaplotypeSet &rHap,HaplotypeSet &tHap, int 
             }
 
 
-            assert(rHap.MapRefToTar[i]==index);
+//            assert(rHap.MapRefToTar[i]==index);
             index++;
         }
     }
-    assert(index==numTarMarkers);
+//    assert(index==numTarMarkers);
 
 }
-
-
-
-
 
 double ImputationStatistics::Rsq(int marker)
    {
@@ -124,9 +119,6 @@ double ImputationStatistics::EmpiricalRsq(int marker)
 
    return r * r;
    }
-
-
-
 
 double ImputationStatistics::LooMajorDose(int marker)
    {
