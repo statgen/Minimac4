@@ -12,7 +12,7 @@ Users should follow the following steps to compile Minimac4
 (if they downloaded the source files) or should skip them
 (if they downloaded the binary executable).
 
-## EXTRACT MINIMAC3 AND COMPILE
+## EXTRACT MINIMAC4 AND COMPILE
  
 tar -xzvf Minimac4.v1.tar.gz
 cd Minimac4/
