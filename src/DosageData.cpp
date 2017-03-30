@@ -10,21 +10,24 @@
 void DosageData::FlushPartialVcf(int NovcfParts)
 {
     PrintStringLength=0;
+    PrintEmpStringLength=0;
 
     int time_Start = time(0);
 
 
     string PartialVcfFileName(MyAllVariables->myOutFormat.OutPrefix);
+    string PartialMetaVcfFileName(MyAllVariables->myOutFormat.OutPrefix);
     stringstream strs,strs1;
     strs<<(NovcfParts);
     strs1<<(ChunkNo+1);
-    string tempStringforMeta = PartialVcfFileName+(".chunk."+(string)(strs1.str())+ ".maskedDose.vcf.part."+ (string)(strs.str()));
     PartialVcfFileName+=(".chunk."+(string)(strs1.str())+ ".dose.vcf.part."+ (string)(strs.str()));
+    PartialMetaVcfFileName+=(".chunk."+(string)(strs1.str())+ ".empiricalDose.vcf.part."+ (string)(strs.str()));
 
     IFILE vcfdosepartial = ifopen(PartialVcfFileName.c_str(), "wb", InputFile::UNCOMPRESSED);
     IFILE vcfLoodosepartial = NULL;
+
     if(MyAllVariables->myOutFormat.meta)
-        vcfLoodosepartial=ifopen(tempStringforMeta.c_str(), "wb", InputFile::UNCOMPRESSED);
+        vcfLoodosepartial=ifopen(PartialMetaVcfFileName.c_str(), "wb", InputFile::UNCOMPRESSED);
 
 
     for(int Id=0;Id<BuffernumSamples;Id++)
@@ -62,12 +65,22 @@ void DosageData::FlushPartialVcf(int NovcfParts)
             ifprintf(vcfdosepartial,"%s",PrintStringPointer);
             PrintStringLength=0;
         }
+        if(PrintEmpStringLength > 0.9 * (float)(MyAllVariables->myOutFormat.PrintBuffer))
+        {
+            ifprintf(vcfLoodosepartial,"%s",PrintEmpStringPointer);
+            PrintEmpStringLength=0;
+        }
 
     }
     if(PrintStringLength>0)
     {
         ifprintf(vcfdosepartial,"%s",PrintStringPointer);
         PrintStringLength=0;
+    }
+    if(PrintEmpStringLength >0)
+    {
+        ifprintf(vcfLoodosepartial,"%s",PrintEmpStringPointer);
+        PrintEmpStringLength=0;
     }
 
     ifclose(vcfdosepartial);
@@ -77,15 +90,6 @@ void DosageData::FlushPartialVcf(int NovcfParts)
 
     TimeToWrite=time(0) - time_Start;
 
-}
-
-
-void DosageData::PrintDiploidLooDosage(bool a, bool b, float &x, float &y)
-{
-    PrintStringLength+=sprintf(PrintStringPointer+PrintStringLength,"\t");
-    PrintStringLength+=sprintf(PrintStringPointer+PrintStringLength,"%d|%d",(a),(b));
-    PrintStringLength+=sprintf(PrintStringPointer+PrintStringLength,":");
-    PrintStringLength+=sprintf(PrintStringPointer+PrintStringLength,"%.3f|%.3f",x , y);
 }
 
 
@@ -135,11 +139,22 @@ void DosageData::PrintDiploidDosage(float &x, float &y)
 
         if(colonIndex)
             PrintStringLength+=sprintf(PrintStringPointer+PrintStringLength,":");
-        colonIndex=false;
+        colonIndex=true;
         PrintStringLength+=sprintf(PrintStringPointer+PrintStringLength,"%.3f,%.3f,%.3f",(1-x)*(1-y),x*(1-y)+y*(1-x),x*y);
     }
+    if(MyAllVariables->myOutFormat.SD)
+    {
+        if(colonIndex)
+            PrintStringLength+=sprintf(PrintStringPointer+PrintStringLength,":");
+        colonIndex=true;
+        PrintStringLength+=sprintf(PrintStringPointer+PrintStringLength,"%.3f", x*(1-x) + y*(1-y));
+    }
+
+
 
 }
+
+
 
 void DosageData::PrintHaploidDosage(float &x)
 {
@@ -172,18 +187,34 @@ void DosageData::PrintHaploidDosage(float &x)
 
         if(colonIndex)
             PrintStringLength+=sprintf(PrintStringPointer+PrintStringLength,":");
-        colonIndex=false;
+        colonIndex=true;
         PrintStringLength+=sprintf(PrintStringPointer+PrintStringLength,"%.3f,%.3f",1-x,x);
     }
-
+    if(MyAllVariables->myOutFormat.SD)
+    {
+        if(colonIndex)
+            PrintStringLength+=sprintf(PrintStringPointer+PrintStringLength,":");
+        colonIndex=true;
+        PrintStringLength+=sprintf(PrintStringPointer+PrintStringLength,"%.3f", x*(1-x));
+    }
 }
 
-void DosageData::PrintHaploidLooDosage(bool a, float &x)
+
+void DosageData::PrintDiploidLooDosage(float &x, float &y, bool a, bool b)
 {
-    PrintStringLength+=sprintf(PrintStringPointer+PrintStringLength,"\t");
-    PrintStringLength+=sprintf(PrintStringPointer+PrintStringLength,"%d",(a));
-    PrintStringLength+=sprintf(PrintStringPointer+PrintStringLength,":");
-    PrintStringLength+=sprintf(PrintStringPointer+PrintStringLength,"%.3f",x);
+    PrintEmpStringLength+=sprintf(PrintEmpStringPointer+PrintEmpStringLength,"\t");
+    PrintEmpStringLength+=sprintf(PrintEmpStringPointer+PrintEmpStringLength,"%d|%d",(a),(b));
+    PrintEmpStringLength+=sprintf(PrintEmpStringPointer+PrintEmpStringLength,":");
+    PrintEmpStringLength+=sprintf(PrintEmpStringPointer+PrintEmpStringLength,"%.3f|%.3f",x , y);
+}
+
+
+void DosageData::PrintHaploidLooDosage(float &x, bool a)
+{
+    PrintEmpStringLength+=sprintf(PrintEmpStringPointer+PrintEmpStringLength,"\t");
+    PrintEmpStringLength+=sprintf(PrintEmpStringPointer+PrintEmpStringLength,"%d",(a));
+    PrintEmpStringLength+=sprintf(PrintEmpStringPointer+PrintEmpStringLength,":");
+    PrintEmpStringLength+=sprintf(PrintEmpStringPointer+PrintEmpStringLength,"%.3f",x);
 }
 
 
@@ -202,9 +233,54 @@ void DosageData::PrintDosageForVcfOutputForID(int MarkerIndex)
             PrintHaploidDosage((hapDosage[2*IndexId])[MarkerIndex] );
         else
             abort();
+
+        if(MyAllVariables->myOutFormat.meta && !rHapFull->Targetmissing[MarkerIndex] )
+        {
+
+            int gwasHapIndex = tHapFull->CummulativeSampleNoHaplotypes[SampleIndex[IndexId]];
+//int FullSamID=;
+
+            int TypedMarkerIndex = rHapFull->MapRefToTar[MarkerIndex];
+
+//            assert(TypedMarkerIndex<LoohapDosage[0].size());
+//            assert(TypedMarkerIndex<tHapFull->MissingSampleUnscaffolded[0].size());
+//            assert(gwasHapIndex<tHapFull->MissingSampleUnscaffolded.size());
+
+            if(NoHaps==2)
+            {
+                 if( tHapFull->MissingSampleUnscaffolded[gwasHapIndex][TypedMarkerIndex] || tHapFull->MissingSampleUnscaffolded[gwasHapIndex+1][TypedMarkerIndex])
+                 {
+                     PrintEmpStringLength+=sprintf(PrintEmpStringPointer+PrintEmpStringLength,"\t.|.:.|.");
+                 }
+                 else
+                 {
+                     PrintDiploidLooDosage((LoohapDosage[2*IndexId])[TypedMarkerIndex] , (LoohapDosage[2*IndexId+1])[TypedMarkerIndex] ,
+                                      tHapFull->haplotypesUnscaffolded[gwasHapIndex][TypedMarkerIndex],
+                                      tHapFull->haplotypesUnscaffolded[gwasHapIndex+1][TypedMarkerIndex]);
+                 }
+
+            }
+            else if(NoHaps==1)
+            {
+                 if( tHapFull->MissingSampleUnscaffolded[gwasHapIndex][TypedMarkerIndex])
+                 {
+                     PrintEmpStringLength+=sprintf(PrintEmpStringPointer+PrintEmpStringLength,"\t.:.");
+                 }
+                 else
+                 {
+                     PrintHaploidLooDosage((LoohapDosage[2*IndexId])[TypedMarkerIndex] ,
+                                      tHapFull->haplotypesUnscaffolded[gwasHapIndex][TypedMarkerIndex]);
+                 }
+            }
+            else
+                abort();
+        }
+
     }
 
-  PrintStringLength+=sprintf(PrintStringPointer+PrintStringLength,"\n");
+    PrintStringLength+=sprintf(PrintStringPointer+PrintStringLength,"\n");
+    if(MyAllVariables->myOutFormat.meta && !rHapFull->Targetmissing[MarkerIndex] )
+        PrintEmpStringLength+=sprintf(PrintEmpStringPointer+PrintEmpStringLength,"\n");
 
 }
 
@@ -216,34 +292,34 @@ void DosageData::PrintGWASOnlyForVcfOutputForID(int MarkerIndex)
     for(int Id=0;Id<BuffernumSamples;Id++)
     {
         int IndexId = InvertSampleIndex[Id];
-        int FullSamID=SampleIndex[IndexId];
+        int gwasHapIndex = tHapFull->CummulativeSampleNoHaplotypes[SampleIndex[IndexId]];
         int NoHaps=BufferSampleNoHaplotypes[IndexId];
 
 //        assert(FullSamID==(Id+FirstHapId));
 
         if(NoHaps==2)
         {
-            bool a1=tHapFull->GWASOnlyMissingSampleUnscaffolded[2*FullSamID][MarkerIndex];
-            bool a2=tHapFull->GWASOnlyMissingSampleUnscaffolded[2*FullSamID+1][MarkerIndex];
+            bool a1=tHapFull->GWASOnlyMissingSampleUnscaffolded[gwasHapIndex][MarkerIndex];
+            bool a2=tHapFull->GWASOnlyMissingSampleUnscaffolded[gwasHapIndex+1][MarkerIndex];
 
             if(a1 || a2)
                 PrintDiploidDosage(freq,freq);
             else
              {
-                 x=(float)tHapFull->GWASOnlyhaplotypesUnscaffolded[2*FullSamID][MarkerIndex];
-                 y=(float)tHapFull->GWASOnlyhaplotypesUnscaffolded[2*FullSamID+1][MarkerIndex];
+                 x=(float)tHapFull->GWASOnlyhaplotypesUnscaffolded[gwasHapIndex][MarkerIndex];
+                 y=(float)tHapFull->GWASOnlyhaplotypesUnscaffolded[gwasHapIndex+1][MarkerIndex];
                  PrintDiploidDosage(x, y);
             }
         }
 
         else if(NoHaps==1)
         {
-            bool a1=tHapFull->GWASOnlyMissingSampleUnscaffolded[2*FullSamID][MarkerIndex];
+            bool a1=tHapFull->GWASOnlyMissingSampleUnscaffolded[gwasHapIndex][MarkerIndex];
             if(a1)
                 PrintHaploidDosage(freq);
             else
              {
-                 x=(float)tHapFull->GWASOnlyhaplotypesUnscaffolded[2*FullSamID][MarkerIndex];
+                 x=(float)tHapFull->GWASOnlyhaplotypesUnscaffolded[gwasHapIndex][MarkerIndex];
                  PrintHaploidDosage(x);
              }
 
@@ -305,6 +381,7 @@ void DosageData::InitializePartialDosageData(HaplotypeSet &tarInitializer, int M
         }
 
     PrintStringPointer = (char*)malloc(sizeof(char) * (MyAllVariables->myOutFormat.PrintBuffer));
+    PrintEmpStringPointer = (char*)malloc(sizeof(char) * (MyAllVariables->myOutFormat.PrintBuffer));
     individualName=tarInitializer.individualName;
 
 }
