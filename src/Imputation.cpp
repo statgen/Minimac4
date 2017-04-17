@@ -73,7 +73,7 @@ void Imputation::ImputeThisChunk(int ChunkId, HaplotypeSet &FullrHap, HaplotypeS
 
                 MM.ThisHapId=hapIdIndiv;
                 MM.ReinitializeMatrices();
-                ThisSamplePartialDosageData->BindSampleMModel(MM,SwapDosageData.second,hapIdIndiv%2);
+                ThisSamplePartialDosageData->BindSampleMModel(MM,SwapDosageData.second,hapIdIndiv-hapId);
 
                 if(!tgwasHap.RetrieveMissingScaffoldedHaplotype(hapIdIndiv,0))
                 {
@@ -98,9 +98,12 @@ void Imputation::ImputeThisChunk(int ChunkId, HaplotypeSet &FullrHap, HaplotypeS
 
 
                 if(tgwasHap.SampleNoHaplotypes[SampleId]==1)
-                    break;
-                hapIdIndiv++;
-            }while(hapIdIndiv%2==1);
+                    {
+                        break;
+                    }
+            }while(hapId == hapIdIndiv++);
+
+
 
             if (MyAllVariables->myOutFormat.hapOutput && !MyAllVariables->myOutFormat.unphasedOutput)
             {
