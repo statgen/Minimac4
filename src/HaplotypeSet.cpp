@@ -1345,9 +1345,9 @@ void HaplotypeSet::CalculateGWASOnlyAlleleFreq()
     vector<int> TotalSample(numTypedOnlyMarkers, 0);
 
     int i,K,j;
+    int haplotypeIndex=0;
     for(K=0;K<numSamples;K++)
     {
-        int haplotypeIndex=(2*K);
         for(j=0; j<(*SampleNoHaplotypesPointer)[K];j++)
         {
             for (i = 0; i<numTypedOnlyMarkers; i++)
