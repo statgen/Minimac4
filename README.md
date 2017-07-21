@@ -30,9 +30,9 @@ make                                                    # Build.
 ## Usage
 A typical Minimac4 command line for imputation is as follows
 ```bash
-minimac4 --refHaps refPanel.m3vcf \ 
-                --haps targetStudy.vcf \
-                --prefix testRun
+minimac4 --refHaps refPanel.m3vcf \
+         --haps targetStudy.vcf \
+         --prefix testRun
 ```
 Here refPanel.vcf is the reference panel used in M3VCF format (e.g. 1000 Genomes), 
 targetStudy.vcf is the phased GWAS data in VCF format, 
