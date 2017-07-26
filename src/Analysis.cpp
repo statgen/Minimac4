@@ -31,7 +31,7 @@
 
     if (!CreateChunks())
 	{
-		cout << "\n Program Exiting ... \n\n";
+        cout << "\n Program Exiting ... \n\n";
 		return "Chunk.Create.Error";
 	}
 
@@ -55,8 +55,12 @@
         cout<<" ------------------------------------------------------------------------------"<<endl;
     }
 
-
-    OpenStreamOutputFiles();
+    if (!OpenStreamOutputFiles())
+	{
+		cout <<" Please check your write permissions in the output directory\n OR maybe the output directory does NOT exist ...\n";
+		cout << "\n Program Exiting ... \n\n";
+		return "File.Write.Error";
+	}
 
     Imputation thisDataFast(MyAllVariables,dosages, hapdose, haps,vcfdosepartial,info,stats);
 
@@ -76,6 +80,9 @@
         GetCurrentPanelReady(0, CurrentRefPanel, CurrentRefPanelChipOnly, CurrentTarPanelChipOnly, thisDataFast);
         cout<<endl;
 
+        TarMem = CurrentTarPanelChipOnly.size();
+        RefMem = CurrentRefPanel.size();
+        ComRefMem = CurrentRefPanelChipOnly.size();
         DosageMem = thisDataFast.Dosagesize();
         ProbMem = thisDataFast.Probsize();
         MemDisplay();
@@ -97,8 +104,10 @@
 
 
 
-
-        thisDataFast.ImputeThisChunk(i, CurrentRefPanel, CurrentTarPanelChipOnly, CurrentRefPanelChipOnly);
+        if(MyAllVariables->myModelVariables.minimac3)
+            thisDataFast.Minimac3ImputeThisChunk(i, CurrentRefPanel, CurrentTarPanelChipOnly, CurrentRefPanelChipOnly);
+        else
+            thisDataFast.ImputeThisChunk(i, CurrentRefPanel, CurrentTarPanelChipOnly, CurrentRefPanelChipOnly);
 
 //abort();
         TimeToImpute+=(thisDataFast.TimeToImpute);
@@ -118,6 +127,7 @@
 
     }
 
+    thisDataFast.FreeMemory();
 
 //    if(MyAllVariables->myHapDataVariables.end==0 && MyAllVariables->myOutFormat.TypedOnly)
 //        assert(FileReadIndex==targetPanel.importIndexListSize);
@@ -618,14 +628,11 @@ void Analysis::readVcfFileChunk(int ChunkNo, HaplotypeSet &ThisTargetPanel)
 
                         int alleleIndex = record.getGT(i, j);
 
-//                        bool MissingPointer = ThisTargetPanel.MissingSampleUnscaffolded[haplotype_index][ThisnumtoBeWrittenRecords + PrevChunkFilledTillTar];
-//                        bool AllelePointer = ThisTargetPanel.haplotypesUnscaffolded[haplotype_index][ThisnumtoBeWrittenRecords + PrevChunkFilledTillTar];
-
-                        ThisTargetPanel.MissingSampleUnscaffolded[haplotype_index][ThisnumtoBeWrittenRecords + PrevChunkFilledTillTar]=false;
-                        ThisTargetPanel.haplotypesUnscaffolded[haplotype_index][ThisnumtoBeWrittenRecords + PrevChunkFilledTillTar]=false;
+                        ThisTargetPanel.MissingSampleUnscaffolded[haplotype_index][ThisnumtoBeWrittenRecords + PrevChunkFilledTillTar]='0';
+                        ThisTargetPanel.haplotypesUnscaffolded[haplotype_index][ThisnumtoBeWrittenRecords + PrevChunkFilledTillTar]='0';
                         if (alleleIndex<0)
                         {
-                             ThisTargetPanel.MissingSampleUnscaffolded[haplotype_index][ThisnumtoBeWrittenRecords + PrevChunkFilledTillTar] = true;
+                             ThisTargetPanel.MissingSampleUnscaffolded[haplotype_index][ThisnumtoBeWrittenRecords + PrevChunkFilledTillTar] = '1';
                         }
                         else
                         {
@@ -633,14 +640,14 @@ void Analysis::readVcfFileChunk(int ChunkNo, HaplotypeSet &ThisTargetPanel)
                             {
                                 if(alleleIndex==1)
                                 {
-                                    ThisTargetPanel.haplotypesUnscaffolded[haplotype_index][ThisnumtoBeWrittenRecords + PrevChunkFilledTillTar] = true;
+                                    ThisTargetPanel.haplotypesUnscaffolded[haplotype_index][ThisnumtoBeWrittenRecords + PrevChunkFilledTillTar] = '1';
                                 }
                             }
                             else
                             {
                                 if(alleleIndex==0)
                                 {
-                                    ThisTargetPanel.haplotypesUnscaffolded[haplotype_index][ThisnumtoBeWrittenRecords + PrevChunkFilledTillTar] = true;
+                                    ThisTargetPanel.haplotypesUnscaffolded[haplotype_index][ThisnumtoBeWrittenRecords + PrevChunkFilledTillTar] = '1';
                                 }
                             }
                         }
@@ -707,17 +714,17 @@ void Analysis::readVcfFileChunk(int ChunkNo, HaplotypeSet &ThisTargetPanel)
 //                        bool MissingPointer = ThisTargetPanel.GWASOnlyMissingSampleUnscaffolded[haplotype_index][GWASnumtoBeWrittenRecords + PrevChunkFilledTillTarOnly];
 //                        bool AllelePointer = ThisTargetPanel.GWASOnlyhaplotypesUnscaffolded[haplotype_index][GWASnumtoBeWrittenRecords + PrevChunkFilledTillTarOnly];
 
-                        ThisTargetPanel.GWASOnlyMissingSampleUnscaffolded[haplotype_index][GWASnumtoBeWrittenRecords + PrevChunkFilledTillTarOnly]=false;
-                        ThisTargetPanel.GWASOnlyhaplotypesUnscaffolded[haplotype_index][GWASnumtoBeWrittenRecords + PrevChunkFilledTillTarOnly]=false;
+                        ThisTargetPanel.GWASOnlyMissingSampleUnscaffolded[haplotype_index][GWASnumtoBeWrittenRecords + PrevChunkFilledTillTarOnly]='0';
+                        ThisTargetPanel.GWASOnlyhaplotypesUnscaffolded[haplotype_index][GWASnumtoBeWrittenRecords + PrevChunkFilledTillTarOnly]='0';
                         if (alleleIndex<0)
                         {
-                             ThisTargetPanel.GWASOnlyMissingSampleUnscaffolded[haplotype_index][GWASnumtoBeWrittenRecords + PrevChunkFilledTillTarOnly] = true;
+                             ThisTargetPanel.GWASOnlyMissingSampleUnscaffolded[haplotype_index][GWASnumtoBeWrittenRecords + PrevChunkFilledTillTarOnly] = '1';
                         }
                         else
                         {
                             if(alleleIndex==1)
                             {
-                                ThisTargetPanel.GWASOnlyhaplotypesUnscaffolded[haplotype_index][GWASnumtoBeWrittenRecords + PrevChunkFilledTillTarOnly] = true;
+                                ThisTargetPanel.GWASOnlyhaplotypesUnscaffolded[haplotype_index][GWASnumtoBeWrittenRecords + PrevChunkFilledTillTarOnly] = '1';
                             }
                         }
                         haplotype_index++;
@@ -774,21 +781,24 @@ void Analysis::readVcfFileChunk(int ChunkNo, HaplotypeSet &ThisTargetPanel)
 }
 
 
-void Analysis::OpenStreamOutputFiles()
+bool Analysis::OpenStreamOutputFiles()
 {
+
+
     bool gzip=MyAllVariables->myOutFormat.gzip;
 
-
-    if (MyAllVariables->myOutFormat.hapOutput && !MyAllVariables->myOutFormat.unphasedOutput)
-    {
-        hapdose = ifopen(MyAllVariables->myOutFormat.OutPrefix + ".hapDose" + (gzip ? ".gz" : ""), "wb", gzip ?InputFile::BGZF:InputFile::UNCOMPRESSED);
-    }
 
     if(MyAllVariables->myOutFormat.vcfOutput)
     {
         VcfPrintStringPointer = (char*)malloc(sizeof(char) * (MyAllVariables->myOutFormat.PrintBuffer));
 
         vcfdosepartial = ifopen(MyAllVariables->myOutFormat.OutPrefix + ".dose.vcf" + (gzip ? ".gz" : ""), "wb", gzip ?InputFile::BGZF:InputFile::UNCOMPRESSED);
+        if(vcfdosepartial==NULL)
+        {
+            cout <<"\n\n ERROR !!! \n Could NOT create the following file : "<< MyAllVariables->myOutFormat.OutPrefix + ".dose.vcf" + (gzip ? ".gz" : "") <<endl;
+            return false;
+        }
+
         ifprintf(vcfdosepartial,"##fileformat=VCFv4.1\n");
         time_t t = time(0);
         struct tm * now = localtime( & t );
@@ -814,7 +824,7 @@ void Analysis::OpenStreamOutputFiles()
         if(MyAllVariables->myOutFormat.SD)
             ifprintf(vcfdosepartial,"##FORMAT=<ID=SD,Number=1,Type=Float,Description=\"Variance of Posterior Genotype Probabilities\">\n");
 
-
+        ifprintf(vcfdosepartial,"##minimac4_Command=%s\n",MyAllVariables->myOutFormat.CommandLine.c_str());
         ifprintf(vcfdosepartial,"#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT");
 
         for(int Id=0;Id<targetPanel.numSamples;Id++)
@@ -829,6 +839,13 @@ void Analysis::OpenStreamOutputFiles()
     {
 
         vcfLoodosepartial = ifopen(MyAllVariables->myOutFormat.OutPrefix + ".empiricalDose.vcf" + (gzip ? ".gz" : ""), "wb", gzip ?InputFile::BGZF:InputFile::UNCOMPRESSED);
+
+        if(vcfLoodosepartial==NULL)
+        {
+            cout <<"\n\n ERROR !!! \n Could NOT create the following file : "<< MyAllVariables->myOutFormat.OutPrefix + ".empiricalDose.vcf" + (gzip ? ".gz" : "") <<endl;
+            return false;
+        }
+
         ifprintf(vcfLoodosepartial,"##fileformat=VCFv4.1\n");
         time_t t = time(0);
         struct tm * now = localtime( & t );
@@ -838,6 +855,7 @@ void Analysis::OpenStreamOutputFiles()
         ifprintf(vcfLoodosepartial,"##INFO=<ID=TYPED,Number=0,Type=Flag,Description=\"Marker was genotyped AND imputed\">\n");
         ifprintf(vcfLoodosepartial,"##FORMAT=<ID=GT,Number=1,Type=String,Description=\"Genotyped alleles from Array\">\n");
         ifprintf(vcfLoodosepartial,"##FORMAT=<ID=LDS,Number=1,Type=String,Description=\"Leave-one-out Imputed Dosage : Estimated Haploid Alternate Allele Dosage assuming site was NOT genotyped \">\n");
+        ifprintf(vcfdosepartial,"##minimac4_Command=%s\n",MyAllVariables->myOutFormat.CommandLine.c_str());
         ifprintf(vcfLoodosepartial,"#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT");
 
         for(int Id=0;Id<targetPanel.numSamples;Id++)
@@ -849,11 +867,25 @@ void Analysis::OpenStreamOutputFiles()
     }
 
     if(MyAllVariables->myOutFormat.doseOutput)
+    {
         dosages = ifopen(MyAllVariables->myOutFormat.OutPrefix + ".dose" + (gzip ? ".gz" : ""), "wb",(gzip ? InputFile::BGZF:InputFile::UNCOMPRESSED) );
+        if(dosages==NULL)
+        {
+            cout <<"\n\n ERROR !!! \n Could NOT create the following file : "<< MyAllVariables->myOutFormat.OutPrefix + ".dose" + (gzip ? ".gz" : "") <<endl;
+            return false;
+        }
+    }
 
     InfoPrintStringPointer = (char*)malloc(sizeof(char) * (MyAllVariables->myOutFormat.PrintBuffer));
     info = ifopen(MyAllVariables->myOutFormat.OutPrefix + ".info", "wb");
+    if(info==NULL)
+    {
+        cout <<"\n\n ERROR !!! \n Could NOT create the following file : "<< MyAllVariables->myOutFormat.OutPrefix + ".info" <<endl;
+        return false;
+    }
     ifprintf(info, "SNP\tREF(0)\tALT(1)\tALT_Frq\tMAF\tAvgCall\tRsq\tGenotyped\tLooRsq\tEmpR\tEmpRsq\tDose0\tDose1\n");
+
+    return true;
 }
 
 void Analysis::MemDisplay()
@@ -941,6 +973,7 @@ void Analysis::CloseStreamOutputFiles()
 
     cout<<endl<<" Info file written to                    : "<< MyAllVariables->myOutFormat.OutPrefix + ".info" <<endl;
     ifclose(info);
+    free(InfoPrintStringPointer);
 
     if (MyAllVariables->myOutFormat.hapOutput && !MyAllVariables->myOutFormat.unphasedOutput)
     {
@@ -951,6 +984,7 @@ void Analysis::CloseStreamOutputFiles()
     if(MyAllVariables->myOutFormat.vcfOutput)
     {
         ifclose(vcfdosepartial);
+        free(VcfPrintStringPointer);
         cout<<" Imputed VCF information written to      : "<< MyAllVariables->myOutFormat.OutPrefix + ".dose.vcf" + (gzip ? ".gz" : "")<<endl;
     }
 
@@ -1152,6 +1186,7 @@ void Analysis::GetCurrentPanelReady(int ChunkNo, HaplotypeSet &ThisRefPanel,
             if(i==(ThisRefPanel.NoBlocks-1))
                  Mapper[j]=i;
         }
+        
     }
 
 
@@ -1242,7 +1277,9 @@ void Analysis::GetCurrentPanelReady(int ChunkNo, HaplotypeSet &ThisRefPanel,
 
         for(i=RefStartPos; i<=RefEndPos; i++)
         {
-    //        ThisRefPanel.VariantList[i-RefStartPos]=referencePanel.VariantList[i];
+            if(MyAllVariables->myOutFormat.verbose)
+                ThisRefPanel.VariantList[i-RefStartPos]=referencePanel.VariantList[i];
+
     //        ThisTarPanel.missing[i-RefStartPos]=targetPanel.missing[i];
             if(i<RefEndPos)
                 ThisRefPanel.Recom[i-RefStartPos]=referencePanel.Recom[i];
@@ -1258,25 +1295,42 @@ void Analysis::GetCurrentPanelReady(int ChunkNo, HaplotypeSet &ThisRefPanel,
         }
     }
 
-
-    int time_prev = time(0);
-
-    cout << "\n Compressing reference panel at GWAS sites ... "<<endl;
-
     ThisRefPanel.CalculateAlleleFreq();
     ThisTarPanel.CalculateGWASOnlyAlleleFreq();
-    ThisRefChipOnlyPanel.UncompressTypedSitesNew(ThisRefPanel,ThisTarPanel);
-
-    thisDataFast.TimeToCompress = time(0) - time_prev;
-    time_prev=time(0);
-    cout << " Re-compression successful (" << TimeToCompress<< " seconds) !!!"<<endl;
-
-    for(int i=0;i<MyAllVariables->myModelVariables.cpus;i++)
+        
+    if(!MyAllVariables->myModelVariables.minimac3)
     {
-        thisDataFast.MainMarkovModel[i].AssignPanels(ThisRefPanel,ThisRefChipOnlyPanel,ThisTarPanel,ThisTarPanel,MyAllVariables);
-        thisDataFast.MainMarkovModel[i].initializeMatricesNew();
+        int time_prev = time(0);
 
+        cout << "\n Compressing reference panel at GWAS sites ... "<<endl;
+
+        ThisRefChipOnlyPanel.UncompressTypedSitesNew(ThisRefPanel,ThisTarPanel,ChunkNo);
+
+        thisDataFast.TimeToCompress = time(0) - time_prev;
+        time_prev=time(0);
+        cout << " Re-compression successful (" << thisDataFast.TimeToCompress<< " seconds) !!!"<<endl;
+
+        for(int i=0;i<MyAllVariables->myModelVariables.cpus;i++)
+        {
+            thisDataFast.MainMarkovModel[i].AssignPanels(ThisRefPanel,ThisRefChipOnlyPanel,ThisTarPanel,ThisTarPanel,MyAllVariables);
+            thisDataFast.MainMarkovModel[i].initializeMatrices();
+
+        }     
     }
+    else
+    {
+        int time_prev = time(0);
+
+      
+       
+        for(int i=0;i<MyAllVariables->myModelVariables.cpus;i++)
+        {
+            thisDataFast.MainMarkovModel[i].AssignPanels(ThisRefPanel,ThisTarPanel,MyAllVariables);
+            thisDataFast.MainMarkovModel[i].initializeMatricesMinimac3();
+
+        }     
+    }
+
 
 }
 
@@ -1314,11 +1368,11 @@ void Analysis::GetCurrentPanelReady(int ChunkNo, HaplotypeSet &ThisRefPanel,
     InitializeRefChipOnlyChunkData(CurrentRefPanelChipOnly);
     stats.PreInitialize(MaxRefMarkerSize);
 
-    if(MyAllVariables->myOutFormat.memUsage)
-    {
-        RefMem = CurrentRefPanel.size();
-        ComRefMem = CurrentRefPanelChipOnly.size();
-    }
+//    if(MyAllVariables->myOutFormat.memUsage)
+//    {
+//        RefMem = CurrentRefPanel.size();
+//        ComRefMem = CurrentRefPanelChipOnly.size();
+//    }
  }
 
 
@@ -1337,17 +1391,17 @@ void Analysis::GetCurrentPanelReady(int ChunkNo, HaplotypeSet &ThisRefPanel,
 
     InitializeTargetChipOnlyChunkData(CurrentTarPanelChipOnly);
 
-    if(MyAllVariables->myOutFormat.memUsage)
-    {
-        TarMem = CurrentTarPanelChipOnly.size();
-    }
+//    if(MyAllVariables->myOutFormat.memUsage)
+//    {
+//        TarMem = CurrentTarPanelChipOnly.size();
+//    }
 
  }
 
 
  String Analysis::RunEstimation(String &Reffilename, String &Recomfilename, String &Errorfilename)
 {
-    int time_prev=time(0);
+//    int time_prev=time(0);
 
 
 //	if (!targetPanel.ScaffoldGWAStoReference(referencePanel,*MyAllVariables))
@@ -1527,6 +1581,12 @@ void Analysis::GetCurrentPanelReady(int ChunkNo, HaplotypeSet &ThisRefPanel,
         return "Command.Line.Error";
     }
 
+//    if(MyAllVariables->myOutFormat.verbose)
+//    {
+//        MyAllVariables->myHapDataVariables.ChunkLengthMb=299;
+//    }
+
+
     if(!MyAllVariables->myModelVariables.processReference)
     {
 
@@ -1540,8 +1600,9 @@ void Analysis::GetCurrentPanelReady(int ChunkNo, HaplotypeSet &ThisRefPanel,
     }
     else
     {
-        cout <<" ERROR !!! \n Currently Minimac4 does NOT support \"--processReference\" "<<endl;
-        cout <<" Please contact author at [sayantan@umich.edu] for updated information ... "<<
+        cout << "\n ERROR !!! The current version of Minimac4 does NOT support \"--processReference\"  "<<endl;
+        cout <<   " Please use Minimac3 if you need to process a VCF file"<<endl;
+        cout<<    " We will implement this feature in Minimac4 very soon "<<endl;
         cout << "\n Program Exiting ... \n\n";
         return "Command.Line.Error";
     }

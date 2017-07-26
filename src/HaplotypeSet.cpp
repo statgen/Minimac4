@@ -5,7 +5,7 @@
 
 #include "STLUtilities.h"
 
-void HaplotypeSet::UncompressTypedSitesNew(HaplotypeSet &rHap,HaplotypeSet &tHap)
+void HaplotypeSet::UncompressTypedSitesNew(HaplotypeSet &rHap,HaplotypeSet &tHap,int ChunkNo)
 {
 //    outFile=MyAllVariables->myOutFormat.OutPrefix;
     vcfType=false;
@@ -59,7 +59,10 @@ void HaplotypeSet::UncompressTypedSitesNew(HaplotypeSet &rHap,HaplotypeSet &tHap
 //        assert(ThisMarkerIndex<ThisRhapInfo.BlockSize);
 
         AlleleFreq[ThisPanelIndex]=rHap.AlleleFreq[RefmarkerIndex];
-//        VariantList[ThisPanelIndex]=rHap.VariantList[RefmarkerIndex];
+        if(MyAllVariables->myOutFormat.verbose)
+        {
+            VariantList[ThisPanelIndex]=rHap.VariantList[RefmarkerIndex];
+        }
         CompHaplotypes[currentPiece].Push(j,ThisMarkerIndex);
 
 
@@ -114,8 +117,6 @@ void HaplotypeSet::UncompressTypedSitesNew(HaplotypeSet &rHap,HaplotypeSet &tHap
                     vector<int> offsets(3,0);
                     for (int i = 0; i < numHaplotypes; i++)
                     {
-
-//                        assert(CompHaplotypes[ThisPiece].GetVal(i)==CompHaplotypes[ThisPiece].GetVal(i, length - 1));
                         offsets[CompHaplotypes[ThisPiece].GetVal(i) - '0' + 1]++;
                     }
 
@@ -123,8 +124,6 @@ void HaplotypeSet::UncompressTypedSitesNew(HaplotypeSet &rHap,HaplotypeSet &tHap
                     oldIndex = index;
                     for (int i = 0; i < numHaplotypes; i++)
                     {
-//                        cout<<CompHaplotypes[ThisPiece].GetVal(i)<<"\t";
-//                        assert(CompHaplotypes[ThisPiece].GetVal(i)==CompHaplotypes[ThisPiece].GetVal(i, length - 1));
                         index[offsets[CompHaplotypes[ThisPiece].GetVal(oldIndex[i],length - 1) - '0']++] = oldIndex[i];
                     }
 
@@ -180,7 +179,15 @@ void HaplotypeSet::UncompressTypedSitesNew(HaplotypeSet &rHap,HaplotypeSet &tHap
     CreateScaffoldedParameters(rHap);
     InvertUniqueIndexMap();
 
-//    writem3vcfFile( outFile+".GWAS", MyAllVariables->myOutFormat.gzip);
+    if(MyAllVariables->myOutFormat.verbose)
+    {
+        stringstream strs;
+        strs<<(ChunkNo+1);
+        string ss=(string)MyAllVariables->myOutFormat.OutPrefix+".chunk."+(string)(strs.str())+".GWAS";
+        String tempString(ss.c_str());
+
+        writem3vcfFile( tempString, MyAllVariables->myOutFormat.gzip);
+    }
 
 
 }
@@ -283,7 +290,6 @@ void HaplotypeSet::CreateSiteSummary()
         if(maxRepSize<TempBlock.RepSize)
             maxRepSize=TempBlock.RepSize;
 
-//            cout<<" WELL = "<<maxRepSize<<"\t"<<TempBlock.RepSize<<endl;
     }
 
     MarkerToReducedInfoMapper.resize(numMarkers, 0);
@@ -298,7 +304,6 @@ void HaplotypeSet::CreateSiteSummary()
         if(i==(NoBlocks-1))
              MarkerToReducedInfoMapper[j]=i;
     }
-//abort();
 
 
 }
@@ -371,12 +376,6 @@ void HaplotypeSet::UpdateParameterList()
     MyModelVariables=&(MyAllVariables->myModelVariables);
     MyHapDataVariables=&(MyAllVariables->myHapDataVariables);
 
-//    RsId=MyAllVariables->myOutFormat.RsId;
-//    outFile=MyAllVariables->myOutFormat.OutPrefix;
-//    gzip=MyAllVariables->myOutFormat.gzip;
-//    Filter=MyAllVariables->myHapDataVariables.passOnly;
-
-
 }
 
 
@@ -394,7 +393,6 @@ bool HaplotypeSet::ReadBlockHeaderSummary(string &line, ReducedHaplotypeInfoSumm
 
     if(CheckBlockPosFlag(line, MyHapDataVariables->CHR, MyHapDataVariables->START, MyHapDataVariables->END)==1)
         return true;
-
 
     return false;
 
@@ -521,14 +519,14 @@ void HaplotypeSet::ReadThisBlock(IFILE m3vcfxStream,
         m3vcfxStream->readLine(line);
         MyTokenize(BlockPieces, line.c_str(), tabSep,9);
 
-        vector<bool> &TempHap = tempBlock.TransposedUniqueHaps[tempIndex];
+        vector<AlleleType> &TempHap = tempBlock.TransposedUniqueHaps[tempIndex];
 
         string &tempString=BlockPieces[8];
 
         for(int index=0;index<tempBlock.RepSize;index++)
         {
             char t=tempString[index];
-            TempHap[index]=(t=='0'? false:true);
+            TempHap[index]=(t);
         }
     }
 
@@ -631,8 +629,9 @@ bool HaplotypeSet::BasicCheckForM3VCFReferenceHaplotypes(String &Reffilename,
     {
 
         cout << "\n ERROR !!! \n VCF Format detected ...";
-        cout << "\n For usual imputation, Reference File provided by \"--refHaps\" must be a M3VCF file !!! \n";
-        cout << " Use handle \"--processReference\" to convert VCF to M3VCF file ...";
+        cout << "\n The current version of Minimac4 can ONLY handle M3VCF files for imputation "<<endl;
+        cout <<   " Please convert the VCF file to M3VCF using Minimac3 "<<endl;
+        cout<<    " We will implement this feature in Minimac4 very soon "<<endl;
         cout << "\n Program Exiting ... \n\n";
         return false;
     }
@@ -679,6 +678,8 @@ bool HaplotypeSet::GetVariantInfofromVCFFile(String &VCFFileName, String TypeofF
 
     while (inFile.readRecord(record))
     {
+
+
 
         int flag=0;
         cno=record.getChromStr();
@@ -1009,7 +1010,7 @@ bool HaplotypeSet::ScaffoldGWAStoReference(HaplotypeSet &rHap, AllVariable& MyAl
     cout<<"                     "<< numTypedOnlyMarkers<<" variants imported that exist only in Target/GWAS panel"<<endl;
 
 
-    VariantList.clear();
+//    VariantList.clear();
 	if (numOverlapMarkers == 0)
 	{
 
@@ -1243,10 +1244,10 @@ void HaplotypeSet::writem3vcfFile(String filename,bool &gzip)
                      Error[j+tempInfo.startIndex],(j+tempInfo.startIndex)<(int)Recom.size()?Recom[j+tempInfo.startIndex]:0);
             ifprintf(m3vcffile, "\t");
 
-            vector<bool> &TempHap = tempInfo.TransposedUniqueHaps[j];
+            vector<AlleleType> &TempHap = tempInfo.TransposedUniqueHaps[j];
             for(k=0;k<reps;k++)
             {
-                ifprintf(m3vcffile,"%d",!TempHap[k]? 0:1);
+                ifprintf(m3vcffile,"%c",TempHap[k]);
             }
             ifprintf(m3vcffile, "\n");
         }
@@ -1260,9 +1261,14 @@ void HaplotypeSet::writem3vcfFile(String filename,bool &gzip)
 string HaplotypeSet::DetectFileType(String filename)
 {
     IFILE fileStream = ifopen(filename, "r");
+//    IFILE fileStream = NULL;
     string line;
+
+//    cout<<" WELL = "<<endl;
+//    abort();
     if(fileStream)
     {
+
         fileStream->readLine(line);
         if(line.length()<1)
             {
@@ -1318,10 +1324,10 @@ void HaplotypeSet::CalculateAlleleFreq()
         ReducedHaplotypeInfo &TempBlock=ReducedStructureInfo[k];
         for(j=TempBlock.startIndex;j<TempBlock.endIndex + (k==(NoBlocks-1)? 1:0) ;j++)
         {
-            vector<bool> &TempHap = TempBlock.TransposedUniqueHaps[j-TempBlock.startIndex];
+            vector<AlleleType> &TempHap = TempBlock.TransposedUniqueHaps[j-TempBlock.startIndex];
             for (i = 0; i<TempBlock.RepSize; i++)
             {
-                if(TempHap[i])
+                if(TempHap[i]=='1')
                 {
                     AlleleFreq[j]+=TempBlock.uniqueCardinality[i];
                 }
@@ -1352,10 +1358,10 @@ void HaplotypeSet::CalculateGWASOnlyAlleleFreq()
         {
             for (i = 0; i<numTypedOnlyMarkers; i++)
             {
-                if(!GWASOnlyMissingSampleUnscaffolded[haplotypeIndex][i])
+                if(GWASOnlyMissingSampleUnscaffolded[haplotypeIndex][i]=='0')
                 {
                     TotalSample[i]++;
-                    if(GWASOnlyhaplotypesUnscaffolded[haplotypeIndex][i])
+                    if(GWASOnlyhaplotypesUnscaffolded[haplotypeIndex][i]=='1')
                         GWASOnlyAlleleFreq[i]++;
                 }
             }
@@ -1370,12 +1376,12 @@ void HaplotypeSet::CalculateGWASOnlyAlleleFreq()
 }
 
 
-bool HaplotypeSet::RetrieveMissingScaffoldedHaplotype(int sample,int marker)
+AlleleType HaplotypeSet::RetrieveMissingScaffoldedHaplotype(int sample,int marker)
 {
     return MissingSampleUnscaffolded[sample][marker];
 }
 
-bool HaplotypeSet::RetrieveScaffoldedHaplotype(int sample,int marker)
+AlleleType HaplotypeSet::RetrieveScaffoldedHaplotype(int sample,int marker)
 {
     return haplotypesUnscaffolded[sample][marker];
 }

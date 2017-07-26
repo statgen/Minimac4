@@ -131,7 +131,7 @@ void DosageData::PrintDiploidDosage(float &x, float &y)
 
         if(colonIndex)
             PrintStringLength+=sprintf(PrintStringPointer+PrintStringLength,":");
-        PrintStringLength+=sprintf(PrintStringPointer+PrintStringLength,"%.3f|%.3f",x , y);
+        PrintStringLength+=sprintf(PrintStringPointer+PrintStringLength,"%.3f,%.3f",x , y);
         colonIndex=true;
     }
     if(MyAllVariables->myOutFormat.GP)
@@ -234,7 +234,7 @@ void DosageData::PrintDosageForVcfOutputForID(int MarkerIndex)
         else
             abort();
 
-        if(MyAllVariables->myOutFormat.meta && !rHapFull->Targetmissing[MarkerIndex] )
+        if(MyAllVariables->myOutFormat.meta && rHapFull->MapRefToTar[MarkerIndex]!=-1 )
         {
 
             int gwasHapIndex = tHapFull->CummulativeSampleNoHaplotypes[SampleIndex[IndexId]];
@@ -242,34 +242,30 @@ void DosageData::PrintDosageForVcfOutputForID(int MarkerIndex)
 
             int TypedMarkerIndex = rHapFull->MapRefToTar[MarkerIndex];
 
-//            assert(TypedMarkerIndex<LoohapDosage[0].size());
-//            assert(TypedMarkerIndex<tHapFull->MissingSampleUnscaffolded[0].size());
-//            assert(gwasHapIndex<tHapFull->MissingSampleUnscaffolded.size());
-
             if(NoHaps==2)
             {
-                 if( tHapFull->MissingSampleUnscaffolded[gwasHapIndex][TypedMarkerIndex] || tHapFull->MissingSampleUnscaffolded[gwasHapIndex+1][TypedMarkerIndex])
+                 if( tHapFull->MissingSampleUnscaffolded[gwasHapIndex][TypedMarkerIndex]=='1' || tHapFull->MissingSampleUnscaffolded[gwasHapIndex+1][TypedMarkerIndex]=='1')
                  {
                      PrintEmpStringLength+=sprintf(PrintEmpStringPointer+PrintEmpStringLength,"\t.|.:.|.");
                  }
                  else
                  {
                      PrintDiploidLooDosage((LoohapDosage[2*IndexId])[TypedMarkerIndex] , (LoohapDosage[2*IndexId+1])[TypedMarkerIndex] ,
-                                      tHapFull->haplotypesUnscaffolded[gwasHapIndex][TypedMarkerIndex],
-                                      tHapFull->haplotypesUnscaffolded[gwasHapIndex+1][TypedMarkerIndex]);
+                                      (tHapFull->haplotypesUnscaffolded[gwasHapIndex][TypedMarkerIndex]=='1'),
+                                      (tHapFull->haplotypesUnscaffolded[gwasHapIndex+1][TypedMarkerIndex]=='1'));
                  }
 
             }
             else if(NoHaps==1)
             {
-                 if( tHapFull->MissingSampleUnscaffolded[gwasHapIndex][TypedMarkerIndex])
+                 if( tHapFull->MissingSampleUnscaffolded[gwasHapIndex][TypedMarkerIndex]=='1' )
                  {
                      PrintEmpStringLength+=sprintf(PrintEmpStringPointer+PrintEmpStringLength,"\t.:.");
                  }
                  else
                  {
                      PrintHaploidLooDosage((LoohapDosage[2*IndexId])[TypedMarkerIndex] ,
-                                      tHapFull->haplotypesUnscaffolded[gwasHapIndex][TypedMarkerIndex]);
+                                      (tHapFull->haplotypesUnscaffolded[gwasHapIndex][TypedMarkerIndex]=='1'));
                  }
             }
             else
@@ -279,7 +275,7 @@ void DosageData::PrintDosageForVcfOutputForID(int MarkerIndex)
     }
 
     PrintStringLength+=sprintf(PrintStringPointer+PrintStringLength,"\n");
-    if(MyAllVariables->myOutFormat.meta && !rHapFull->Targetmissing[MarkerIndex] )
+    if(MyAllVariables->myOutFormat.meta && rHapFull->MapRefToTar[MarkerIndex]!=-1 )
         PrintEmpStringLength+=sprintf(PrintEmpStringPointer+PrintEmpStringLength,"\n");
 
 }
@@ -299,27 +295,27 @@ void DosageData::PrintGWASOnlyForVcfOutputForID(int MarkerIndex)
 
         if(NoHaps==2)
         {
-            bool a1=tHapFull->GWASOnlyMissingSampleUnscaffolded[gwasHapIndex][MarkerIndex];
-            bool a2=tHapFull->GWASOnlyMissingSampleUnscaffolded[gwasHapIndex+1][MarkerIndex];
+            bool a1=(tHapFull->GWASOnlyMissingSampleUnscaffolded[gwasHapIndex][MarkerIndex]=='1');
+            bool a2=(tHapFull->GWASOnlyMissingSampleUnscaffolded[gwasHapIndex+1][MarkerIndex]=='1');
 
             if(a1 || a2)
                 PrintDiploidDosage(freq,freq);
             else
              {
-                 x=(float)tHapFull->GWASOnlyhaplotypesUnscaffolded[gwasHapIndex][MarkerIndex];
-                 y=(float)tHapFull->GWASOnlyhaplotypesUnscaffolded[gwasHapIndex+1][MarkerIndex];
+                 x=(float)(tHapFull->GWASOnlyhaplotypesUnscaffolded[gwasHapIndex][MarkerIndex]=='1');
+                 y=(float)(tHapFull->GWASOnlyhaplotypesUnscaffolded[gwasHapIndex+1][MarkerIndex]=='1');
                  PrintDiploidDosage(x, y);
             }
         }
 
         else if(NoHaps==1)
         {
-            bool a1=tHapFull->GWASOnlyMissingSampleUnscaffolded[gwasHapIndex][MarkerIndex];
+            bool a1=(tHapFull->GWASOnlyMissingSampleUnscaffolded[gwasHapIndex][MarkerIndex]=='1');
             if(a1)
                 PrintHaploidDosage(freq);
             else
              {
-                 x=(float)tHapFull->GWASOnlyhaplotypesUnscaffolded[gwasHapIndex][MarkerIndex];
+                 x=(float)(tHapFull->GWASOnlyhaplotypesUnscaffolded[gwasHapIndex][MarkerIndex]=='1');
                  PrintHaploidDosage(x);
              }
 
@@ -381,7 +377,8 @@ void DosageData::InitializePartialDosageData(HaplotypeSet &tarInitializer, int M
         }
 
     PrintStringPointer = (char*)malloc(sizeof(char) * (MyAllVariables->myOutFormat.PrintBuffer));
-    PrintEmpStringPointer = (char*)malloc(sizeof(char) * (MyAllVariables->myOutFormat.PrintBuffer));
+    if(MyAllVariables->myOutFormat.meta)
+        PrintEmpStringPointer = (char*)malloc(sizeof(char) * (MyAllVariables->myOutFormat.PrintBuffer));
     individualName=tarInitializer.individualName;
 
 }

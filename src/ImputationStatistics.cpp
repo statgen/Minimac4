@@ -18,8 +18,8 @@ void ImputationStatistics::NewUpdate(HaplotypeSet &rHap,HaplotypeSet &tHap, int 
         count[i] ++;
     }
 
-    vector<bool> &UnScaff = tHap.haplotypesUnscaffolded[hapId];
-    vector<bool> &MissUnScaff = tHap.MissingSampleUnscaffolded[hapId];
+    vector<AlleleType> &UnScaff = tHap.haplotypesUnscaffolded[hapId];
+    vector<AlleleType> &MissUnScaff = tHap.MissingSampleUnscaffolded[hapId];
 
     int index=0;
     for (int i = 0; i < numRefMarkers; i++)
@@ -27,14 +27,14 @@ void ImputationStatistics::NewUpdate(HaplotypeSet &rHap,HaplotypeSet &tHap, int 
         if(!rHap.Targetmissing[i])
         {
 //            assert(index<tHap.numMarkers);
-            if(!MissUnScaff[index])
+            if(MissUnScaff[index]=='0')
             {
-                bool observed=UnScaff[index];
+                AlleleType observed=UnScaff[index];
                 float &LooVal = (*loo)[index];
                 looSum[i] += LooVal;
                 looSumSq[i] += LooVal * LooVal;
-                looProduct[i] += (observed) ? LooVal : 0.0;
-                looObserved[i] += (observed) ? 1.0 : 0.0;
+                looProduct[i] += (observed == '1') ? LooVal : 0.0;
+                looObserved[i] += (observed == '1') ? 1.0 : 0.0;
                 looCount[i]++;
             }
 

@@ -34,12 +34,12 @@ class HaplotypeSet
 
 
 
-		// Reduced Haplotype Information
+        // Reduced Haplotype Information
 
-		vector<ReducedHaplotypeInfo> ReducedStructureInfo;
-		vector<ReducedHaplotypeInfoSummary> ReducedStructureInfoSummary;
-		vector<vector<ReducedHaplotypeInfo> > ReducedStructureInfoBuffer;
-		vector<int> MarkerToReducedInfoMapper;
+        vector<ReducedHaplotypeInfo> ReducedStructureInfo;
+        vector<ReducedHaplotypeInfoSummary> ReducedStructureInfoSummary;
+        vector<vector<ReducedHaplotypeInfo> > ReducedStructureInfoBuffer;
+        vector<int> MarkerToReducedInfoMapper;
 
 
 
@@ -47,24 +47,24 @@ class HaplotypeSet
 
         // Special Haplotype Variables for GWAS Panel
 
-        vector<vector<bool> >     haplotypesUnscaffolded;
-		vector<vector<bool> >     MissingSampleUnscaffolded;
-        vector<vector<bool> >     GWASOnlyhaplotypesUnscaffolded;
-		vector<vector<bool> >     GWASOnlyMissingSampleUnscaffolded;
+        vector<vector<AlleleType> >     haplotypesUnscaffolded;
+        vector<vector<AlleleType> >     MissingSampleUnscaffolded;
+        vector<vector<AlleleType> >     GWASOnlyhaplotypesUnscaffolded;
+        vector<vector<AlleleType> >     GWASOnlyMissingSampleUnscaffolded;
 
 
         // Variant and Sample Information and Allele Freq
 
         vector<bool> Targetmissing;
         vector<string> individualName;
-		vector<int> SampleNoHaplotypes;
-		vector<int> CummulativeSampleNoHaplotypes;
-		vector<int> *SampleNoHaplotypesPointer;
-		vector<variant> VariantList;
-		vector<variant> TypedOnlyVariantList;
-		vector<variant> OverlapOnlyVariantList;
-		vector<double> AlleleFreq;
-		vector<double> GWASOnlyAlleleFreq;
+        vector<int> SampleNoHaplotypes;
+        vector<int> CummulativeSampleNoHaplotypes;
+        vector<int> *SampleNoHaplotypesPointer;
+        vector<variant> VariantList;
+        vector<variant> TypedOnlyVariantList;
+        vector<variant> OverlapOnlyVariantList;
+        vector<double> AlleleFreq;
+        vector<double> GWASOnlyAlleleFreq;
         vector<double>      Recom,Error;
 
 
@@ -74,8 +74,8 @@ class HaplotypeSet
         vector<int> knownPosition;
         vector<int> importIndexList;
         vector<bool> RefAlleleSwap;
-		vector<int>        MapTarToRef;
-		vector<int>        MapRefToTar;
+        vector<int>        MapTarToRef;
+        vector<int>        MapRefToTar;
         vector<int> TargetMissingTypedOnly;
         vector<int> RefTypedIndex;
 
@@ -85,8 +85,8 @@ class HaplotypeSet
 
         // Printing Indexing Variables
 
-		int PrintStartIndex,PrintEndIndex;
-		int PrintTypedOnlyStartIndex,PrintTypedOnlyEndIndex;
+        int PrintStartIndex,PrintEndIndex;
+        int PrintTypedOnlyStartIndex,PrintTypedOnlyEndIndex;
         vector<int> FlankRegionStart,FlankRegionEnd;
 
 
@@ -107,9 +107,10 @@ class HaplotypeSet
             S+=RefAlleleSwap.size() * sizeof(bool);
 
 
+            S+=RefTypedIndex.size() * sizeof(int);
             S+=optEndPoints.size() * sizeof(int);
+            S+=CummulativeSampleNoHaplotypes.size() * sizeof(int);
             S+=SampleNoHaplotypes.size() * sizeof(bool);
-            S+=Targetmissing.size() * sizeof(int);
             S+=MarkerToReducedInfoMapper.size() * sizeof(int);
             S+=AlleleFreq.size() * sizeof(double);
             S+=GWASOnlyAlleleFreq.size() * sizeof(double);
@@ -142,17 +143,33 @@ class HaplotypeSet
             {
                 S+=ReducedStructureInfo[i].size();
             }
+            for(int i=0;i<(int)ReducedStructureInfoSummary.size();i++)
+            {
+                S+=ReducedStructureInfoSummary[i].size();
+            }
+
+
+
+
+            for(int j=0;j<(int)ReducedStructureInfoBuffer.size();j++)
+                for(int i=0;i<(int)ReducedStructureInfoBuffer[j].size();i++)
+                {
+                    S+=ReducedStructureInfoBuffer[j][i].size();
+                }
+
+
+
 
             for(int i=0;i<(int)haplotypesUnscaffolded.size();i++)
             {
-                S+=haplotypesUnscaffolded[i].size() * sizeof(bool);
-                S+=MissingSampleUnscaffolded[i].size() * sizeof(bool);
+                S+=haplotypesUnscaffolded[i].size() * sizeof(AlleleType);
+                S+=MissingSampleUnscaffolded[i].size() * sizeof(AlleleType);
             }
 
             for(int i=0;i<(int)GWASOnlyhaplotypesUnscaffolded.size();i++)
             {
-                S+=GWASOnlyhaplotypesUnscaffolded[i].size() * sizeof(bool);
-                S+=GWASOnlyMissingSampleUnscaffolded[i].size() * sizeof(bool);
+                S+=GWASOnlyhaplotypesUnscaffolded[i].size() * sizeof(AlleleType);
+                S+=GWASOnlyMissingSampleUnscaffolded[i].size() * sizeof(AlleleType);
             }
             return (S);
         };
@@ -185,7 +202,7 @@ class HaplotypeSet
 
 
 
-void UncompressTypedSitesNew(HaplotypeSet &rHap,HaplotypeSet &tHap);
+void UncompressTypedSitesNew(HaplotypeSet &rHap,HaplotypeSet &tHap,int ChunkNo);
 void CreateScaffoldedParameters(HaplotypeSet &rHap);
 void CreateAfterUncompressSummary();
 void InvertUniqueIndexMap();
@@ -212,8 +229,8 @@ void    writem3vcfFile                              (String filename,bool &gzip)
 string  DetectFileType                        (String filename);
 void CalculateGWASOnlyAlleleFreq();
 void CalculateAlleleFreq();
-bool RetrieveMissingScaffoldedHaplotype(int sample,int marker);
-bool RetrieveScaffoldedHaplotype(int sample,int marker);
+AlleleType RetrieveMissingScaffoldedHaplotype(int sample,int marker);
+AlleleType RetrieveScaffoldedHaplotype(int sample,int marker);
 void MyTokenize(vector<string> &result,const char *input,const char *delimiter, int Number);
 string FindTokenWithPrefix(const char *input,const char *delimiter,string CheckPrefix);
 int CheckBlockPosFlag(string &input,String &CHR,int &START,int &END);

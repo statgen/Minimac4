@@ -44,6 +44,11 @@
     ThisRefPanel.Recom.resize(MaxRefMarkerSize);
     ThisRefPanel.Error.resize(MaxRefMarkerSize);
     ThisRefPanel.AlleleFreq.resize(MaxRefMarkerSize);
+    if(MyAllVariables->myOutFormat.verbose)
+    {
+        ThisRefPanel.VariantList.resize(MaxRefMarkerSize);
+    }
+
  }
 
 
@@ -54,13 +59,20 @@
 
     ThisRefPanel.numHaplotypes=NoRefHaps;
     ThisRefPanel.numSamples=referencePanel.numSamples;
-    ThisRefPanel.MyAllVariables=MyAllVariables;
-
     ThisRefPanel.MarkerToReducedInfoMapper.resize(MaxGwasMarkerSize);
     ThisRefPanel.Recom.resize(MaxGwasMarkerSize);
     ThisRefPanel.Error.resize(MaxGwasMarkerSize);
     ThisRefPanel.AlleleFreq.resize(MaxGwasMarkerSize);
+    ThisRefPanel.MyAllVariables=MyAllVariables;
+
+    if(MyAllVariables->myOutFormat.verbose)
+    {
+        ThisRefPanel.individualName=referencePanel.individualName;
+        ThisRefPanel.SampleNoHaplotypes=referencePanel.SampleNoHaplotypes;
+        ThisRefPanel.VariantList.resize(MaxGwasMarkerSize);
+    }
  }
+
 
  void Analysis::InitializeTargetChipOnlyChunkData(HaplotypeSet &ThisTarPanel)
  {
@@ -76,10 +88,10 @@
     ThisTarPanel.individualName=targetPanel.individualName;
 
     ThisTarPanel.haplotypesUnscaffolded.resize(tempnumHaplotypes);
-	ThisTarPanel.MissingSampleUnscaffolded.resize(tempnumHaplotypes);
+    ThisTarPanel.MissingSampleUnscaffolded.resize(tempnumHaplotypes);
 
 
-	if(MyAllVariables->myOutFormat.TypedOnly)
+    if(MyAllVariables->myOutFormat.TypedOnly)
     {
         ThisTarPanel.GWASOnlyhaplotypesUnscaffolded.resize(tempnumHaplotypes);
         ThisTarPanel.GWASOnlyMissingSampleUnscaffolded.resize(tempnumHaplotypes);
@@ -89,14 +101,14 @@
 
 	for (int i = 0; i<tempnumHaplotypes; i++)
 	{
-		ThisTarPanel.haplotypesUnscaffolded[i].resize(MaxGwasMarkerSize, false);
-        ThisTarPanel.MissingSampleUnscaffolded[i].resize(MaxGwasMarkerSize, false);
-        if(MyAllVariables->myOutFormat.TypedOnly)
-        {
-            ThisTarPanel.TypedOnlyVariantList.resize(MaxTypedOnlyMarkerSize);
-            ThisTarPanel.GWASOnlyhaplotypesUnscaffolded[i].resize(MaxTypedOnlyMarkerSize, false);
-            ThisTarPanel.GWASOnlyMissingSampleUnscaffolded[i].resize(MaxTypedOnlyMarkerSize, false);
-        }
+            ThisTarPanel.haplotypesUnscaffolded[i].resize(MaxGwasMarkerSize, '0');
+            ThisTarPanel.MissingSampleUnscaffolded[i].resize(MaxGwasMarkerSize, '0');
+            if(MyAllVariables->myOutFormat.TypedOnly)
+            {
+                ThisTarPanel.TypedOnlyVariantList.resize(MaxTypedOnlyMarkerSize);
+                ThisTarPanel.GWASOnlyhaplotypesUnscaffolded[i].resize(MaxTypedOnlyMarkerSize, '0');
+                ThisTarPanel.GWASOnlyMissingSampleUnscaffolded[i].resize(MaxTypedOnlyMarkerSize, '0');
+            }
 	}
 
 
@@ -276,13 +288,15 @@ void Analysis::ImportChunksToTarget()
     int i=0;
     for(int CurrentChunkNo=0; CurrentChunkNo<noChunks; CurrentChunkNo++)
     {
-        while(i<targetPanel.numOverlapMarkers && targetPanel.OverlapOnlyVariantList[i].bp < MyChunks[CurrentChunkNo][0] )
+
+        while(i<targetPanel.numOverlapMarkers && targetPanel.MapTarToRef[i]<MyRefVariantNumber[CurrentChunkNo][0])
         {
             i++;
         }
+
         MyTargetVariantNumber[CurrentChunkNo][0]=i;
 
-        while(i<targetPanel.numOverlapMarkers && targetPanel.OverlapOnlyVariantList[i].bp <= MyChunks[CurrentChunkNo][3] )
+        while(i<targetPanel.numOverlapMarkers && targetPanel.MapTarToRef[i] <= MyRefVariantNumber[CurrentChunkNo][1] )
         {
             i++;
         }
@@ -400,7 +414,7 @@ bool Analysis::CheckChunkValidityandPrintChunk()
     {
         cout<<"\n ERROR !!! ERROR !!! ERROR !!! "<<endl;
         cout<<" Chunk "<< InIndex+1<<" has 0 variants from the reference panel in it ... "<<endl;
-        cout<<" Please increase the value of \"--chunkSize\" to analyze larger chunks ..." <<endl<<endl;
+        cout<<" Please increase the value of \"--ChunkLengthMb\" to analyze larger chunks ..." <<endl<<endl;
         return false;
 
     }
@@ -408,7 +422,7 @@ bool Analysis::CheckChunkValidityandPrintChunk()
     {
         cout<<"\n ERROR !!! ERROR !!! ERROR !!! "<<endl;
         cout<<" Chunk "<< MaIndex+1<<" has 0 variants from the GWAS panel in it ... "<<endl;
-        cout<<" Please increase the value of \"--chunkSize\" to analyze larger chunks ..." <<endl<<endl;
+        cout<<" Please increase the value of \"--ChunkLengthMb\" to analyze larger chunks ..." <<endl<<endl;
         cout<<" Program Exiting ... "<<endl<<endl;
         return false;
 
@@ -417,7 +431,7 @@ bool Analysis::CheckChunkValidityandPrintChunk()
     {
         cout<<"\n ERROR !!! ERROR !!! ERROR !!! "<<endl;
         cout<<" Chunk "<< raIndex+1<<" has less than "<<MyAllVariables->myHapDataVariables.minRatio <<"\% of variants from the GWAS panel overlapping with the reference panel ... "<<endl;
-        cout<<" Please increase the value of \"--chunkSize\" to analyze larger chunks "<<endl;
+        cout<<" Please increase the value of \"--ChunkLengthMb\" to analyze larger chunks "<<endl;
         cout<<" or decrease the value of \"--minRatio\" = " <<MyAllVariables->myHapDataVariables.minRatio <<endl<<endl;
         return false;
 
@@ -461,7 +475,7 @@ bool Analysis::CheckChunkValidityForParamEstimationandPrintChunk()
     {
         cout<<"\n ERROR !!! ERROR !!! ERROR !!! "<<endl;
         cout<<" Chunk "<< InIndex+1<<" has 0 variants from the reference panel in it ... "<<endl;
-        cout<<" Please increase the value of \"--chunkSize\" to analyze larger chunks ..." <<endl<<endl;
+        cout<<" Please increase the value of \"--ChunkLengthMb\" to analyze larger chunks ..." <<endl<<endl;
         return false;
 
     }

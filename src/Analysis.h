@@ -148,7 +148,7 @@ void MemDisplay();
                                         int StartBlock, int EndBlock, int StartNextBlock);
                 void                    readVcfFileChunk(HaplotypeSet &ThisTargetPanel, HaplotypeSet &NextTargetPanel,
                                         int StartPos, int EndPos, int StartNextPos, int ChunkNo);
-                void                    OpenStreamOutputFiles();
+                bool                    OpenStreamOutputFiles();
                 void                    CloseStreamOutputFiles();
                 void                    InitializeRefFileStream(String &Reffilename);
                 void                    InitializeTargetFileStream(String &Tarfilename);

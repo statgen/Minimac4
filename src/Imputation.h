@@ -31,7 +31,6 @@ class Imputation
         public:
 
             // Haplotype Variables and Other Basic Variables
-
             HaplotypeSet *THapUnchunked, *rHapChunked;
             AllVariable *MyAllVariables;
             int ChunkNo, TotalNovcfParts;
@@ -39,13 +38,10 @@ class Imputation
 
 
             // File Output Stream handling
-
             IFILE dosages, hapdose, haps, vcfdosepartial, info;
             ImputationStatistics *stats;
 
             // Dosage Date for Output
-
-//            vector<DosageData> TwoPartialDosageData;
             DosageData SinglePartialDosageData;
             DosageData* CurrentPartialDosageData;
 
@@ -53,68 +49,38 @@ class Imputation
             int TimeToCompress, TimeToImpute, TimeToWrite;
 
 
-            Imputation          (AllVariable *MyAllVariable, IFILE Dosages, IFILE Hapdose,IFILE Haps,IFILE Vcfdosepartial,
-                                 IFILE Info, ImputationStatistics &Stats)
-                                {
-                                    MyAllVariables=MyAllVariable;
-                                    dosages=Dosages;
-                                    hapdose=Hapdose;
-                                    haps=Haps;
-                                    vcfdosepartial=Vcfdosepartial;
-                                    info=Info;
-                                    stats=&Stats;
-                                    TimeToWrite=0;
-                                    TimeToImpute=0;
-                                    TimeToCompress=0;
+            double Dosagesize()
+            {
+                double S=0;
+                S+=SinglePartialDosageData.size();
+                return (S);
+            };
 
-                                };
+            double Probsize()
+            {
+                double S=0;
+                for(int i=0;i<MyAllVariables->myModelVariables.cpus;i++)
+                {
+                    S+=MainMarkovModel[i].size();
+                }
+                return (S);
+            };
 
 
-
-
-    double Dosagesize()
-    {
-        double S=0;
-        S+=SinglePartialDosageData.size();
-        return (S);
-    };
-
-    double Probsize()
-    {
-        double S=0;
-
-        for(int i=0;i<MyAllVariables->myModelVariables.cpus;i++)
-        {
-            S+=MainMarkovModel[i].size();
-        }
-
-        return (S);
-    };
+void Minimac3ImputeThisChunk(int ChunkId, HaplotypeSet &FullrHap, HaplotypeSet &tgwasHap, HaplotypeSet &rgwasHap);
 
 
         void                            performImputationBasedonTypedSites(HaplotypeSet &tHap,
-                                                    HaplotypeSet &rHap,
-                                                    HaplotypeSet &tHapOrig,
-                                                    HaplotypeSet &FullrHap);
-
-
-
+                                                                    HaplotypeSet &rHap,
+                                                                    HaplotypeSet &tHapOrig,
+                                                                    HaplotypeSet &FullrHap);
         MarkovParameters*               createEstimates             (HaplotypeSet &rHap,HaplotypeSet &tHap,vector<int> &optStructure,bool NoTargetEstimation);
         void                            splitFoldedProb             (vector<float> &SplitProb,vector<float> &totalProb, vector<float> &noRecomProb);
         void                            performImputation           (HaplotypeSet &tHap,HaplotypeSet &rHap, String Golden);
-
-
-        void ImputeThisChunk(int ChunkId, HaplotypeSet &rHapOriginal
-                                 ,HaplotypeSet &tgwasHap, HaplotypeSet &rgwasHap);
-
-
-        void                            performImputationNew           (HaplotypeSet &tHap,HaplotypeSet &rHap);
-
-
+        void                            ImputeThisChunk             (int ChunkId, HaplotypeSet &rHapOriginal
+                                                                    ,HaplotypeSet &tgwasHap, HaplotypeSet &rgwasHap);
+        void                            performImputationNew        (HaplotypeSet &tHap,HaplotypeSet &rHap);
         void                            LooOptimalStructure         (int loo,HaplotypeSet &rHap, HaplotypeSet &HapLoo);
-        void                            Condition                   (HaplotypeSet &rHap, int markerPos,vector<float> &Prob,
-                                                                    vector<float> &noRecomProb,
-                                                                    double e, double freq, bool observed, double backgroundError, int NoRedStates, ReducedHaplotypeInfo &Info);
         double                          CalculateLikelihood         (HaplotypeSet &rHap,MarkovModel &MM);
         void                            ImputeTraverse              (HaplotypeSet &rHap,HaplotypeSet &tHap,int hapID,
                                                                     MarkovModel &MM,int group, vector<float> &recomProb,
@@ -123,14 +89,13 @@ class Imputation
                                                                     vector<float> &CurrentNoRecoRightProb,
                                                                     HaplotypeSet &rHapMain);
         void                            ImputeTraverse              (HaplotypeSet &rHap,
-                                                                        int hapID,
-                                                                      MarkovModel &MM,int group, vector<float> &recomProb,
-                                                                      vector<float> &PrevRightFoldedProb,
-                                                                      vector<float> &CurrentRightProb,
-                                                                      vector<float> &CurrentNoRecoRightProb);
-        void                            LeftTraverse                (HaplotypeSet &rHap,HaplotypeSet &tHap,int hapID,
+                                                                    int hapID,
                                                                     MarkovModel &MM,int group, vector<float> &recomProb,
-                                                                    HaplotypeSet &rHapMain);
+                                                                    vector<float> &PrevRightFoldedProb,
+                                                                    vector<float> &CurrentRightProb,
+                                                                    vector<float> &CurrentNoRecoRightProb);
+        void                            LeftTraverse                (HaplotypeSet &rHap,HaplotypeSet &tHap,int hapID,
+                                                                    MarkovModel &MM,int group, vector<float> &recomProb);
         void                            EMTraverse                  (HaplotypeSet &rHap,HaplotypeSet &tHap,int hapID,
                                                                     MarkovModel &MM,int group, vector<float> &recomProb,
                                                                     vector<float> &PrevRightFoldedProb,
@@ -138,7 +103,7 @@ class Imputation
                                                                     vector<float> &CurrentNoRecoRightProb,
                                                                     HaplotypeSet &rHapMain);
         void                            ConditionJunctionProb       (HaplotypeSet &rHap, int markerPos,vector<float> &Prob,
-                                                                    double e, double freq, bool observed, double backgroundError,
+                                                                    double e, double freq, AlleleType observed, double backgroundError,
                                                                     ReducedHaplotypeInfo &Info);
         void                            FlushPartialVcf             (HaplotypeSet &rHap,HaplotypeSet &tHap,HaplotypeSet &PartialDosage, string &filename,int &Index);
         void                            MergeFinalVcf               (HaplotypeSet &rHap,HaplotypeSet &tHap,ImputationStatistics &stats,int MaxIndex);
@@ -146,12 +111,26 @@ class Imputation
         void                            PrintDosageData             (int ThisSampleId, vector<float> &ThisDosage1,vector<float> &ThisDosage2);
         void                            PrintHaplotypeData          (int ThisHapId, int ThisSampleId, vector<float> *ThisimputedHap);
         void                            PrintInfoFile               (HaplotypeSet &rHap,HaplotypeSet &tHap, ImputationStatistics &stats);
+        void                            OutputFilesInitialize       (HaplotypeSet &rHap,HaplotypeSet &tHapOrig);
+        void                            InitializeOutputFiles       (HaplotypeSet &tarInitializer, int maxSample,
+                                                                     int maxRefVar, int maxTarVar);
+        void                            FreeMemory                  ();
 
 
-
-void OutputFilesInitialize(HaplotypeSet &rHap,HaplotypeSet &tHapOrig);
-void InitializeOutputFiles(HaplotypeSet &tarInitializer, int maxSample, int maxRefVar, int maxTarVar);
-
+                                        Imputation                  (AllVariable *MyAllVariable, IFILE Dosages, IFILE Hapdose,IFILE Haps,IFILE Vcfdosepartial,
+                                                                    IFILE Info, ImputationStatistics &Stats)
+                                                                    {
+                                                                        MyAllVariables=MyAllVariable;
+                                                                        dosages=Dosages;
+                                                                        hapdose=Hapdose;
+                                                                        haps=Haps;
+                                                                        vcfdosepartial=Vcfdosepartial;
+                                                                        info=Info;
+                                                                        stats=&Stats;
+                                                                        TimeToWrite=0;
+                                                                        TimeToImpute=0;
+                                                                        TimeToCompress=0;
+                                                                    };
 
 
 };

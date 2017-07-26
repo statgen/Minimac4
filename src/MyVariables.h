@@ -21,6 +21,8 @@ public:
     bool        unphasedOutput;
     bool GT,DS,GP,HDS,SD;
     String OutPrefix;
+    string CommandLine;
+    char* MyCommandLine;
     bool onlyrefmarkers;
     bool gzip,RsId,nobgzip,meta;
 //    vector<bool> format;
@@ -170,6 +172,25 @@ public:
     };
 
 
+void CreateCommandLine(int argc, char ** argv)
+{
+    int len = 0;
+
+    for (int i=0; i<argc; i++)
+        len += strlen(argv[i]) + 1;
+
+    char MyCommandLine[len];
+    strcpy(MyCommandLine,argv[0]);
+
+    for (int i=1; i<argc; i++)
+    {
+        strcat(MyCommandLine, " ");
+        strcat(MyCommandLine, argv[i]);
+    }
+    CommandLine=MyCommandLine;
+}
+
+
 };
 
 
@@ -178,13 +199,14 @@ class ModelVariable
 public:
 
     bool        processReference,  updateModel ;
-    double      probThreshold;
+    double      probThreshold, diffThreshold, topThreshold;
     bool constantParam;
     bool lowMemory;
     int rounds, states;
     int transFactor;
     int cisFactor ;
     int cpus;
+    int minimac3;
 
     ModelVariable()
     {
@@ -192,6 +214,8 @@ public:
         processReference = false;
         updateModel = false;
         probThreshold = 0.01;
+        diffThreshold = 0.01;
+        topThreshold = 0.01;
         lowMemory = false;
         rounds = 5;
         states = 200;
@@ -201,7 +225,7 @@ public:
         #ifdef _OPENMP
             cpus=5;
         #endif
-
+        minimac3=false;
 
 
     };
@@ -265,10 +289,24 @@ public:
             cout<<" Program Exiting ..."<<endl<<endl;
             return false;
         }
-        if(probThreshold<0.0 || probThreshold>1.0)
+        if(probThreshold<0.0 || probThreshold>=1.0)
         {
             cout << " ERROR !!! \n Invalid input for \"--probThreshold\" = "<<probThreshold<<"\n";;
-            cout << " Value must be between 0.0 and 1.0 (inclusive) !!! \n\n";
+            cout << " Value must be between 0.0 and 1.0 (NOT inclusive) !!! \n\n";
+            cout<<" Program Exiting ..."<<endl<<endl;
+            return false;
+        }
+        if(diffThreshold<0.0 || diffThreshold>=1.0)
+        {
+            cout << " ERROR !!! \n Invalid input for \"--diffThreshold\" = "<<diffThreshold<<"\n";;
+            cout << " Value must be between 0.0 and 1.0 (NOT inclusive) !!! \n\n";
+            cout<<" Program Exiting ..."<<endl<<endl;
+            return false;
+        }
+        if(topThreshold<0.0 || topThreshold>=1.0)
+        {
+            cout << " ERROR !!! \n Invalid input for \"--topThreshold\" = "<<topThreshold<<"\n";;
+            cout << " Value must be between 0.0 and 1.0 (NOT inclusive) !!! \n\n";
             cout<<" Program Exiting ..."<<endl<<endl;
             return false;
         }
