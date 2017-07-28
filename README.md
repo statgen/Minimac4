@@ -1,8 +1,7 @@
 # Minimac4
 
-To compile from git repo after cloning:
-
+## EXTRACT MINIMAC4 AND COMPILE
+ 
 cd minimac4/
-
 ./install.sh
 
