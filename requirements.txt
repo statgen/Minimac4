@@ -1,0 +1,1 @@
+statgen/libStatGen --cmake dep/libstatgen.cmake
