@@ -101,13 +101,13 @@
 
 	for (int i = 0; i<tempnumHaplotypes; i++)
 	{
-		ThisTarPanel.haplotypesUnscaffolded[i].resize(MaxGwasMarkerSize, false);
-        ThisTarPanel.MissingSampleUnscaffolded[i].resize(MaxGwasMarkerSize, false);
+		ThisTarPanel.haplotypesUnscaffolded[i].resize(MaxGwasMarkerSize, '0');
+        ThisTarPanel.MissingSampleUnscaffolded[i].resize(MaxGwasMarkerSize, '0');
         if(MyAllVariables->myOutFormat.TypedOnly)
         {
             ThisTarPanel.TypedOnlyVariantList.resize(MaxTypedOnlyMarkerSize);
-            ThisTarPanel.GWASOnlyhaplotypesUnscaffolded[i].resize(MaxTypedOnlyMarkerSize, false);
-            ThisTarPanel.GWASOnlyMissingSampleUnscaffolded[i].resize(MaxTypedOnlyMarkerSize, false);
+            ThisTarPanel.GWASOnlyhaplotypesUnscaffolded[i].resize(MaxTypedOnlyMarkerSize, '0');
+            ThisTarPanel.GWASOnlyMissingSampleUnscaffolded[i].resize(MaxTypedOnlyMarkerSize, '0');
         }
 	}
 

@@ -184,17 +184,40 @@ class MarkovModel : public MarkovParameters
                                              HaplotypeSet &tarFullHap,
                                              AllVariable *MyAllVariable)
                                             {
+        MyAllVariables=MyAllVariable;
+
+        rHap=&refFullHap;
+        tHap=&tarFullHap;
+
+        refCount=rHap->numHaplotypes;
+        tarCount=tHap->numHaplotypes;
+        NoRefMarkers=rHap->numMarkers;
+        NoChipSites=tHap->numMarkers;
+        backgroundError = 1e-5;
+    };
+        void AssignPanels                   (HaplotypeSet &refFullHap,
+                                             AllVariable *MyAllVariable)
+                                            {
                                                 MyAllVariables=MyAllVariable;
-                                                
                                                 rHap=&refFullHap;
-                                                tHap=&tarFullHap;
-                                                
                                                 refCount=rHap->numHaplotypes;
-                                                tarCount=tHap->numHaplotypes;
                                                 NoRefMarkers=rHap->numMarkers;
-                                                NoChipSites=tHap->numMarkers;
+                                                NoChipSites=rHap->numMarkers;
                                                 backgroundError = 1e-5;
                                             };
+        void CountExpected                  (int hapID,int group);
+        void CreatePosteriorProb            (vector<float> &Leftprob,vector<float> &rightProb,
+                                            vector<float> &leftNoRecoProb,vector<float> &rightNoRecoProb,
+                                            vector<float> &leftEndProb,vector<float> &rightEndProb,
+                                             ReducedHaplotypeInfo &Info);
+        double CountRecombinants            (vector<float> &from, vector<float> &to,
+                                            double r,bool PrecisionMultiply);
+        double CountErrors                  (int markerPos,
+                                            AlleleType observed,
+                                            double e,double freq,
+                                            ReducedHaplotypeInfo &Info);
+
+
 
 
 

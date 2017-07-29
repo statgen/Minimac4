@@ -38,7 +38,7 @@ class Imputation
 
 
             // File Output Stream handling
-            IFILE dosages, hapdose, haps, vcfdosepartial, info;
+            IFILE dosages, hapdose, haps, vcfdosepartial, info, m3vcfFile, recFile, errFile;
             ImputationStatistics *stats;
 
             // Dosage Date for Output
@@ -116,6 +116,7 @@ void Minimac3ImputeThisChunk(int ChunkId, HaplotypeSet &FullrHap, HaplotypeSet &
                                                                      int maxRefVar, int maxTarVar);
         void                            FreeMemory                  ();
 
+        void                            ParameterEstimateThisChunk  (int ChunkId, HaplotypeSet &FullrHap, HaplotypeSet &rHap_loo);
 
                                         Imputation                  (AllVariable *MyAllVariable, IFILE Dosages, IFILE Hapdose,IFILE Haps,IFILE Vcfdosepartial,
                                                                     IFILE Info, ImputationStatistics &Stats)
@@ -133,6 +134,14 @@ void Minimac3ImputeThisChunk(int ChunkId, HaplotypeSet &FullrHap, HaplotypeSet &
                                                                     };
 
 
+
+    Imputation                  (AllVariable *MyAllVariable, IFILE m3vcf, IFILE recom, IFILE error)
+    {
+        MyAllVariables=MyAllVariable;
+        m3vcfFile = m3vcf;
+        recFile = recom;
+        errFile = error;
+    };
 };
 
 

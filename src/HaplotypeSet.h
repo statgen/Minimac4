@@ -30,7 +30,7 @@ class HaplotypeSet
         string finChromosome;
         bool PseudoAutosomal;
         bool  vcfType,m3vcfxType;
-        vector<int>        optEndPoints;
+      //  vector<int>        optEndPoints;
 
 
 
@@ -108,7 +108,7 @@ class HaplotypeSet
 
 
             S+=RefTypedIndex.size() * sizeof(int);
-            S+=optEndPoints.size() * sizeof(int);
+//            S+=optEndPoints.size() * sizeof(int);
             S+=CummulativeSampleNoHaplotypes.size() * sizeof(int);
             S+=SampleNoHaplotypes.size() * sizeof(bool);
             S+=MarkerToReducedInfoMapper.size() * sizeof(int);
@@ -213,7 +213,8 @@ bool ReadBlockHeaderSummary(string &line, ReducedHaplotypeInfoSummary &tempBlock
 void GetVariantInfoFromBlock(IFILE m3vcfxStream, ReducedHaplotypeInfoSummary &tempBlock,int &NoMarkersImported);
 bool ReadBlockHeader(string &line, ReducedHaplotypeInfo &tempBlocktoCheck);
 void ReadThisBlock(IFILE m3vcfxStream, int blockIndex, ReducedHaplotypeInfo &tempBlock);
-
+void Create(int index, HaplotypeSet &rHap);
+void reconstructHaplotype(vector<AlleleType> &reHaplotypes,int &index);
 bool BasicCheckForM3VCFReferenceHaplotypes(String &Reffilename, AllVariable& MyAllVariable);
 bool BasicCheckForTargetHaplotypes(String &VCFFileName, String TypeofFile, AllVariable& MyAllVariable);
 bool BasicCheckForVCFReferenceHaplotypes(String &VCFFileName, String TypeofFile, AllVariable& MyAllVariable);

@@ -198,7 +198,7 @@ class ModelVariable
 {
 public:
 
-    bool        processReference,  updateModel ;
+    bool        processReference,  reEstimate, updateModel ;
     double      probThreshold, diffThreshold, topThreshold;
     bool constantParam;
     bool lowMemory;
@@ -212,6 +212,7 @@ public:
     {
         constantParam=false;
         processReference = false;
+        reEstimate=false;
         updateModel = false;
         probThreshold = 0.01;
         diffThreshold = 0.01;
@@ -235,44 +236,67 @@ public:
         if(processReference)
         {
 
-            cout<<" NOTE: Since \"--processReference\" is ON, all options under \"Target Haplotypes\" \n";
-            cout<<"       and \"Starting Parameters\" will be ignored !!!\n";
-            cout<<"       Program will only estimate parameters and create M3VCF file.\n";
+            cout<<" NOTE: Since \"--estimate\" is ON, all options under \"Target Haplotypes\" \n";
+            cout<<"       will be ignored !!!\n";
+            cout<<"       Program will only estimate parameters and create a M3VCF file.\n";
             cout<<"       No imputation will be performed, hence other parameters are unnecessary !!!"<<endl<<endl;
 
-            cout<<" NOTE: If \"--processReference\" is ON, Parameter Estimation will be done by default ! \n";
-            cout<<"       Use \"--rounds 0\" to AVOID Parameter Estimation !!!\n"<<endl<<endl;
-
-            if(updateModel)
-            {
-
-                cout<<" ERROR !!! \n Handle \"--updateModel\" does NOT work with handle \"--processReference\" !!! \n";
-                cout<<" Program Exiting ..."<<endl<<endl;
-                return false;
-            }
-
-        }
-
-        if(updateModel)
-        {
-
-            cout<<" NOTE: Handle \"--updateModel\" works only on M3VCF files ! \n";
-            cout<<"       Program will NOT run if \"--refHaps\" is a VCF file !!!\n"<<endl;
 
             if(rounds<=0)
             {
                 cout << " ERROR !!! \n Invalid input for \"--rounds\" = "<<rounds<<"\n";;
-                cout << " Value must be POSITIVE if \"--updateModel\" is ON !!! \n\n";
+                cout << " Value must be POSITIVE if \"--estimate\" is ON !!! \n\n";
                 cout<<" Program Exiting ..."<<endl<<endl;
                 return false;
             }
             if(states<=0)
             {
                 cout << " ERROR !!! \n Invalid input for \"--states\" = "<<states<<"\n";;
-                cout << " Value must be POSITIVE if \"--updateModel\" is ON !!! \n\n";
+                cout << " Value must be POSITIVE if \"--estimate\" is ON !!! \n\n";
                 cout<<" Program Exiting ..."<<endl<<endl;
                 return false;
             }
+
+        }
+
+        if(reEstimate)
+        {
+
+            processReference=reEstimate;
+
+            cout<<" NOTE: Since \"--reEstimate\" is ON, all options under \"Target Haplotypes\" \n";
+            cout<<"       will be ignored !!!\n";
+            cout<<"       Program will only estimate parameters and create a M3VCF file.\n";
+            cout<<"       No imputation will be performed, hence other parameters are unnecessary !!!"<<endl<<endl;
+
+
+            if(rounds<=0)
+            {
+                cout << " ERROR !!! \n Invalid input for \"--rounds\" = "<<rounds<<"\n";;
+                cout << " Value must be POSITIVE if \"--reEstimate\" is ON !!! \n\n";
+                cout<<" Program Exiting ..."<<endl<<endl;
+                return false;
+            }
+            if(states<=0)
+            {
+                cout << " ERROR !!! \n Invalid input for \"--states\" = "<<states<<"\n";;
+                cout << " Value must be POSITIVE if \"--reEstimate\" is ON !!! \n\n";
+                cout<<" Program Exiting ..."<<endl<<endl;
+                return false;
+            }
+
+        }
+
+
+        if(constantParam && processReference)
+        {
+            {
+                cout << " ERROR !!! \n Invalid input !\n";;
+                cout << " Both \"--constantParam\" and \"--estimate\" cannot be ON at the same time !!! \n\n";
+                cout << " Program Exiting ..."<<endl<<endl;
+                return false;
+            }
+
         }
 
         if(rounds<0)

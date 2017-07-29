@@ -96,8 +96,6 @@ void MarkovModel::ImputeSitesMinimac3(int hapID,int group)
     PrevRightFoldedProb = ThisBlockRightProb[endIndex-startIndex];
     ThisBlockRightNoRecoProb[endIndex-startIndex] = ThisBlockRightProb[endIndex-startIndex];
     noReducedStatesCurrent=Info.RepSize;
-    NoSitesToUnfold=0;
-    MostProbableTemplate=-1;
 
     fill(Constants.begin(), Constants.end(), 0.0);
     for(int i=0;i<refCount;i++)
@@ -846,32 +844,8 @@ void MarkovModel::initializeMatricesMinimac3()
 
     // Full Dimension Variable Initialize (NO NEED TO REINITLAIZE)
 
-    FoldedProbValue.resize(rHap->maxRepSize);
-    probHapFullAverage.resize(rHap->numHaplotypes);
-    FirstFoldedValue.resize(rHap->maxRepSize);
-    UnfoldTheseSites.resize(rHap->maxBlockSize);
-
-    LeftAdj_Rec.resize(rHap->maxRepSize);
-    LeftAdj_NoRrec.resize(rHap->maxRepSize);
-    RightAdj_Rec.resize(rHap->maxRepSize);
-    RightAdj_NoRec.resize(rHap->maxRepSize);
 
 
-
-    FinalBestMatchfHaps.resize(rHap->maxRepSize);
-    FinalBestMatchfHapsIndicator.resize(rHap->maxRepSize);
-    if(MyAllVariables->myModelVariables.probThreshold>0.0)
-    {
-        BestMatchHaps.resize(rHap->maxRepSize);
-        BestMatchFullRefHaps.resize(refCount);
-    }
-    else
-    {
-        for(int i=0;i<rHap->maxRepSize ;i++)
-        {
-            FinalBestMatchfHaps[i]=i;
-        }
-    }
 
 
 
@@ -1304,6 +1278,225 @@ bool MarkovModel::LeftTranspose(vector<float> &from,
 
 
  }
+
+
+
+
+double MarkovModel::CountErrors(int markerPos,
+                                AlleleType observed,
+                                double e,double freq,
+                                ReducedHaplotypeInfo &Info)
+{
+
+    double match = 0;
+    double mismatch = 0;
+    double background = 0;
+    vector<AlleleType> &TempHap = Info.TransposedUniqueHaps[markerPos-Info.startIndex];
+
+    for (int i = 0; i < noReducedStatesCurrent; i++)
+    {
+
+        if(TempHap[i]==observed)
+            match += probHapMinimac3[i];
+        else
+            mismatch += probHapMinimac3[i];
+    }
+
+
+    background = (match + mismatch) * backgroundError;
+    mismatch = (match + mismatch) * e *freq;
+    match *= 1.0 - e;
+
+    return mismatch / (mismatch + match + background);
+}
+
+
+double MarkovModel::CountRecombinants(vector<float> &from, vector<float> &to,
+                                      double r,bool PrecisionMultiply)
+{
+    if (r == 0)
+        return 0.0;
+
+    double fromSum = 0.0,toSum=0.0,totalSum=0.0;
+
+    for (int i = 0; i < noReducedStatesCurrent; i++)
+    {
+        fromSum += from[i];
+        toSum += to[i];
+        totalSum+=probHapMinimac3[i];
+    }
+
+    double rsum = fromSum*r*toSum/(double)refCount;
+
+    if(PrecisionMultiply)
+        return (1e15*rsum / totalSum);
+    else
+        return (rsum / totalSum);
+}
+
+
+void MarkovModel::CreatePosteriorProb( vector<float> &Leftprob,vector<float> &rightProb,
+                                       vector<float> &leftNoRecoProb,vector<float> &rightNoRecoProb,
+                                       vector<float> &leftEndProb,vector<float> &rightEndProb,
+                                       ReducedHaplotypeInfo &Info)
+{
+
+    for(int i=0;i<noReducedStatesCurrent;i++)
+    {
+        probHapMinimac3[i] = Constants[i]*(leftNoRecoProb[i]*rightNoRecoProb[i]/(leftEndProb[i]*rightEndProb[i]))
+                             +(Leftprob[i]*rightProb[i]-leftNoRecoProb[i]*rightNoRecoProb[i])*(Info.InvuniqueCardinality[i]);
+    }
+}
+
+
+
+void MarkovModel::CountExpected(int hapID,int group)
+{
+
+    vector<float> &juncLeftprob = junctionLeftProb[group];
+    vector<float> &juncRightProb = PrevjunctionRightProb;
+    ReducedHaplotypeInfo &Info=rHap->ReducedStructureInfo[group];
+    vector<double> &alleleFreq=rHap->AlleleFreq;
+    ReCreateLeftNoRecoProbMinimac3(*tHap,hapID,group,Info,alleleFreq);
+    vector<vector<float> > &Leftprob = leftProb[group];
+    vector<vector<float> > &leftNoRecomProb= ThisBlockLeftNoRecoProb;
+    int startIndex=Info.startIndex;
+    int endIndex=Info.endIndex;
+    PrevRightFoldedProb = ThisBlockRightProb[endIndex-startIndex];
+    ThisBlockRightNoRecoProb[endIndex-startIndex] = ThisBlockRightProb[endIndex-startIndex];
+    noReducedStatesCurrent=Info.RepSize;
+    fill(Constants.begin(), Constants.end(), 0.0);
+    for(int i=0;i<refCount;i++)
+        Constants[Info.uniqueIndexMap[i]]+=(juncLeftprob[i]*juncRightProb[i]);
+
+
+    CreatePosteriorProb( Leftprob[endIndex-startIndex], ThisBlockRightProb[endIndex-startIndex],
+                         leftNoRecomProb[endIndex-startIndex],ThisBlockRightProb[endIndex-startIndex],
+                         Leftprob[0],PrevRightFoldedProb,Info);
+
+    int TargetMarkerPosition = rHap->MapRefToTar[endIndex];
+    if (TargetMarkerPosition!=-1 && tHap->RetrieveMissingScaffoldedHaplotype(hapID, TargetMarkerPosition)=='0')
+    {
+        empError[endIndex]+=CountErrors(endIndex,
+                                        tHap->RetrieveScaffoldedHaplotype(hapID, TargetMarkerPosition),
+                                        Error[endIndex],
+                                        tHap->RetrieveScaffoldedHaplotype(hapID, TargetMarkerPosition)=='1'?
+                                        alleleFreq[endIndex] : 1-alleleFreq[endIndex],
+                                        Info);
+
+    }
+    else
+        empError[endIndex]+=Error[endIndex];
+
+
+    for (int markerPos=endIndex-1; markerPos>startIndex; markerPos--)
+    {
+
+
+        int TargetMarkerPosition = rHap->MapRefToTar[markerPos+1];
+        if (TargetMarkerPosition!=-1 && tHap->RetrieveMissingScaffoldedHaplotype(hapID, TargetMarkerPosition)=='0')
+        {
+            RightCondition(markerPos+1,ThisBlockRightProb[markerPos-startIndex+1],
+                           ThisBlockRightProb[markerPos-startIndex],
+                           ThisBlockRightNoRecoProb[markerPos-startIndex+1],
+                           ThisBlockRightNoRecoProb[markerPos-startIndex],
+                           tHap->RetrieveScaffoldedHaplotype(hapID, TargetMarkerPosition),
+                           Error[markerPos+1],
+                           tHap->RetrieveScaffoldedHaplotype(hapID, TargetMarkerPosition)=='1'?
+                           alleleFreq[markerPos+1] : 1-alleleFreq[markerPos+1],Info);
+        }
+        else
+        {
+            ThisBlockRightProb[markerPos-startIndex]= ThisBlockRightProb[markerPos-startIndex+1];
+            ThisBlockRightNoRecoProb[markerPos-startIndex]= ThisBlockRightNoRecoProb[markerPos-startIndex+1];
+
+        }
+
+
+        empRecom[markerPos]+=CountRecombinants(Leftprob[markerPos-startIndex],
+                                               ThisBlockRightProb[markerPos-startIndex],
+                                               Recom[markerPos],
+                                               LeftPrecisionJump[markerPos+1]);
+
+        RightTranspose(ThisBlockRightProb[markerPos-startIndex],
+                       ThisBlockRightNoRecoProb[markerPos-startIndex],
+                       Recom[markerPos],
+                       Info.uniqueCardinality);
+
+        CreatePosteriorProb(Leftprob[markerPos-startIndex], ThisBlockRightProb[markerPos-startIndex],
+                            leftNoRecomProb[markerPos-startIndex], ThisBlockRightNoRecoProb[markerPos-startIndex],
+                            Leftprob[0],PrevRightFoldedProb,Info);
+
+        TargetMarkerPosition = rHap->MapRefToTar[markerPos];
+        if (TargetMarkerPosition!=-1 && tHap->RetrieveMissingScaffoldedHaplotype(hapID, TargetMarkerPosition)=='0')
+        {
+            empError[markerPos]+=CountErrors(markerPos,
+                                            tHap->RetrieveScaffoldedHaplotype(hapID, TargetMarkerPosition),
+                                            Error[markerPos],
+                                            tHap->RetrieveScaffoldedHaplotype(hapID, TargetMarkerPosition)=='1'?
+                                            alleleFreq[markerPos] : 1-alleleFreq[markerPos],Info);
+
+        }
+        else
+            empError[markerPos]+=Error[markerPos];
+
+    }
+
+
+     TargetMarkerPosition = rHap->MapRefToTar[startIndex+1];
+    if (TargetMarkerPosition!=-1 && tHap->RetrieveMissingScaffoldedHaplotype(hapID,TargetMarkerPosition)=='0')
+    {
+
+        RightCondition(startIndex+1, ThisBlockRightProb[1],
+                       ThisBlockRightProb[0],
+                       ThisBlockRightNoRecoProb[1],
+                       ThisBlockRightNoRecoProb[0],
+                       tHap->RetrieveScaffoldedHaplotype(hapID, TargetMarkerPosition),
+                       Error[startIndex+1],
+                       tHap->RetrieveScaffoldedHaplotype(hapID, TargetMarkerPosition)=='1'?
+                       alleleFreq[startIndex+1] : 1-alleleFreq[startIndex+1],Info);
+
+    }
+    else
+    {
+        ThisBlockRightProb[0]= ThisBlockRightProb[1];
+        ThisBlockRightNoRecoProb[0]= ThisBlockRightNoRecoProb[1];
+
+    }
+
+    empRecom[startIndex]+=CountRecombinants(Leftprob[0],
+                                           ThisBlockRightProb[0],
+                                           Recom[startIndex],
+                                           LeftPrecisionJump[startIndex+1]);
+
+    RightTranspose(ThisBlockRightProb[0],
+                   ThisBlockRightNoRecoProb[0],
+                   Recom[startIndex],
+                   Info.uniqueCardinality);
+
+    if(startIndex==0)
+    {
+        CreatePosteriorProb(Leftprob[0],
+                            ThisBlockRightProb[startIndex-startIndex],
+                            leftNoRecomProb[startIndex-startIndex],ThisBlockRightNoRecoProb[0],
+                            Leftprob[0],PrevRightFoldedProb,Info);
+
+
+        TargetMarkerPosition = rHap->MapRefToTar[startIndex];
+        if (TargetMarkerPosition!=-1 && tHap->RetrieveMissingScaffoldedHaplotype(hapID, TargetMarkerPosition)=='0')
+        {
+            empError[startIndex]+=CountErrors(startIndex,
+                                             tHap->RetrieveScaffoldedHaplotype(hapID, TargetMarkerPosition),
+                                            Error[startIndex],
+                                            tHap->RetrieveScaffoldedHaplotype(hapID, TargetMarkerPosition)=='1'?
+                                            alleleFreq[startIndex] : 1-alleleFreq[startIndex],Info);
+
+        }
+        else
+            empError[startIndex]+=Error[startIndex];
+    }
+
+}
 
 
 

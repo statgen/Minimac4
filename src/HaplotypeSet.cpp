@@ -220,11 +220,11 @@ void HaplotypeSet::CreateAfterUncompressSummary()
     int i,j;
     maxBlockSize=0;
     maxRepSize=0;
-    optEndPoints.clear();
+//    optEndPoints.clear();
     for(i=0;i<NoBlocks;i++)
     {
         ReducedHaplotypeInfo &TempBlock=ReducedStructureInfo[i];
-        optEndPoints.push_back(TempBlock.startIndex);
+//        optEndPoints.push_back(TempBlock.startIndex);
 
         if(maxBlockSize<TempBlock.BlockSize)
             maxBlockSize=TempBlock.BlockSize;
@@ -240,7 +240,7 @@ void HaplotypeSet::CreateAfterUncompressSummary()
         if(i==(NoBlocks-1))
              MarkerToReducedInfoMapper[j]=i;
     }
-    optEndPoints.push_back(ReducedStructureInfo[i-1].endIndex);
+//    optEndPoints.push_back(ReducedStructureInfo[i-1].endIndex);
 
 }
 
@@ -442,7 +442,7 @@ void HaplotypeSet::GetVariantInfoFromBlock(IFILE m3vcfxStream, ReducedHaplotypeI
                     Recom.push_back(0.01);
                     Error.push_back(0.001);
                 }
-                else
+                else if (!MyAllVariables->myModelVariables.processReference)
                 {
                     cout << "\n ERROR !!! \n No parameter estimates found in M3VCF file !!!"<<endl;
                     cout << " Please use M3VCF file with parameter estimates OR use handle \"--constantParam\" to override this check ... "<<endl;
@@ -452,6 +452,16 @@ void HaplotypeSet::GetVariantInfoFromBlock(IFILE m3vcfxStream, ReducedHaplotypeI
             }
             else
             {
+                if (MyAllVariables->myModelVariables.processReference && !MyAllVariables->myModelVariables.reEstimate)
+                {
+                    cout << "\n ERROR !!! \n Existing parameter estimates already found in M3VCF file !!!"<<endl;
+                    cout << " Are you sure you want to update them ? "<<endl;
+                    cout << " If Yes, please use handle \"--reEstimate\" to override this check "<<endl;
+                    cout << " Else, use M3VCF file without parameter estimates "<< endl;
+                    cout << "\n Program Exiting ... \n\n";
+                    abort();
+                }
+
                 Recom.push_back(tempRecom);
                 Error.push_back(tempError);
             }
@@ -468,6 +478,34 @@ void HaplotypeSet::GetVariantInfoFromBlock(IFILE m3vcfxStream, ReducedHaplotypeI
         tempBlock.endIndex=NoMarkersImported-1;
     }
 
+}
+
+
+void HaplotypeSet::reconstructHaplotype(vector<AlleleType> &reHaplotypes,int &index)
+{
+    int markerIndex=0,k;
+    for(int j=0;j<NoBlocks;j++)
+    {
+        int ThisIndex = ReducedStructureInfo[j].uniqueIndexMap[index];
+        for(k=0;k<(ReducedStructureInfo[j].BlockSize-1);k++)
+        {
+            reHaplotypes[markerIndex++]=ReducedStructureInfo[j].TransposedUniqueHaps[k][ThisIndex];
+        }
+
+        if(j==(NoBlocks-1))
+        {
+            reHaplotypes[markerIndex]=reHaplotypes[markerIndex++]=ReducedStructureInfo[j].TransposedUniqueHaps[k][ThisIndex];
+        }
+    }
+}
+
+
+void HaplotypeSet::Create(int index, HaplotypeSet &rHap)
+{
+    vector<AlleleType> padded(rHap.numMarkers);
+    rHap.reconstructHaplotype(padded,index);
+    numMarkers=(int)padded.size();
+    haplotypesUnscaffolded[0]= padded;
 }
 
 
@@ -1115,7 +1153,7 @@ bool HaplotypeSet::ReadM3VCFChunkingInformation(String &Reffilename,string check
             AlreadyReadMiddle=true;
             if(blockIndex==0)
             {
-               if(finChromosome!=checkChr)
+               if(checkChr!="" && finChromosome!=checkChr)
                {
                     cout << "\n ERROR !!! \n Reference Panel is on chromosome "<<finChromosome<<" which is ";
                     cout <<" different from chromosome "<< checkChr<<" of the GWAS panel  "<<endl;
