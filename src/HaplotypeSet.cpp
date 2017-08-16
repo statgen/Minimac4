@@ -1,7 +1,7 @@
 #include "HaplotypeSet.h"
-
 #include "assert.h"
-
+#define ALT_DELIM ','
+#define MONOMORPH_INDICATOR '-'
 
 #include "STLUtilities.h"
 
@@ -311,7 +311,45 @@ void HaplotypeSet::CreateSiteSummary()
 
 
 
-void HaplotypeSet::getm3VCFSampleNames(string line)
+void HaplotypeSet::UpdatePloidySummary(string &line)
+{
+    if (m3vcfVERSION == 1)
+        return;
+
+    CummulativeSampleNoHaplotypes.resize(numSamples, 0);
+    SampleNoHaplotypes.resize(numSamples, 0);
+
+    char *pch;
+    char *end_str1;
+    string tempString2, tempString, tempString3;
+    int colCount = 0, sampleCount = 0;
+    pch = strtok_r((char *) line.c_str(), "\t", &end_str1);
+
+    while (pch != NULL)
+    {
+        colCount++;
+        if (colCount > 9)
+        {
+            tempString = string(pch);
+            if(tempString.find('|')==string::npos)
+                SampleNoHaplotypes[sampleCount]=1;
+            else
+                SampleNoHaplotypes[sampleCount]=2;
+            sampleCount++;
+        }
+
+        pch = strtok_r (NULL,"\t", &end_str1);
+    }
+
+    for (int i = 1; i < numSamples; i++)
+        CummulativeSampleNoHaplotypes[i] += CummulativeSampleNoHaplotypes[i - 1] + SampleNoHaplotypes[i - 1];
+
+    numHaplotypes = CummulativeSampleNoHaplotypes.back()+SampleNoHaplotypes.back();
+}
+
+
+
+void HaplotypeSet::getm3VCFSampleNames(string &line)
 {
 
     individualName.clear();
@@ -331,7 +369,7 @@ void HaplotypeSet::getm3VCFSampleNames(string line)
     while(pch!=NULL)
     {
         colCount++;
-        if(colCount>9)
+        if(m3vcfVERSION==1 && colCount>9)
         {
             numHaplotypes++;
 
@@ -357,14 +395,21 @@ void HaplotypeSet::getm3VCFSampleNames(string line)
                 printErr(inFileName);
             }
         }
+        else if(m3vcfVERSION==2 && colCount>9)
+        {
+            numSamples++;
+            tempString=string(pch);
+            individualName.push_back(tempString);
+        }
         pch = strtok_r (NULL,"\t", &end_str1);
     }
 
-    CummulativeSampleNoHaplotypes.resize(numSamples,0);
-
-    for(int i=1;i<numSamples;i++)
-        CummulativeSampleNoHaplotypes[i]+=CummulativeSampleNoHaplotypes[i-1]+SampleNoHaplotypes[i-1];
-
+    if(m3vcfVERSION==1)
+    {
+        CummulativeSampleNoHaplotypes.resize(numSamples, 0);
+        for (int i = 1; i < numSamples; i++)
+            CummulativeSampleNoHaplotypes[i] += CummulativeSampleNoHaplotypes[i - 1] + SampleNoHaplotypes[i - 1];
+    }
 }
 
 
@@ -512,7 +557,7 @@ void HaplotypeSet::Create(int index, HaplotypeSet &rHap)
 
 bool HaplotypeSet::ReadBlockHeader(string &line, ReducedHaplotypeInfo &tempBlocktoCheck)
 {
-    const char* tabSep="\t";
+    const char* tabSep="\t", *dashSep="|";
     vector<string> BlockPieces(numHaplotypes+9);
 
     MyTokenize(BlockPieces, line.c_str(), tabSep,numHaplotypes+9);
@@ -527,12 +572,42 @@ bool HaplotypeSet::ReadBlockHeader(string &line, ReducedHaplotypeInfo &tempBlock
 
     int index=0;
 
-    while(index<numHaplotypes)
+    if(m3vcfVERSION==1) {
+        while (index < numHaplotypes) {
+            int tempval = atoi(BlockPieces[index + 9].c_str());
+            tempBlocktoCheck.uniqueIndexMap[index] = tempval;
+            tempBlocktoCheck.uniqueCardinality[tempval]++;
+            index++;
+        }
+    }
+    else if (m3vcfVERSION==2)
     {
-        int tempval=atoi(BlockPieces[index+9].c_str());
-        tempBlocktoCheck.uniqueIndexMap[index]=tempval;
-        tempBlocktoCheck.uniqueCardinality[tempval]++;
-        index++;
+        int haploIndex = 0;
+        while (index < numSamples)
+        {
+            if(SampleNoHaplotypes[index]==2)
+            {
+                vector<string> HaploPieces(2);
+                MyTokenize(HaploPieces, BlockPieces[index + 9].c_str(), dashSep, 2);
+
+                int tempval = atoi(HaploPieces[0].c_str());
+                tempBlocktoCheck.uniqueIndexMap[haploIndex++] = tempval;
+                tempBlocktoCheck.uniqueCardinality[tempval]++;
+
+                tempval = atoi(HaploPieces[1].c_str());
+                tempBlocktoCheck.uniqueIndexMap[haploIndex++] = tempval;
+                tempBlocktoCheck.uniqueCardinality[tempval]++;
+            }
+            else
+            {
+                int tempval = atoi(BlockPieces[index + 9].c_str());
+                tempBlocktoCheck.uniqueIndexMap[haploIndex++] = tempval;
+                tempBlocktoCheck.uniqueCardinality[tempval]++;
+            }
+
+            index++;
+        }
+
     }
 
     for (int i = 0; i < tempBlocktoCheck.RepSize; i++)
@@ -542,6 +617,51 @@ bool HaplotypeSet::ReadBlockHeader(string &line, ReducedHaplotypeInfo &tempBlock
 
     return false;
 
+}
+
+
+
+void HaplotypeSet::GetTransUniqueHapsVERSION2(int index, ReducedHaplotypeInfo &tempBlock, string &tempString)
+{
+    vector<AlleleType> &TempHap = tempBlock.TransposedUniqueHaps[index];
+    fill(TempHap.begin(), TempHap.end(), '0');
+    vector<int> AlternateAlleles;
+    AlternateAlleles.clear();
+    int prevVal = 0;
+
+    char *input=&tempString[0];
+    string word="";
+    while (*input)
+    {
+        if(*input==MONOMORPH_INDICATOR)
+        {
+            break;
+        }
+
+        if (*input==ALT_DELIM)
+        {
+            word.push_back('\0');
+            AlternateAlleles.push_back(prevVal+atoi(word.c_str()));
+            prevVal=AlternateAlleles.back();
+            word.clear();
+        }
+        else
+        {
+            word.push_back(*input);
+        }
+
+        input++;
+    }
+
+    if(word.c_str()!="")
+    {
+        word.push_back('\0');
+        AlternateAlleles.push_back(prevVal+atoi(word.c_str()));
+    }
+
+    for(int i=0; i<(int)AlternateAlleles.size(); i++) {
+        TempHap[AlternateAlleles[i]]='1';
+    }
 }
 
 
@@ -561,10 +681,14 @@ void HaplotypeSet::ReadThisBlock(IFILE m3vcfxStream,
 
         string &tempString=BlockPieces[8];
 
-        for(int index=0;index<tempBlock.RepSize;index++)
-        {
-            char t=tempString[index];
-            TempHap[index]=(t);
+        if(m3vcfVERSION==1) {
+            for (int index = 0; index < tempBlock.RepSize; index++) {
+                char t = tempString[index];
+                TempHap[index] = (t);
+            }
+        }
+        else if(m3vcfVERSION==2) {
+            GetTransUniqueHapsVERSION2(tempIndex, tempBlock, tempString);
         }
     }
 
@@ -1069,7 +1193,7 @@ void HaplotypeSet::GetSummary(IFILE m3vcfxStream)
     vector<string> headerTag(2);
     string line;
     const char *equalSep="=";
-    m3vcfxStream->readLine(line);
+    m3vcfVERSION=0;
 
     bool Header=true;
 
@@ -1090,6 +1214,23 @@ void HaplotypeSet::GetSummary(IFILE m3vcfxStream)
         {
             NoBlocks=atoi(headerTag[1].c_str());
         }
+
+        if(m3vcfVERSION==0 && headerTag[0].compare("##fileformat")==0)
+        {
+            string tempVer = headerTag[1].substr(5,5).c_str();
+            if(tempVer.length()==0)
+                m3vcfVERSION=1;
+            else if (tempVer=="v2.0")
+                m3vcfVERSION=2;
+            else
+            {
+                cout << "\n ERROR !!! \n Invalid M3VCF Version  : "<<tempVer<<endl;
+                cout << " Please check the file properly..\n";
+                cout << "\n Program Exiting ... \n\n";
+                abort();
+            }
+        }
+
     }
 
     getm3VCFSampleNames(line);
@@ -1104,7 +1245,7 @@ void HaplotypeSet::GetSummary(IFILE m3vcfxStream)
 bool HaplotypeSet::ReadM3VCFChunkingInformation(String &Reffilename,string checkChr)
 {
     string line;
-    int blockIndex, NoMarkersImported=0;
+    int blockIndex=0, NoMarkersImported=0;
     NoLinesToDiscardatBeginning=0;
     finChromosome="NULL";
     StartedThisPanel=false;
@@ -1133,11 +1274,16 @@ bool HaplotypeSet::ReadM3VCFChunkingInformation(String &Reffilename,string check
         }
 
         ReducedStructureInfoSummary.clear();
-        for(blockIndex=0;blockIndex<NoBlocks;blockIndex++)
-        {
-            line.clear();
-            m3vcfxStream->readLine(line);
+        //for(blockIndex=0;blockIndex<NoBlocks;blockIndex++)
 
+
+        while(m3vcfxStream->readLine(line)!=-1)
+        {
+            if(blockIndex==0)
+            {
+                string tempLine = line;
+                UpdatePloidySummary(tempLine);
+            }
 
             ReducedHaplotypeInfoSummary tempBlock;
             if(ReadBlockHeaderSummary(line, tempBlock))
@@ -1166,13 +1312,16 @@ bool HaplotypeSet::ReadM3VCFChunkingInformation(String &Reffilename,string check
 
             GetVariantInfoFromBlock(m3vcfxStream, tempBlock, NoMarkersImported);
             ReducedStructureInfoSummary.push_back(tempBlock);
-
+            line.clear();
+            blockIndex++;
         }
 
 
 
     }
     numMarkers=VariantList.size();
+    NoBlocks=ReducedStructureInfoSummary.size();
+    cout<<" WE== "<<NoBlocks<<" == P"<<endl;
 
     if (numMarkers == 0)
 	{
@@ -1299,11 +1448,8 @@ void HaplotypeSet::writem3vcfFile(String filename,bool &gzip)
 string HaplotypeSet::DetectFileType(String filename)
 {
     IFILE fileStream = ifopen(filename, "r");
-//    IFILE fileStream = NULL;
     string line;
 
-//    cout<<" WELL = "<<endl;
-//    abort();
     if(fileStream)
     {
 
@@ -1462,12 +1608,17 @@ string HaplotypeSet::FindTokenWithPrefix(const char *input,const char *delimiter
 
     std::string word = "";
     int Size = (int)CheckPrefix.size();
+    int FirstChar = 0;
     while (*input)
     {
-        if (*input==*delimiter)
+        if ( FirstChar==0 || *input==*delimiter)
         {
+            if(FirstChar==0)
+                FirstChar=1;
+            else
+                ++input;
+
             int Index=0;
-            ++input;
             while(*input)
             {
                 word=word + (*input);

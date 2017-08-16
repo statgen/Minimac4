@@ -29,6 +29,7 @@ class HaplotypeSet
         int RefTypedTotalCount;
         string finChromosome;
         bool PseudoAutosomal;
+        int m3vcfVERSION;
         bool  vcfType,m3vcfxType;
       //  vector<int>        optEndPoints;
 
@@ -201,14 +202,15 @@ class HaplotypeSet
 
 
 
-
+void UpdatePloidySummary(string &line);
 void UncompressTypedSitesNew(HaplotypeSet &rHap,HaplotypeSet &tHap,int ChunkNo);
 void CreateScaffoldedParameters(HaplotypeSet &rHap);
 void CreateAfterUncompressSummary();
 void InvertUniqueIndexMap();
 void CreateSiteSummary();
-void getm3VCFSampleNames(string line);
+void getm3VCFSampleNames(string &line);
 void UpdateParameterList();
+void GetTransUniqueHapsVERSION2(int index, ReducedHaplotypeInfo &tempBlock, string &tempString);
 bool ReadBlockHeaderSummary(string &line, ReducedHaplotypeInfoSummary &tempBlocktoCheck);
 void GetVariantInfoFromBlock(IFILE m3vcfxStream, ReducedHaplotypeInfoSummary &tempBlock,int &NoMarkersImported);
 bool ReadBlockHeader(string &line, ReducedHaplotypeInfo &tempBlocktoCheck);
