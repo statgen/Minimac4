@@ -311,7 +311,7 @@ void HaplotypeSet::CreateSiteSummary()
 
 
 
-void HaplotypeSet::UpdatePloidySummary(string &line)
+void HaplotypeSet::UpdatePloidySummary(string line)
 {
     if (m3vcfVERSION == 1)
         return;
@@ -473,8 +473,7 @@ void HaplotypeSet::GetVariantInfoFromBlock(IFILE m3vcfxStream, ReducedHaplotypeI
             tempVariant.assignValues(currID,rsID,BlockPiecesforVarInfo[0],atoi(BlockPiecesforVarInfo[1].c_str()));
             tempVariant.assignRefAlt(BlockPiecesforVarInfo[3],BlockPiecesforVarInfo[4]);
             VariantList.push_back(tempVariant);
-
-
+            
             string Info=BlockPiecesforVarInfo[7];
 
             double tempRecom=GetRecom(Info);
@@ -484,8 +483,8 @@ void HaplotypeSet::GetVariantInfoFromBlock(IFILE m3vcfxStream, ReducedHaplotypeI
             {
                 if(MyAllVariables->myModelVariables.constantParam)
                 {
-                    Recom.push_back(0.01);
-                    Error.push_back(0.001);
+                    Recom.push_back(4e-05);
+                    Error.push_back(0.005);
                 }
                 else if (!MyAllVariables->myModelVariables.processReference)
                 {
@@ -653,7 +652,7 @@ void HaplotypeSet::GetTransUniqueHapsVERSION2(int index, ReducedHaplotypeInfo &t
         input++;
     }
 
-    if(word.c_str()!="")
+    if(word!="")
     {
         word.push_back('\0');
         AlternateAlleles.push_back(prevVal+atoi(word.c_str()));
@@ -689,9 +688,9 @@ void HaplotypeSet::ReadThisBlock(IFILE m3vcfxStream,
         }
         else if(m3vcfVERSION==2) {
             GetTransUniqueHapsVERSION2(tempIndex, tempBlock, tempString);
+
         }
     }
-
 }
 
 
@@ -1281,10 +1280,13 @@ bool HaplotypeSet::ReadM3VCFChunkingInformation(String &Reffilename,string check
         {
             if(blockIndex==0)
             {
-                string tempLine = line;
+                string tempLine = line.c_str() ;
+//                tempLine.assign(line);
+                //strcpy(tempLine.c_str(), line.c_str());
                 UpdatePloidySummary(tempLine);
+            int j=9;
             }
-
+//            cout<<line<<endl;
             ReducedHaplotypeInfoSummary tempBlock;
             if(ReadBlockHeaderSummary(line, tempBlock))
             {
@@ -1321,16 +1323,16 @@ bool HaplotypeSet::ReadM3VCFChunkingInformation(String &Reffilename,string check
     }
     numMarkers=VariantList.size();
     NoBlocks=ReducedStructureInfoSummary.size();
-    cout<<" WE== "<<NoBlocks<<" == P"<<endl;
 
     if (numMarkers == 0)
-	{
+    {
         cout << "\n ERROR !!! \n No variants left to imported from reference haplotype file "<<endl;
 		cout << " Please check the filtering conditions OR the file properly ...\n";
 		cout << "\n Program Exiting ... \n\n";
         return false;
     }
 
+   
     ifclose(m3vcfxStream);
 
     CreateSiteSummary();

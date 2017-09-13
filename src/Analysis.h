@@ -30,7 +30,7 @@ class Analysis
         IFILE RefFileStream;
         VcfFileReader TarFileStream;
         VcfRecord record;
-
+        vector< vector<double> > GeneticMapData;
 
         // Swapping Variables for actual chunk IMPUTATION
         HaplotypeSet CurrentTarPanel,CurrentRefPanel;
@@ -155,6 +155,7 @@ void MemDisplay();
                 void                    InitializeRefChunkData(HaplotypeSet &ThisRefPanel);
                 void                    InitializeTargetChunkData(HaplotypeSet &ThisTarPanel);
 
+                bool                  CreateRecombinationMap();
                 bool                    CreateChunks();
                 bool                    CreateChunksForParamEstimation();
                 void                    InitializeChunkVariables();
@@ -163,8 +164,7 @@ void MemDisplay();
                 void                    ImportChunksToTarget();
                 bool                    CheckChunkValidityandPrintChunk();
                 bool                    CheckChunkValidityForParamEstimationandPrintChunk();
-
-
+                bool                    CheckGeneticMapFile();
                 void                    CreatePrintIndices(int ChunkNo, HaplotypeSet &ThisRefPanel, HaplotypeSet &ThisTarPanel);
                 void                    GetCurrentPanelReady(int ChunkNo, HaplotypeSet &ThisRefPanel, HaplotypeSet &ThisRefChipOnlyPanel, HaplotypeSet &ThisTarPanel,Imputation &thisDataFast);
 

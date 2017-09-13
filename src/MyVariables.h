@@ -207,7 +207,8 @@ public:
     int cisFactor ;
     int cpus;
     int minimac3;
-
+    
+    
     ModelVariable()
     {
         constantParam=false;
@@ -374,6 +375,8 @@ class HaplotypeDataVariables
     int END;
     int WINDOW;
     double minRatio;
+    String mapFile;
+    String build;
 
 
         HaplotypeDataVariables()
@@ -391,6 +394,7 @@ class HaplotypeDataVariables
             ignoreDuplicates=false;
             allowRefDuplicates=false;
             minRatio=0.1;
+            mapFile="/net/fantasia/home/sayantan/Softwares/Beagle/Version4/plink.chr20.GRCh37.map";
         };
 
         bool CheckValidity()
@@ -548,7 +552,8 @@ class HaplotypeDataVariables
                 }
             }
 
-
+                    
+                    
             CHR=chr;
             START=start;
             END=end;

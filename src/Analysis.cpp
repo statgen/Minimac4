@@ -3,9 +3,65 @@
 #include <iomanip>
 #include "assert.h"
 
+void MyTokenize(vector<string> &result, const char *input, const char *delimiter, int Number)
+{
+
+    size_t wordCount = 1;
+    result[0].clear();
+    std::string *word = &result[0];
 
 
- String Analysis::RunAnalysis(String &Reffilename, String &Tarfilename, String &Recomfilename, String &Errorfilename)
+    while (*input)
+    {
+        if (*input==*delimiter)
+        {
+            // we got a delimeter, and since an empty word following
+            // a delimeter still counts as a word, we allocate it here
+            wordCount++;
+
+            if((int)wordCount>Number)
+                return;
+
+            result[wordCount-1].clear();
+            word = &result[wordCount-1];
+        }
+        else
+        {
+            word->push_back(*input);
+        }
+        input++;
+    }
+
+}
+
+
+
+bool Analysis::CreateRecombinationMap()
+{
+    int FirstIndex=0;
+    while(referencePanel.VariantList[FirstIndex].bp<GeneticMapData[0][0])
+    {
+        referencePanel.Recom[FirstIndex]=0.0;
+        FirstIndex++;
+    }
+    
+    int SecondIndex=FirstIndex+1;
+    for(int i=1; i<(int)GeneticMapData.size(); i++)
+    {
+        while(referencePanel.VariantList[SecondIndex].bp<GeneticMapData[i][0])
+        {
+            double denom = GeneticMapData[i][0] - GeneticMapData[i-1][0];
+            double num = referencePanel.VariantList[SecondIndex].bp - referencePanel.VariantList[SecondIndex-1].bp;
+            referencePanel.Recom[SecondIndex-1]=0.0;
+            SecondIndex++;
+        }
+    }
+    return true;
+    
+}
+
+
+String Analysis::RunAnalysis(String &Reffilename, String &Tarfilename, String &Recomfilename, String &Errorfilename)
 {
     int time_prev=time(0);
 
@@ -14,16 +70,22 @@
     {
         return "Reference.Panel.Load.Error";
     }
-	if (!referencePanel.ReadM3VCFChunkingInformation(Reffilename,targetPanel.finChromosome))
-	{
-		cout << "\n Program Exiting ... \n\n";
-		return "Reference.Panel.Load.Error";
-	}
-	if (!targetPanel.ScaffoldGWAStoReference(referencePanel,*MyAllVariables))
-	{
-		cout << "\n Program Exiting ... \n\n";
-		return "Reference.Panel.Load.Error";
-	}
+    if (!referencePanel.ReadM3VCFChunkingInformation(Reffilename,targetPanel.finChromosome))
+    {
+            cout << "\n Program Exiting ... \n\n";
+            return "Reference.Panel.Load.Error";
+    }
+    if (!CreateRecombinationMap())
+    {
+            cout << "\n Program Exiting ... \n\n";
+            return "Genetic.Map.Load.Error";
+    }
+    
+    if (!targetPanel.ScaffoldGWAStoReference(referencePanel,*MyAllVariables))
+    {
+            cout << "\n Program Exiting ... \n\n";
+            return "Reference.Panel.Load.Error";
+    }
 
 
     cout<<"\n ------------------------------------------------------------------------------"<<endl;
@@ -1562,22 +1624,71 @@ void Analysis::GetCurrentPanelReady(int ChunkNo, HaplotypeSet &ThisRefPanel,
 
 }
 
+ 
+ 
+bool Analysis::CheckGeneticMapFile()
+{
+    std::cout << "\n Checking genetic map file : "<<MyAllVariables->myHapDataVariables.mapFile << endl<<endl;
+    IFILE fileStream = ifopen(MyAllVariables->myHapDataVariables.mapFile, "r");
+    string line;
+    GeneticMapData.clear();
+    const char* tabSep="\t";
+    vector<string> Pieces(4);
+    vector<double> AppendPiece(2);
+    AppendPiece[1]=0.0;
+    
+    if(fileStream)
+    {  
+        while(fileStream->readLine(line)!=-1)
+        {
+            MyTokenize(Pieces, line.c_str(), tabSep,4);
+            if(Pieces[0]==targetPanel.finChromosome)
+            {
+                AppendPiece[0]=atof(Pieces[3].c_str());
+                AppendPiece[1]=atof(Pieces[2].c_str())-AppendPiece[1];
+                GeneticMapData.push_back(AppendPiece);
+                cout<<GeneticMapData.back()[0]<<endl;
+            }
+            line.clear();
+        }
+    }
+    else
+    {
+        cout << "\n ERROR !!! \n Program could NOT open genetic map file : " << MyAllVariables->myHapDataVariables.mapFile << endl;
+        cout << "\n Program Exiting ... \n\n";
+        return false;
+    }
+    
+    
+    if(GeneticMapData.size()==0)
+    {
+        cout << "\n ERROR !!! Chromosome "<<targetPanel.finChromosome <<" not found in genetic map file : " << MyAllVariables->myHapDataVariables.mapFile << endl;
+        cout << "\n Program Exiting ... \n\n";
+        return false;
+    }
+        
+    ifclose(fileStream);
+    
+    cout<<" Successful !!! "<<endl;
+    return true; 
+ }
+ 
  String Analysis::CheckValidity(String &Reffilename, String &Tarfilename, String &Recomfilename, String &Errorfilename)
 {
     cout<<endl<<endl;
-	if (Reffilename == "")
-	{
-		cout<< " Missing \"--refHaps\", a required parameter.\n";
-		cout<< " Type \"--help\" for more help.\n\n";
-		return "Command.Line.Error";
-	}
+    if (Reffilename == "")
+    {
+        cout<< " Missing \"--refHaps\", a required parameter.\n";
+        cout<< " Type \"--help\" for more help.\n\n";
+        return "Command.Line.Error";
+    }
 
 
-	if(!MyAllVariables->myModelVariables.CheckValidity())
+    if(!MyAllVariables->myModelVariables.CheckValidity())
     {
         return "Command.Line.Error";
     }
-	if(!MyAllVariables->myHapDataVariables.CheckValidity())
+    if(!MyAllVariables->myHapDataVariables.CheckValidity())
     {
         return "Command.Line.Error";
     }
@@ -1619,11 +1730,19 @@ void Analysis::GetCurrentPanelReady(int ChunkNo, HaplotypeSet &ThisRefPanel,
 
 
 
-	if(!MyAllVariables->myModelVariables.processReference)
+    if(!MyAllVariables->myModelVariables.processReference)
     {
-	    if (!targetPanel.BasicCheckForTargetHaplotypes(Tarfilename, "GWAS", *MyAllVariables))
+        if (!targetPanel.BasicCheckForTargetHaplotypes(Tarfilename, "GWAS", *MyAllVariables))
         {
             return "Target.Panel.Load.Error";
+        }
+    }
+
+    if(!MyAllVariables->myModelVariables.processReference)
+    {
+        if (!CheckGeneticMapFile())
+        {
+            return "Genetic.Map.File.Load.Error";
         }
     }
 

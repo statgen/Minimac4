@@ -202,7 +202,7 @@ class HaplotypeSet
 
 
 
-void UpdatePloidySummary(string &line);
+void UpdatePloidySummary(string line);
 void UncompressTypedSitesNew(HaplotypeSet &rHap,HaplotypeSet &tHap,int ChunkNo);
 void CreateScaffoldedParameters(HaplotypeSet &rHap);
 void CreateAfterUncompressSummary();
