@@ -40,7 +40,9 @@ int main(int argc, char ** argv)
 		LONG_STRINGPARAMETER("refHaps", &refHaps)
 		LONG_PARAMETER("passOnly", &MyHapDataVariables.passOnly)
 		LONG_PARAMETER("rsid", &MyOutFormat.RsId)
+		LONG_PARAMETER("referenceEstimates", &MyModelVariables.referenceEstimates)
 		LONG_STRINGPARAMETER("mapFile", &MyHapDataVariables.mapFile)
+
 
 
 		LONG_PARAMETER_GROUP("Target Haplotypes")
@@ -49,13 +51,13 @@ int main(int argc, char ** argv)
 
 		LONG_PARAMETER_GROUP("Output Parameters")
 		LONG_STRINGPARAMETER("prefix", &MyOutFormat.OutPrefix)
-                LONG_PARAMETER("estimate" , &MyModelVariables.processReference)
+		LONG_PARAMETER("estimate" , &MyModelVariables.processReference)
 		LONG_PARAMETER("nobgzip", &MyOutFormat.nobgzip)
 		LONG_INTPARAMETER("vcfBuffer", &MyOutFormat.vcfBuffer)
 		LONG_STRINGPARAMETER("format", &MyOutFormat.formatString)
 		LONG_PARAMETER("allTypedSites", &MyOutFormat.TypedOnly)
 		LONG_PARAMETER("meta", &MyOutFormat.meta)
-                LONG_PARAMETER("memUsage", &MyOutFormat.memUsage)
+		LONG_PARAMETER("memUsage", &MyOutFormat.memUsage)
 
 
 		LONG_PARAMETER_GROUP("Chunking Parameters")
@@ -98,7 +100,7 @@ int main(int argc, char ** argv)
 
 		BEGIN_LEGACY_PARAMETERS()
 		LONG_PARAMETER("reEstimate", &MyModelVariables.reEstimate)
-		LONG_PARAMETER("constantParam", &MyModelVariables.constantParam)
+		LONG_DOUBLEPARAMETER("constantParam", &MyModelVariables.constantParam)
 		LONG_INTPARAMETER("printBuffer", &MyOutFormat.PrintBuffer)
 		LONG_PARAMETER("verbose", &MyOutFormat.verbose)
 		LONG_DOUBLEPARAMETER("minRatioPercent", &MyHapDataVariables.minRatio)

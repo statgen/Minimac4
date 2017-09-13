@@ -42,19 +42,33 @@ bool Analysis::CreateRecombinationMap()
     while(referencePanel.VariantList[FirstIndex].bp<GeneticMapData[0][0])
     {
         referencePanel.Recom[FirstIndex]=0.0;
+        //cout<<FirstIndex<<"\t"<<referencePanel.Recom[FirstIndex]<<endl;
         FirstIndex++;
+
     }
-    
+    double denom =0.0, num=0.0, Val=0.0;
     int SecondIndex=FirstIndex+1;
-    for(int i=1; i<(int)GeneticMapData.size(); i++)
+    int i=0;
+    for(i=1; i<(int)GeneticMapData.size() && SecondIndex<referencePanel.numMarkers; i++)
     {
-        while(referencePanel.VariantList[SecondIndex].bp<GeneticMapData[i][0])
+        while(SecondIndex<referencePanel.numMarkers && referencePanel.VariantList[SecondIndex].bp<GeneticMapData[i][0])
         {
-            double denom = GeneticMapData[i][0] - GeneticMapData[i-1][0];
-            double num = referencePanel.VariantList[SecondIndex].bp - referencePanel.VariantList[SecondIndex-1].bp;
-            referencePanel.Recom[SecondIndex-1]=0.0;
+            denom += GeneticMapData[i][0] - GeneticMapData[i-1][0];
+            num = referencePanel.VariantList[SecondIndex].bp - referencePanel.VariantList[SecondIndex-1].bp;
+            Val += GeneticMapData[i][1];
+            referencePanel.Recom[SecondIndex-1]=(1-exp(-Val*num/denom/50))/2;
+            //cout<<SecondIndex-1<<"\t"<<referencePanel.Recom[SecondIndex-1]<<"\t"<<num/denom<<endl;
             SecondIndex++;
+            denom = 0.0;
+            Val = 0.0;
         }
+        denom+=GeneticMapData[i][0] - GeneticMapData[i-1][0];
+        Val += GeneticMapData[i][1];
+    }
+    while(SecondIndex<referencePanel.numMarkers)
+    {
+        referencePanel.Recom[SecondIndex-1]=0.0;
+        SecondIndex++;
     }
     return true;
     
@@ -75,7 +89,7 @@ String Analysis::RunAnalysis(String &Reffilename, String &Tarfilename, String &R
             cout << "\n Program Exiting ... \n\n";
             return "Reference.Panel.Load.Error";
     }
-    if (!CreateRecombinationMap())
+    if (!MyAllVariables->myModelVariables.referenceEstimates && !CreateRecombinationMap())
     {
             cout << "\n Program Exiting ... \n\n";
             return "Genetic.Map.Load.Error";
@@ -1635,7 +1649,7 @@ bool Analysis::CheckGeneticMapFile()
     const char* tabSep="\t";
     vector<string> Pieces(4);
     vector<double> AppendPiece(2);
-    AppendPiece[1]=0.0;
+    double PrevSumVal=0.0;
     
     if(fileStream)
     {  
@@ -1645,9 +1659,10 @@ bool Analysis::CheckGeneticMapFile()
             if(Pieces[0]==targetPanel.finChromosome)
             {
                 AppendPiece[0]=atof(Pieces[3].c_str());
-                AppendPiece[1]=atof(Pieces[2].c_str())-AppendPiece[1];
+                AppendPiece[1]=atof(Pieces[2].c_str())-PrevSumVal;
+                PrevSumVal=atof(Pieces[2].c_str());
                 GeneticMapData.push_back(AppendPiece);
-                cout<<GeneticMapData.back()[0]<<endl;
+                //cout<<GeneticMapData.back()[0]<<endl;
             }
             line.clear();
         }
@@ -1660,7 +1675,7 @@ bool Analysis::CheckGeneticMapFile()
     }
     
     
-    if(GeneticMapData.size()==0)
+    if(GeneticMapData.size()<2)
     {
         cout << "\n ERROR !!! Chromosome "<<targetPanel.finChromosome <<" not found in genetic map file : " << MyAllVariables->myHapDataVariables.mapFile << endl;
         cout << "\n Program Exiting ... \n\n";
@@ -1738,7 +1753,7 @@ bool Analysis::CheckGeneticMapFile()
         }
     }
 
-    if(!MyAllVariables->myModelVariables.processReference)
+    if(!MyAllVariables->myModelVariables.referenceEstimates)
     {
         if (!CheckGeneticMapFile())
         {

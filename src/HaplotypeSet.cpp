@@ -479,37 +479,23 @@ void HaplotypeSet::GetVariantInfoFromBlock(IFILE m3vcfxStream, ReducedHaplotypeI
             double tempRecom=GetRecom(Info);
             double tempError=GetError(Info);
 
-            if(tempRecom==-3.0)
+            if(MyAllVariables->myModelVariables.constantParam>0.0)
             {
-                if(MyAllVariables->myModelVariables.constantParam)
-                {
-                    Recom.push_back(4e-05);
-                    Error.push_back(0.005);
-                }
-                else if (!MyAllVariables->myModelVariables.processReference)
-                {
-                    cout << "\n ERROR !!! \n No parameter estimates found in M3VCF file !!!"<<endl;
-                    cout << " Please use M3VCF file with parameter estimates OR use handle \"--constantParam\" to override this check ... "<<endl;
-                    cout << "\n Program Exiting ... \n\n";
-                    abort();
-                }
+                Recom.push_back(MyAllVariables->myModelVariables.constantParam);
+                Error.push_back(0.005);
             }
             else
             {
-                if (MyAllVariables->myModelVariables.processReference && !MyAllVariables->myModelVariables.reEstimate)
-                {
-                    cout << "\n ERROR !!! \n Existing parameter estimates already found in M3VCF file !!!"<<endl;
-                    cout << " Are you sure you want to update them ? "<<endl;
-                    cout << " If Yes, please use handle \"--reEstimate\" to override this check "<<endl;
-                    cout << " Else, use M3VCF file without parameter estimates "<< endl;
+                if (tempRecom == -3.0 && MyAllVariables->myModelVariables.referenceEstimates) {
+                    cout << "\n ERROR !!! \n NO parameter estimates already found in M3VCF file !!!" << endl;
+                    cout << " Please remove handle \"--referenceEstimates\" to ignore this check " << endl;
+                    cout << " Else, use M3VCF file with parameter estimates " << endl;
                     cout << "\n Program Exiting ... \n\n";
                     abort();
                 }
-
                 Recom.push_back(tempRecom);
                 Error.push_back(tempError);
             }
-
             NewBlockSizeCount++;
             NoMarkersImported++;
         }

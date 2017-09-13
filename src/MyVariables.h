@@ -200,18 +200,20 @@ public:
 
     bool        processReference,  reEstimate, updateModel ;
     double      probThreshold, diffThreshold, topThreshold;
-    bool constantParam;
+    double constantParam;
     bool lowMemory;
     int rounds, states;
     int transFactor;
     int cisFactor ;
     int cpus;
     int minimac3;
+    bool referenceEstimates;
     
     
     ModelVariable()
     {
-        constantParam=false;
+        referenceEstimates=false;
+        constantParam=0.0;
         processReference = false;
         reEstimate=false;
         updateModel = false;
@@ -287,17 +289,14 @@ public:
             }
 
         }
-
-
-        if(constantParam && processReference)
+        if(constantParam>0.0)
+            referenceEstimates=true;
+        if(constantParam>=0.5)
         {
-            {
-                cout << " ERROR !!! \n Invalid input !\n";;
-                cout << " Both \"--constantParam\" and \"--estimate\" cannot be ON at the same time !!! \n\n";
-                cout << " Program Exiting ..."<<endl<<endl;
-                return false;
-            }
-
+            cout << " ERROR !!! \n Invalid input for \"--constantParam\" = "<<constantParam<<"\n";;
+            cout << " Value must be less than 0.5 !!! \n\n";
+            cout<<" Program Exiting ..."<<endl<<endl;
+            return false;
         }
 
         if(rounds<0)
