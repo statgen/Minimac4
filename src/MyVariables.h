@@ -4,7 +4,11 @@
 #include<fstream>
 #include "StringBasics.h"
 #include<vector>
+
+#if defined(_OPENMP)
 #include <omp.h>
+#endif
+
 #include <unordered_set>
 #include "assert.h"
 using namespace std;
@@ -21,8 +25,10 @@ public:
     bool        unphasedOutput;
     bool GT,DS,GP,HDS,SD;
     String OutPrefix;
+
     string CommandLine;
     char* MyCommandLine;
+
     bool onlyrefmarkers;
     bool gzip,RsId,nobgzip,meta;
 //    vector<bool> format;
@@ -172,6 +178,7 @@ public:
     };
 
 
+
 void CreateCommandLine(int argc, char ** argv)
 {
     int len = 0;
@@ -190,7 +197,6 @@ void CreateCommandLine(int argc, char ** argv)
     CommandLine=MyCommandLine;
 }
 
-
 };
 
 
@@ -198,14 +204,17 @@ class ModelVariable
 {
 public:
 
+
     bool        processReference,  reEstimate, updateModel ;
     double      probThreshold, diffThreshold, topThreshold;
     double constantParam;
+
     bool lowMemory;
     int rounds, states;
     int transFactor;
     int cisFactor ;
     int cpus;
+
     int minimac3;
     bool referenceEstimates;
     
@@ -229,7 +238,9 @@ public:
         #ifdef _OPENMP
             cpus=5;
         #endif
+
         minimac3=false;
+
 
 
     };
@@ -251,6 +262,7 @@ public:
                 cout << " Value must be POSITIVE if \"--estimate\" is ON !!! \n\n";
                 cout<<" Program Exiting ..."<<endl<<endl;
                 return false;
+
             }
             if(states<=0)
             {
@@ -320,6 +332,7 @@ public:
             cout<<" Program Exiting ..."<<endl<<endl;
             return false;
         }
+
         if(diffThreshold<0.0 || diffThreshold>=1.0)
         {
             cout << " ERROR !!! \n Invalid input for \"--diffThreshold\" = "<<diffThreshold<<"\n";;
@@ -374,8 +387,10 @@ class HaplotypeDataVariables
     int END;
     int WINDOW;
     double minRatio;
+
     String mapFile;
     String build;
+
 
 
         HaplotypeDataVariables()
@@ -393,6 +408,7 @@ class HaplotypeDataVariables
             ignoreDuplicates=false;
             allowRefDuplicates=false;
             minRatio=0.1;
+
             mapFile="/net/fantasia/home/sayantan/Softwares/Beagle/Version4/plink.chr20.GRCh37.map";
         };
 

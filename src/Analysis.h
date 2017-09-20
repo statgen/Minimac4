@@ -1,8 +1,10 @@
 #ifndef ANALYSIS_H_INCLUDED
 #define ANALYSIS_H_INCLUDED
 
-
+#if defined(_OPENMP)
 #include <omp.h>
+#endif
+
 #include "MyVariables.h"
 #include "Unique.h"
 #include "Imputation.h"
@@ -17,7 +19,6 @@
 
 using namespace std;
 
-
 class Analysis
 {
 
@@ -31,6 +32,7 @@ class Analysis
         VcfFileReader TarFileStream;
         VcfRecord record;
         vector< vector<double> > GeneticMapData;
+
 
         // Swapping Variables for actual chunk IMPUTATION
         HaplotypeSet CurrentTarPanel,CurrentRefPanel;
