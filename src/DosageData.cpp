@@ -131,7 +131,7 @@ void DosageData::PrintDiploidDosage(float &x, float &y)
 
         if(colonIndex)
             PrintStringLength+=sprintf(PrintStringPointer+PrintStringLength,":");
-        PrintStringLength+=sprintf(PrintStringPointer+PrintStringLength,"%.3f|%.3f",x , y);
+        PrintStringLength+=sprintf(PrintStringPointer+PrintStringLength,"%.3f,%.3f",x , y);
         colonIndex=true;
     }
     if(MyAllVariables->myOutFormat.GP)
@@ -381,7 +381,8 @@ void DosageData::InitializePartialDosageData(HaplotypeSet &tarInitializer, int M
         }
 
     PrintStringPointer = (char*)malloc(sizeof(char) * (MyAllVariables->myOutFormat.PrintBuffer));
-    PrintEmpStringPointer = (char*)malloc(sizeof(char) * (MyAllVariables->myOutFormat.PrintBuffer));
+    if(MyAllVariables->myOutFormat.meta)
+        PrintEmpStringPointer = (char*)malloc(sizeof(char) * (MyAllVariables->myOutFormat.PrintBuffer));
     individualName=tarInitializer.individualName;
 
 }

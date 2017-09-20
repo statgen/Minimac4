@@ -4,10 +4,12 @@
 #include<fstream>
 #include "StringBasics.h"
 #include<vector>
-
 #include <unordered_set>
 #include "assert.h"
+
 using namespace std;
+typedef char AlleleType;
+typedef int SmallInt;
 
 class variant
 {
@@ -17,7 +19,6 @@ public:
     int bp;
     string chr;
     string rsid;
-//    char refAllele,altAllele;
     string refAlleleString,altAlleleString;
 
     variant(){};
@@ -62,8 +63,6 @@ public:
         chr=obj.chr;
         refAlleleString=obj.refAlleleString;
         altAlleleString=obj.altAlleleString;
-//        refAllele=obj.refAllele;
-//        altAllele=obj.altAllele;
     }
 };
 
@@ -79,24 +78,11 @@ class ReducedHaplotypeInfo
         vector<int> uniqueCardinality; // has number of representatives for each unique representative
         vector<float> InvuniqueCardinality; // has number of representatives for each unique representative
         vector<int> uniqueIndexMap; // maps to corresponding item in the uniqueRep... required to map Constants and unfold fold probs
-//        vector<vector<bool> > uniqueHaps;
-        vector<vector<bool> > TransposedUniqueHaps;
-
+        vector<vector<AlleleType> > TransposedUniqueHaps;
         int BlockSize, RepSize;
 
-
-
-//        bool returnHapAtPosition(int i,int position)
-//        {
-//            //assert((position-startIndex)>=0);
-//            return uniqueHaps[i][position-startIndex];
-//        }
-
-
         // Special members for RefAtGWAS Panel
-
         vector< vector<int> > uniqueIndexReverseMaps;
-        vector< unordered_set<int> > uniqueIndexOriginalReducedMaps;
 
         int size()
         {
@@ -106,7 +92,11 @@ class ReducedHaplotypeInfo
             S+=uniqueIndexMap.size() * sizeof(int);
             for(int i=0;i<(int)TransposedUniqueHaps.size();i++)
             {
-                S+=TransposedUniqueHaps[i].size() * sizeof(bool);
+                S+=TransposedUniqueHaps[i].size() * sizeof(AlleleType);
+            }
+            for(int i=0;i<(int)uniqueIndexReverseMaps.size();i++)
+            {
+                S+=uniqueIndexReverseMaps[i].size() * sizeof(int);
             }
             return (S+8);
         };
@@ -122,7 +112,6 @@ class ReducedHaplotypeInfo
             InvuniqueCardinality.clear();
             uniqueIndexMap.clear();
             TransposedUniqueHaps.clear();
-//            uniqueHaps.clear();
         }
 
         ~ReducedHaplotypeInfo()
@@ -139,7 +128,6 @@ class ReducedHaplotypeInfo
             InvuniqueCardinality=obj.InvuniqueCardinality;
             uniqueIndexMap=obj.uniqueIndexMap;
             TransposedUniqueHaps=obj.TransposedUniqueHaps;
-//            uniqueHaps=obj.uniqueHaps;
         }
 
 };
@@ -160,6 +148,12 @@ class ReducedHaplotypeInfoSummary
             BlockSize=0;
             RepSize=0;
         }
+
+        int size()
+        {
+            return 16;
+        };
+
         ~ReducedHaplotypeInfoSummary()
         {
         }
@@ -178,7 +172,7 @@ class CompressedHaplotype
         vector<int> ReducedInfoVariantMapper;
         vector<ReducedHaplotypeInfo> *RhapInfo;
         ReducedHaplotypeInfo *CurrentVariantInfo;
-        vector<bool> *CurrentVariantHaps;
+        vector<AlleleType> *CurrentVariantHaps;
 
         CompressedHaplotype()
         {
@@ -212,18 +206,18 @@ class CompressedHaplotype
             CurrentVariantInfo = & (*RhapInfo)[ReducedInfoMapper[position]];
             CurrentVariantHaps = &(CurrentVariantInfo->TransposedUniqueHaps[ReducedInfoVariantMapper[position]]);
         }
-        char GetVal(int &HapId)
+        AlleleType GetVal(int &HapId)
         {
             int &Index = CurrentVariantInfo->uniqueIndexMap[HapId];
-            return ( (*CurrentVariantHaps)[Index]?'1':'0');
+            return ( (*CurrentVariantHaps)[Index]);
         }
 
-        char GetVal(int &HapId, int position)
+        AlleleType GetVal(int &HapId, int position)
         {
             ReducedHaplotypeInfo &tempInfo=(*RhapInfo)[ReducedInfoMapper[position]];
             int &Index = tempInfo.uniqueIndexMap[HapId];
 
-            return (tempInfo.TransposedUniqueHaps[ReducedInfoVariantMapper[position]][Index]?'1':'0');
+            return (tempInfo.TransposedUniqueHaps[ReducedInfoVariantMapper[position]][Index]);
         }
 
 
@@ -231,57 +225,6 @@ class CompressedHaplotype
         {
             ReducedInfoMapper[Length]=Val1;
             ReducedInfoVariantMapper[Length++]=Val2;
-        }
-
-};
-
-class CrossReducedHaplotypeInfo
-{
-    public:
-//
-//        // Basic Compulsory Parameters
-//
-//        int startIndex,endIndex;
-//        vector<int> uniqueCardinality; // has number of representatives for each unique representative
-//        vector<float> InvuniqueCardinality; // has number of representatives for each unique representative
-//        vector<int> uniqueIndexMap; // maps to corresponding item in the uniqueRep... required to map Constants and unfold fold probs
-//        vector<vector<bool> > uniqueHaps;
-//
-//        int BlockSize, RepSize;
-//
-//
-//
-//        bool returnHapAtPosition(int i,int position)
-//        {
-//            //assert((position-startIndex)>=0);
-//            return uniqueHaps[i][position-startIndex];
-//        }
-//
-//
-//        // Special members for RefAtGWAS Panel
-
-        vector< vector<int> > uniqueIndexMaps;
-
-//        vector< vector<int> > uniqueIndexMaps;
-
-        vector< vector<int> > InvuniqueCardinality;
-
-
-//
-//        vector< unordered_set<int> > uniqueIndexOriginalReducedMaps;
-//
-
-
-        CrossReducedHaplotypeInfo()
-        {
-            uniqueIndexMaps.clear();
-            InvuniqueCardinality.clear();
-        }
-
-        CrossReducedHaplotypeInfo(int N)
-        {
-            uniqueIndexMaps.resize(N);
-            InvuniqueCardinality.resize(N);
         }
 
 };

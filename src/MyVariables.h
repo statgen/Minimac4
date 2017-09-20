@@ -4,9 +4,11 @@
 #include<fstream>
 #include "StringBasics.h"
 #include<vector>
+
 #if defined(_OPENMP)
 #include <omp.h>
 #endif
+
 #include <unordered_set>
 #include "assert.h"
 using namespace std;
@@ -23,6 +25,10 @@ public:
     bool        unphasedOutput;
     bool GT,DS,GP,HDS,SD;
     String OutPrefix;
+
+    string CommandLine;
+    char* MyCommandLine;
+
     bool onlyrefmarkers;
     bool gzip,RsId,nobgzip,meta;
 //    vector<bool> format;
@@ -172,6 +178,25 @@ public:
     };
 
 
+
+void CreateCommandLine(int argc, char ** argv)
+{
+    int len = 0;
+
+    for (int i=0; i<argc; i++)
+        len += strlen(argv[i]) + 1;
+
+    char MyCommandLine[len];
+    strcpy(MyCommandLine,argv[0]);
+
+    for (int i=1; i<argc; i++)
+    {
+        strcat(MyCommandLine, " ");
+        strcat(MyCommandLine, argv[i]);
+    }
+    CommandLine=MyCommandLine;
+}
+
 };
 
 
@@ -179,21 +204,31 @@ class ModelVariable
 {
 public:
 
-    bool        processReference,  updateModel ;
-    double      probThreshold;
-    bool constantParam;
+
+    bool        processReference,  reEstimate, updateModel ;
+    double      probThreshold, diffThreshold, topThreshold;
+    double constantParam;
+
     bool lowMemory;
     int rounds, states;
     int transFactor;
     int cisFactor ;
     int cpus;
 
+    int minimac3;
+    bool referenceEstimates;
+    
+    
     ModelVariable()
     {
-        constantParam=false;
+        referenceEstimates=false;
+        constantParam=0.0;
         processReference = false;
+        reEstimate=false;
         updateModel = false;
         probThreshold = 0.01;
+        diffThreshold = 0.01;
+        topThreshold = 0.01;
         lowMemory = false;
         rounds = 5;
         states = 200;
@@ -204,6 +239,8 @@ public:
             cpus=5;
         #endif
 
+        minimac3=false;
+
 
 
     };
@@ -213,44 +250,65 @@ public:
         if(processReference)
         {
 
-            cout<<" NOTE: Since \"--processReference\" is ON, all options under \"Target Haplotypes\" \n";
-            cout<<"       and \"Starting Parameters\" will be ignored !!!\n";
-            cout<<"       Program will only estimate parameters and create M3VCF file.\n";
+            cout<<" NOTE: Since \"--estimate\" is ON, all options under \"Target Haplotypes\" \n";
+            cout<<"       will be ignored !!!\n";
+            cout<<"       Program will only estimate parameters and create a M3VCF file.\n";
             cout<<"       No imputation will be performed, hence other parameters are unnecessary !!!"<<endl<<endl;
 
-            cout<<" NOTE: If \"--processReference\" is ON, Parameter Estimation will be done by default ! \n";
-            cout<<"       Use \"--rounds 0\" to AVOID Parameter Estimation !!!\n"<<endl<<endl;
 
-            if(updateModel)
+            if(rounds<=0)
             {
+                cout << " ERROR !!! \n Invalid input for \"--rounds\" = "<<rounds<<"\n";;
+                cout << " Value must be POSITIVE if \"--estimate\" is ON !!! \n\n";
+                cout<<" Program Exiting ..."<<endl<<endl;
+                return false;
 
-                cout<<" ERROR !!! \n Handle \"--updateModel\" does NOT work with handle \"--processReference\" !!! \n";
+            }
+            if(states<=0)
+            {
+                cout << " ERROR !!! \n Invalid input for \"--states\" = "<<states<<"\n";;
+                cout << " Value must be POSITIVE if \"--estimate\" is ON !!! \n\n";
                 cout<<" Program Exiting ..."<<endl<<endl;
                 return false;
             }
 
         }
 
-        if(updateModel)
+        if(reEstimate)
         {
 
-            cout<<" NOTE: Handle \"--updateModel\" works only on M3VCF files ! \n";
-            cout<<"       Program will NOT run if \"--refHaps\" is a VCF file !!!\n"<<endl;
+            processReference=reEstimate;
+
+            cout<<" NOTE: Since \"--reEstimate\" is ON, all options under \"Target Haplotypes\" \n";
+            cout<<"       will be ignored !!!\n";
+            cout<<"       Program will only estimate parameters and create a M3VCF file.\n";
+            cout<<"       No imputation will be performed, hence other parameters are unnecessary !!!"<<endl<<endl;
+
 
             if(rounds<=0)
             {
                 cout << " ERROR !!! \n Invalid input for \"--rounds\" = "<<rounds<<"\n";;
-                cout << " Value must be POSITIVE if \"--updateModel\" is ON !!! \n\n";
+                cout << " Value must be POSITIVE if \"--reEstimate\" is ON !!! \n\n";
                 cout<<" Program Exiting ..."<<endl<<endl;
                 return false;
             }
             if(states<=0)
             {
                 cout << " ERROR !!! \n Invalid input for \"--states\" = "<<states<<"\n";;
-                cout << " Value must be POSITIVE if \"--updateModel\" is ON !!! \n\n";
+                cout << " Value must be POSITIVE if \"--reEstimate\" is ON !!! \n\n";
                 cout<<" Program Exiting ..."<<endl<<endl;
                 return false;
             }
+
+        }
+        if(constantParam>0.0)
+            referenceEstimates=true;
+        if(constantParam>=0.5)
+        {
+            cout << " ERROR !!! \n Invalid input for \"--constantParam\" = "<<constantParam<<"\n";;
+            cout << " Value must be less than 0.5 !!! \n\n";
+            cout<<" Program Exiting ..."<<endl<<endl;
+            return false;
         }
 
         if(rounds<0)
@@ -267,10 +325,25 @@ public:
             cout<<" Program Exiting ..."<<endl<<endl;
             return false;
         }
-        if(probThreshold<0.0 || probThreshold>1.0)
+        if(probThreshold<0.0 || probThreshold>=1.0)
         {
             cout << " ERROR !!! \n Invalid input for \"--probThreshold\" = "<<probThreshold<<"\n";;
-            cout << " Value must be between 0.0 and 1.0 (inclusive) !!! \n\n";
+            cout << " Value must be between 0.0 and 1.0 (NOT inclusive) !!! \n\n";
+            cout<<" Program Exiting ..."<<endl<<endl;
+            return false;
+        }
+
+        if(diffThreshold<0.0 || diffThreshold>=1.0)
+        {
+            cout << " ERROR !!! \n Invalid input for \"--diffThreshold\" = "<<diffThreshold<<"\n";;
+            cout << " Value must be between 0.0 and 1.0 (NOT inclusive) !!! \n\n";
+            cout<<" Program Exiting ..."<<endl<<endl;
+            return false;
+        }
+        if(topThreshold<0.0 || topThreshold>=1.0)
+        {
+            cout << " ERROR !!! \n Invalid input for \"--topThreshold\" = "<<topThreshold<<"\n";;
+            cout << " Value must be between 0.0 and 1.0 (NOT inclusive) !!! \n\n";
             cout<<" Program Exiting ..."<<endl<<endl;
             return false;
         }
@@ -315,6 +388,10 @@ class HaplotypeDataVariables
     int WINDOW;
     double minRatio;
 
+    String mapFile;
+    String build;
+
+
 
         HaplotypeDataVariables()
         {
@@ -331,6 +408,8 @@ class HaplotypeDataVariables
             ignoreDuplicates=false;
             allowRefDuplicates=false;
             minRatio=0.1;
+
+            mapFile="/net/fantasia/home/sayantan/Softwares/Beagle/Version4/plink.chr20.GRCh37.map";
         };
 
         bool CheckValidity()
@@ -488,7 +567,8 @@ class HaplotypeDataVariables
                 }
             }
 
-
+                    
+                    
             CHR=chr;
             START=start;
             END=end;

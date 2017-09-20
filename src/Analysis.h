@@ -4,6 +4,7 @@
 #if defined(_OPENMP)
 #include <omp.h>
 #endif
+
 #include "MyVariables.h"
 #include "Unique.h"
 #include "Imputation.h"
@@ -18,7 +19,6 @@
 
 using namespace std;
 
-
 class Analysis
 {
 
@@ -31,6 +31,7 @@ class Analysis
         IFILE RefFileStream;
         VcfFileReader TarFileStream;
         VcfRecord record;
+        vector< vector<double> > GeneticMapData;
 
 
         // Swapping Variables for actual chunk IMPUTATION
@@ -149,13 +150,14 @@ void MemDisplay();
                                         int StartBlock, int EndBlock, int StartNextBlock);
                 void                    readVcfFileChunk(HaplotypeSet &ThisTargetPanel, HaplotypeSet &NextTargetPanel,
                                         int StartPos, int EndPos, int StartNextPos, int ChunkNo);
-                void                    OpenStreamOutputFiles();
+                bool                    OpenStreamOutputFiles();
                 void                    CloseStreamOutputFiles();
                 void                    InitializeRefFileStream(String &Reffilename);
                 void                    InitializeTargetFileStream(String &Tarfilename);
                 void                    InitializeRefChunkData(HaplotypeSet &ThisRefPanel);
                 void                    InitializeTargetChunkData(HaplotypeSet &ThisTarPanel);
 
+                bool                  CreateRecombinationMap();
                 bool                    CreateChunks();
                 bool                    CreateChunksForParamEstimation();
                 void                    InitializeChunkVariables();
@@ -164,8 +166,7 @@ void MemDisplay();
                 void                    ImportChunksToTarget();
                 bool                    CheckChunkValidityandPrintChunk();
                 bool                    CheckChunkValidityForParamEstimationandPrintChunk();
-
-
+                bool                    CheckGeneticMapFile();
                 void                    CreatePrintIndices(int ChunkNo, HaplotypeSet &ThisRefPanel, HaplotypeSet &ThisTarPanel);
                 void                    GetCurrentPanelReady(int ChunkNo, HaplotypeSet &ThisRefPanel, HaplotypeSet &ThisRefChipOnlyPanel, HaplotypeSet &ThisTarPanel,Imputation &thisDataFast);
 

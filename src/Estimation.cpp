@@ -1,82 +1,16 @@
-#include "Analysis.h"
 #include "Estimation.h"
 #include <iomanip>
 #include "assert.h"
 
-void MyTokenize(vector<string> &result, const char *input, const char *delimiter, int Number)
+
+
+String Estimation::RunEstimation(String &Reffilename, String &Recomfilename, String &Errorfilename,  AllVariable& MyAllVariable)
 {
+    MyOutFormat=&MyAllVariable.myOutFormat;
+    MyModelVariables=&MyAllVariable.myModelVariables;
+    MyHapDataVariables=&MyAllVariable.myHapDataVariables;
+    MyAllVariables=&MyAllVariable;
 
-    size_t wordCount = 1;
-    result[0].clear();
-    std::string *word = &result[0];
-
-
-    while (*input)
-    {
-        if (*input==*delimiter)
-        {
-            // we got a delimeter, and since an empty word following
-            // a delimeter still counts as a word, we allocate it here
-            wordCount++;
-
-            if((int)wordCount>Number)
-                return;
-
-            result[wordCount-1].clear();
-            word = &result[wordCount-1];
-        }
-        else
-        {
-            word->push_back(*input);
-        }
-        input++;
-    }
-
-}
-
-
-
-bool Analysis::CreateRecombinationMap()
-{
-    int FirstIndex=0;
-    while(referencePanel.VariantList[FirstIndex].bp<GeneticMapData[0][0])
-    {
-        referencePanel.Recom[FirstIndex]=0.0;
-        //cout<<FirstIndex<<"\t"<<referencePanel.Recom[FirstIndex]<<endl;
-        FirstIndex++;
-
-    }
-    double denom =0.0, num=0.0, Val=0.0;
-    int SecondIndex=FirstIndex+1;
-    int i=0;
-    for(i=1; i<(int)GeneticMapData.size() && SecondIndex<referencePanel.numMarkers; i++)
-    {
-        while(SecondIndex<referencePanel.numMarkers && referencePanel.VariantList[SecondIndex].bp<GeneticMapData[i][0])
-        {
-            denom += GeneticMapData[i][0] - GeneticMapData[i-1][0];
-            num = referencePanel.VariantList[SecondIndex].bp - referencePanel.VariantList[SecondIndex-1].bp;
-            Val += GeneticMapData[i][1];
-            referencePanel.Recom[SecondIndex-1]=(1-exp(-Val*num/denom/50))/2;
-            //cout<<SecondIndex-1<<"\t"<<referencePanel.Recom[SecondIndex-1]<<"\t"<<num/denom<<endl;
-            SecondIndex++;
-            denom = 0.0;
-            Val = 0.0;
-        }
-        denom+=GeneticMapData[i][0] - GeneticMapData[i-1][0];
-        Val += GeneticMapData[i][1];
-    }
-    while(SecondIndex<referencePanel.numMarkers)
-    {
-        referencePanel.Recom[SecondIndex-1]=0.0;
-        SecondIndex++;
-    }
-    return true;
-    
-}
-
-
-String Analysis::RunAnalysis(String &Reffilename, String &Tarfilename, String &Recomfilename, String &Errorfilename)
-{
     int time_prev=time(0);
 
 
@@ -84,21 +18,15 @@ String Analysis::RunAnalysis(String &Reffilename, String &Tarfilename, String &R
     {
         return "Reference.Panel.Load.Error";
     }
-    if (!referencePanel.ReadM3VCFChunkingInformation(Reffilename,targetPanel.finChromosome))
+    if (!referencePanel.ReadM3VCFChunkingInformation(Reffilename,""))
     {
-            cout << "\n Program Exiting ... \n\n";
-            return "Reference.Panel.Load.Error";
+        cout << "\n Program Exiting ... \n\n";
+        return "Reference.Panel.Load.Error";
     }
-    if (!MyAllVariables->myModelVariables.referenceEstimates && !CreateRecombinationMap())
+    if (!referencePanel.ScaffoldGWAStoReference(referencePanel,*MyAllVariables))
     {
-            cout << "\n Program Exiting ... \n\n";
-            return "Genetic.Map.Load.Error";
-    }
-    
-    if (!targetPanel.ScaffoldGWAStoReference(referencePanel,*MyAllVariables))
-    {
-            cout << "\n Program Exiting ... \n\n";
-            return "Reference.Panel.Load.Error";
+        cout << "\n Program Exiting ... \n\n";
+        return "Reference.Panel.Load.Error";
     }
 
 
@@ -107,113 +35,86 @@ String Analysis::RunAnalysis(String &Reffilename, String &Tarfilename, String &R
     cout<<" ------------------------------------------------------------------------------"<<endl;
 
     if (!CreateChunks())
-	{
+    {
         cout << "\n Program Exiting ... \n\n";
-		return "Chunk.Create.Error";
-	}
+        return "Chunk.Create.Error";
+    }
 
     InitializeRefFileStream(Reffilename);
-    InitializeTargetFileStream(Tarfilename);
     TimeToRead+=( time(0) - time_prev);
 
 
     if(!MyAllVariables->myOutFormat.memUsage)
     {
         cout<<" ------------------------------------------------------------------------------"<<endl;
-        cout<<"                           MAIN IMPUTATION ANALYSIS                            "<<endl;
+        cout<<"                           MAIN IMPUTATION Estimation                            "<<endl;
         cout<<" ------------------------------------------------------------------------------"<<endl;
 
-        std::cout << "\n Starting imputation analysis of "<<noChunks <<" chunk(s) ... "  << endl;
+        std::cout << "\n Starting imputation Estimation of "<<noChunks <<" chunk(s) ... "  << endl;
     }
     else
     {
         cout<<" ------------------------------------------------------------------------------"<<endl;
-        cout<<"                             MEMORY USAGE ANALYSIS                             "<<endl;
+        cout<<"                             MEMORY USAGE Estimation                             "<<endl;
         cout<<" ------------------------------------------------------------------------------"<<endl;
     }
 
     if (!OpenStreamOutputFiles())
-	{
-		cout <<" Please check your write permissions in the output directory\n OR maybe the output directory does NOT exist ...\n";
-		cout << "\n Program Exiting ... \n\n";
-		return "File.Write.Error";
-	}
+    {
+        cout <<" Please check your write permissions in the output directory\n OR maybe the output directory does NOT exist ...\n";
+        cout << "\n Program Exiting ... \n\n";
+        return "File.Write.Error";
+    }
 
-    Imputation thisDataFast(MyAllVariables,dosages, hapdose, haps,vcfdosepartial,info,stats);
+    Imputation thisDataFast(MyAllVariables,m3vcfpartial, recfile, errfile);
 
     thisDataFast.MainMarkovModel.resize(MyAllVariables->myModelVariables.cpus);
 
-    if(MyAllVariables->myOutFormat.vcfBuffer >= targetPanel.numSamples)
-        MyAllVariables->myOutFormat.vcfBuffer=targetPanel.numSamples;
 
-    thisDataFast.InitializeOutputFiles(targetPanel, MyAllVariables->myOutFormat.vcfBuffer, MaxRefMarkerSize, MaxGwasMarkerSize);
-    if(MyAllVariables->myOutFormat.memUsage)
-    {
 
-        cout<<" Estimating Memory based on a single chunk ..."<< endl;
-
-        readm3vcfFileChunk(0, CurrentRefPanel);
-        readVcfFileChunk(0, CurrentTarPanelChipOnly);
-        GetCurrentPanelReady(0, CurrentRefPanel, CurrentRefPanelChipOnly, CurrentTarPanelChipOnly, thisDataFast);
-        cout<<endl;
-
-        TarMem = CurrentTarPanelChipOnly.size();
-        RefMem = CurrentRefPanel.size();
-        ComRefMem = CurrentRefPanelChipOnly.size();
-        DosageMem = thisDataFast.Dosagesize();
-        ProbMem = thisDataFast.Probsize();
-        MemDisplay();
-        return "Success";
-    }
 
     for(int i=0;i<noChunks;i++)
     {
-         int time_prev = time(0), time_load;
+        int time_prev = time(0), time_load;
 
         cout<<"\n -------------------------------------------"<<endl;
         cout<<" Analyzing Chunk "<<i+1<<"/"<<noChunks<<" ["<<referencePanel.finChromosome<<":"<< MyChunks[i][0]<<"-"<<MyChunks[i][3]<<"]"<< endl;
         cout<<" -------------------------------------------"<<endl;
 
         readm3vcfFileChunk(i, CurrentRefPanel);
-        readVcfFileChunk(i, CurrentTarPanelChipOnly);
-        GetCurrentPanelReady(i, CurrentRefPanel, CurrentRefPanelChipOnly, CurrentTarPanelChipOnly, thisDataFast);
+        GetCurrentPanelReady(i, CurrentRefPanel, thisDataFast);
 
 
+        thisDataFast.ParameterEstimateThisChunk(i, CurrentRefPanel, CurrentRefPanelLoo);
 
-
-        if(MyAllVariables->myModelVariables.minimac3)
-            thisDataFast.Minimac3ImputeThisChunk(i, CurrentRefPanel, CurrentTarPanelChipOnly, CurrentRefPanelChipOnly);
-        else
-            thisDataFast.ImputeThisChunk(i, CurrentRefPanel, CurrentTarPanelChipOnly, CurrentRefPanelChipOnly);
-
-//abort();
+        //abort();
         TimeToImpute+=(thisDataFast.TimeToImpute);
         TimeToWrite+=(thisDataFast.TimeToWrite);
-        TimeToCompress+=(thisDataFast.TimeToCompress);
 
-
-        AppendtoMainVcfFaster(i,thisDataFast.TotalNovcfParts);
-        if(MyAllVariables->myOutFormat.meta)
-            AppendtoMainLooVcfFaster(i,thisDataFast.TotalNovcfParts);
-        PrintInfoFile(i);
-
-        time_load = time(0) - time_prev;
-        cout << "\n Time taken for this chunk = " << time_load << " seconds."<<endl;
-
-
+//
+//
+//        AppendtoMainVcfFaster(i,thisDataFast.TotalNovcfParts);
+//        if(MyAllVariables->myOutFormat.meta)
+//            AppendtoMainLooVcfFaster(i,thisDataFast.TotalNovcfParts);
+//        PrintInfoFile(i);
+//
+//        time_load = time(0) - time_prev;
+//        cout << "\n Time taken for this chunk = " << time_load << " seconds."<<endl;
+//
+//
 
     }
-
-    thisDataFast.FreeMemory();
-
-//    if(MyAllVariables->myHapDataVariables.end==0 && MyAllVariables->myOutFormat.TypedOnly)
-//        assert(FileReadIndex==targetPanel.importIndexListSize);
-//    asserassertt(OverCount==targetPanel.numOverlapMarkers);
-//    assert(TypOnlyCount==targetPanel.numTypedOnlyMarkers);
-//    assert(RefCOUNT==referencePanel.NoBlocks);
-
-    CloseStreamOutputFiles();
-
+//
+//    thisDataFast.FreeMemory();
+//
+////    if(MyAllVariables->myHapDataVariables.end==0 && MyAllVariables->myOutFormat.TypedOnly)
+////        assert(FileReadIndex==targetPanel.importIndexListSize);
+////    asserassertt(OverCount==targetPanel.numOverlapMarkers);
+////    assert(TypOnlyCount==targetPanel.numTypedOnlyMarkers);
+////    assert(RefCOUNT==referencePanel.NoBlocks);
+//
+//    CloseStreamOutputFiles();
+//
     return "Success";
 
 
@@ -221,7 +122,7 @@ String Analysis::RunAnalysis(String &Reffilename, String &Tarfilename, String &R
 
 
 
-void Analysis::PrintInfoFile(int ChunkNo)
+void Estimation::PrintInfoFile(int ChunkNo)
 
 {
     InfoPrintStringLength=0;
@@ -241,22 +142,22 @@ void Analysis::PrintInfoFile(int ChunkNo)
                 double TarFreq = stats.AlleleFrequency(i);
 
                 InfoPrintStringLength+=sprintf(InfoPrintStringPointer+InfoPrintStringLength , "%s\t%s\t%s\t%.5f\t%.5f\t%.5f\t%.5f\t",
-                MyAllVariables->myOutFormat.RsId ? thisVariant.rsid.c_str(): thisVariant.name.c_str(),
-                thisVariant.refAlleleString.c_str(),
-                thisVariant.altAlleleString.c_str(),
-                TarFreq,
-                TarFreq > 0.5 ? 1.0 - TarFreq : TarFreq,
-                stats.AverageCallScore(i),
-                stats.Rsq(i));
+                                               MyAllVariables->myOutFormat.RsId ? thisVariant.rsid.c_str(): thisVariant.name.c_str(),
+                                               thisVariant.refAlleleString.c_str(),
+                                               thisVariant.altAlleleString.c_str(),
+                                               TarFreq,
+                                               TarFreq > 0.5 ? 1.0 - TarFreq : TarFreq,
+                                               stats.AverageCallScore(i),
+                                               stats.Rsq(i));
 
                 if (!CurrentRefPanel.Targetmissing[i])
                 {
                     InfoPrintStringLength+=sprintf(InfoPrintStringPointer+InfoPrintStringLength , "Genotyped\t%.3f\t%.3f\t%.5f\t%.5f\t%.5f\n",
-                      stats.LooRsq(i), stats.EmpiricalR(i), stats.EmpiricalRsq(i),
-                      stats.LooMajorDose(i), stats.LooMinorDose(i));
+                                                   stats.LooRsq(i), stats.EmpiricalR(i), stats.EmpiricalRsq(i),
+                                                   stats.LooMajorDose(i), stats.LooMinorDose(i));
                 }
                 else
-                 InfoPrintStringLength+=sprintf(InfoPrintStringPointer+InfoPrintStringLength , "Imputed\t-\t-\t-\t-\t-\n");
+                    InfoPrintStringLength+=sprintf(InfoPrintStringPointer+InfoPrintStringLength , "Imputed\t-\t-\t-\t-\t-\n");
             }
             i++;
         }
@@ -269,19 +170,19 @@ void Analysis::PrintInfoFile(int ChunkNo)
             int MappingIndex = CurrentRefPanel.RefTypedIndex[index];
 
             if(MappingIndex>=CurrentTarPanelChipOnly.PrintTypedOnlyStartIndex && MappingIndex<=CurrentTarPanelChipOnly.PrintTypedOnlyEndIndex)
-               {
+            {
 
-                     variant ThisTypedVariant = CurrentTarPanelChipOnly.TypedOnlyVariantList[MappingIndex];
-                    double TarFreq = CurrentTarPanelChipOnly.GWASOnlyAlleleFreq[MappingIndex];
-                    InfoPrintStringLength+=sprintf(InfoPrintStringPointer+InfoPrintStringLength , "%s\t%s\t%s\t%.5f\t%.5f\t-\t-\tTyped_Only\t-\t-\t-\t-\t-\n",
-                    MyAllVariables->myOutFormat.RsId ? ThisTypedVariant.rsid.c_str(): ThisTypedVariant.name.c_str(),
-                    ThisTypedVariant.refAlleleString.c_str(),
-                    ThisTypedVariant.altAlleleString.c_str(),
-                    TarFreq,
-                    TarFreq > 0.5 ?
-                                1.0 - TarFreq : TarFreq);
+                variant ThisTypedVariant = CurrentTarPanelChipOnly.TypedOnlyVariantList[MappingIndex];
+                double TarFreq = CurrentTarPanelChipOnly.GWASOnlyAlleleFreq[MappingIndex];
+                InfoPrintStringLength+=sprintf(InfoPrintStringPointer+InfoPrintStringLength , "%s\t%s\t%s\t%.5f\t%.5f\t-\t-\tTyped_Only\t-\t-\t-\t-\t-\n",
+                                               MyAllVariables->myOutFormat.RsId ? ThisTypedVariant.rsid.c_str(): ThisTypedVariant.name.c_str(),
+                                               ThisTypedVariant.refAlleleString.c_str(),
+                                               ThisTypedVariant.altAlleleString.c_str(),
+                                               TarFreq,
+                                               TarFreq > 0.5 ?
+                                               1.0 - TarFreq : TarFreq);
 
-               }
+            }
 
 
         }
@@ -301,7 +202,7 @@ void Analysis::PrintInfoFile(int ChunkNo)
 }
 
 
-void Analysis::AppendtoMainLooVcfFaster(int ChunkNo, int MaxIndex)
+void Estimation::AppendtoMainLooVcfFaster(int ChunkNo, int MaxIndex)
 {
 
     VcfPrintStringLength=0;
@@ -319,7 +220,7 @@ void Analysis::AppendtoMainLooVcfFaster(int ChunkNo, int MaxIndex)
         strs<<(i);
         strs1<<(ChunkNo+1);
         tempFileIndex+=(".chunk."+(string)(strs1.str())+".empiricalDose.vcf.part." +
-                         (string)(strs.str()));
+                        (string)(strs.str()));
         vcfLoodosepartialList[i-1] = ifopen(tempFileIndex.c_str(), "r");
     }
     string line;
@@ -337,11 +238,11 @@ void Analysis::AppendtoMainLooVcfFaster(int ChunkNo, int MaxIndex)
                     variant &tempVariant = referencePanel.VariantList[i+RefStartPos];
 
                     VcfPrintStringLength+=sprintf(VcfPrintStringPointer + VcfPrintStringLength,"%s\t%d\t%s\t%s\t%s\t.\tPASS",
-                         tempVariant.chr.c_str(),
-                         tempVariant.bp,
-                         MyAllVariables->myOutFormat.RsId?tempVariant.rsid.c_str():tempVariant.name.c_str(),
-                         tempVariant.refAlleleString.c_str(),
-                         tempVariant.altAlleleString.c_str());
+                                                  tempVariant.chr.c_str(),
+                                                  tempVariant.bp,
+                                                  MyAllVariables->myOutFormat.RsId?tempVariant.rsid.c_str():tempVariant.name.c_str(),
+                                                  tempVariant.refAlleleString.c_str(),
+                                                  tempVariant.altAlleleString.c_str());
                     VcfPrintStringLength+=sprintf(VcfPrintStringPointer + VcfPrintStringLength,"\tTYPED\tGT:LDS");
 
                     for(int j=1;j<=MaxIndex;j++)
@@ -382,7 +283,7 @@ void Analysis::AppendtoMainLooVcfFaster(int ChunkNo, int MaxIndex)
         strs<<(i);
         strs1<<(ChunkNo+1);
         tempFileIndex+=(".chunk."+(string)(strs1.str())+".empiricalDose.vcf.part." +
-                         (string)(strs.str()));
+                        (string)(strs.str()));
         remove(tempFileIndex.c_str());
     }
 
@@ -392,7 +293,7 @@ void Analysis::AppendtoMainLooVcfFaster(int ChunkNo, int MaxIndex)
 
 
 
-void Analysis::AppendtoMainVcfFaster(int ChunkNo, int MaxIndex)
+void Estimation::AppendtoMainVcfFaster(int ChunkNo, int MaxIndex)
 {
 
     VcfPrintStringLength=0;
@@ -412,7 +313,7 @@ void Analysis::AppendtoMainVcfFaster(int ChunkNo, int MaxIndex)
         strs<<(i);
         strs1<<(ChunkNo+1);
         tempFileIndex+=(".chunk."+(string)(strs1.str())+".dose.vcf.part." +
-                         (string)(strs.str()));
+                        (string)(strs.str()));
         vcfdosepartialList[i-1] = ifopen(tempFileIndex.c_str(), "r");
     }
     string line;
@@ -427,18 +328,18 @@ void Analysis::AppendtoMainVcfFaster(int ChunkNo, int MaxIndex)
                 variant &tempVariant = referencePanel.VariantList[i+RefStartPos];
 
                 VcfPrintStringLength+=sprintf(VcfPrintStringPointer + VcfPrintStringLength,"%s\t%d\t%s\t%s\t%s\t.\tPASS",
-                         tempVariant.chr.c_str(),
-                         tempVariant.bp,
-                         MyAllVariables->myOutFormat.RsId?tempVariant.rsid.c_str():tempVariant.name.c_str(),
-                         tempVariant.refAlleleString.c_str(),
-                         tempVariant.altAlleleString.c_str());
+                                              tempVariant.chr.c_str(),
+                                              tempVariant.bp,
+                                              MyAllVariables->myOutFormat.RsId?tempVariant.rsid.c_str():tempVariant.name.c_str(),
+                                              tempVariant.refAlleleString.c_str(),
+                                              tempVariant.altAlleleString.c_str());
 
 
 
                 double freq = stats.AlleleFrequency(i);
 
                 VcfPrintStringLength+=sprintf(VcfPrintStringPointer + VcfPrintStringLength,"\tAF=%.5f;MAF=%.5f;R2=%.5f",
-                        freq, freq > 0.5 ? 1.0 - freq : freq, stats.Rsq(i));
+                                              freq, freq > 0.5 ? 1.0 - freq : freq, stats.Rsq(i));
 
 
                 if(!CurrentRefPanel.Targetmissing[i])
@@ -455,7 +356,7 @@ void Analysis::AppendtoMainVcfFaster(int ChunkNo, int MaxIndex)
                     VcfPrintStringLength+=sprintf(VcfPrintStringPointer + VcfPrintStringLength,"%s",line.c_str());
 
                 }
-                 VcfPrintStringLength+=sprintf(VcfPrintStringPointer + VcfPrintStringLength,"\n");
+                VcfPrintStringLength+=sprintf(VcfPrintStringPointer + VcfPrintStringLength,"\n");
 
             }
 
@@ -470,16 +371,16 @@ void Analysis::AppendtoMainVcfFaster(int ChunkNo, int MaxIndex)
             {
                 variant &ThisTypedVariant = (CurrentTarPanelChipOnly.TypedOnlyVariantList[CurrentRefPanel.RefTypedIndex[index]]);
                 VcfPrintStringLength+=sprintf(VcfPrintStringPointer + VcfPrintStringLength,"%s\t%d\t%s\t%s\t%s\t.\tPASS",
-                         ThisTypedVariant.chr.c_str(),
-                         ThisTypedVariant.bp,
-                         MyAllVariables->myOutFormat.RsId? ThisTypedVariant.rsid.c_str():ThisTypedVariant.name.c_str(),
-                         ThisTypedVariant.refAlleleString.c_str(),
-                         ThisTypedVariant.altAlleleString.c_str());
+                                              ThisTypedVariant.chr.c_str(),
+                                              ThisTypedVariant.bp,
+                                              MyAllVariables->myOutFormat.RsId? ThisTypedVariant.rsid.c_str():ThisTypedVariant.name.c_str(),
+                                              ThisTypedVariant.refAlleleString.c_str(),
+                                              ThisTypedVariant.altAlleleString.c_str());
 
                 double &freq = (CurrentTarPanelChipOnly.GWASOnlyAlleleFreq[CurrentRefPanel.RefTypedIndex[index]]);
 
                 VcfPrintStringLength+=sprintf(VcfPrintStringPointer + VcfPrintStringLength,"\tAF=%.5f;MAF=%.5f;TYPED_ONLY",
-                            freq, freq > 0.5 ? 1.0 - freq : freq);
+                                              freq, freq > 0.5 ? 1.0 - freq : freq);
 
                 VcfPrintStringLength+=sprintf(VcfPrintStringPointer + VcfPrintStringLength,"\t%s",MyAllVariables->myOutFormat.formatStringForVCF.c_str());
                 for(int j=1;j<=MaxIndex;j++)
@@ -494,12 +395,12 @@ void Analysis::AppendtoMainVcfFaster(int ChunkNo, int MaxIndex)
         }
 
 
-      if(VcfPrintStringLength > 0.9 * (float)(MyAllVariables->myOutFormat.PrintBuffer))
-      {
+        if(VcfPrintStringLength > 0.9 * (float)(MyAllVariables->myOutFormat.PrintBuffer))
+        {
 
             ifprintf(vcfdosepartial,"%s",VcfPrintStringPointer);
             VcfPrintStringLength=0;
-      }
+        }
 
 
 
@@ -520,7 +421,7 @@ void Analysis::AppendtoMainVcfFaster(int ChunkNo, int MaxIndex)
         strs<<(i);
         strs1<<(ChunkNo+1);
         tempFileIndex+=(".chunk."+(string)(strs1.str())+".dose.vcf.part." +
-                         (string)(strs.str()));
+                        (string)(strs.str()));
         remove(tempFileIndex.c_str());
     }
 
@@ -532,7 +433,7 @@ void Analysis::AppendtoMainVcfFaster(int ChunkNo, int MaxIndex)
 
 
 
-void Analysis::readm3vcfFileChunk(int ChunkNo, HaplotypeSet &ThisRefPanel)
+void Estimation::readm3vcfFileChunk(int ChunkNo, HaplotypeSet &ThisRefPanel)
 {
 
     int time_prev = time(0);
@@ -599,7 +500,7 @@ void Analysis::readm3vcfFileChunk(int ChunkNo, HaplotypeSet &ThisRefPanel)
 }
 
 
-void Analysis::readVcfFileChunk(int ChunkNo, HaplotypeSet &ThisTargetPanel)
+void Estimation::readVcfFileChunk(int ChunkNo, HaplotypeSet &ThisTargetPanel)
 {
 
     int time_prev = time(0);
@@ -712,11 +613,11 @@ void Analysis::readVcfFileChunk(int ChunkNo, HaplotypeSet &ThisTargetPanel)
                         ThisTargetPanel.haplotypesUnscaffolded[haplotype_index][ThisnumtoBeWrittenRecords + PrevChunkFilledTillTar]='0';
                         if (alleleIndex<0)
                         {
-                             ThisTargetPanel.MissingSampleUnscaffolded[haplotype_index][ThisnumtoBeWrittenRecords + PrevChunkFilledTillTar] = '1';
+                            ThisTargetPanel.MissingSampleUnscaffolded[haplotype_index][ThisnumtoBeWrittenRecords + PrevChunkFilledTillTar] = '1';
                         }
                         else
                         {
-                             if(!targetPanel.RefAlleleSwap[overlapImportIndex])
+                            if(!targetPanel.RefAlleleSwap[overlapImportIndex])
                             {
                                 if(alleleIndex==1)
                                 {
@@ -798,7 +699,7 @@ void Analysis::readVcfFileChunk(int ChunkNo, HaplotypeSet &ThisTargetPanel)
                         ThisTargetPanel.GWASOnlyhaplotypesUnscaffolded[haplotype_index][GWASnumtoBeWrittenRecords + PrevChunkFilledTillTarOnly]='0';
                         if (alleleIndex<0)
                         {
-                             ThisTargetPanel.GWASOnlyMissingSampleUnscaffolded[haplotype_index][GWASnumtoBeWrittenRecords + PrevChunkFilledTillTarOnly] = '1';
+                            ThisTargetPanel.GWASOnlyMissingSampleUnscaffolded[haplotype_index][GWASnumtoBeWrittenRecords + PrevChunkFilledTillTarOnly] = '1';
                         }
                         else
                         {
@@ -861,114 +762,48 @@ void Analysis::readVcfFileChunk(int ChunkNo, HaplotypeSet &ThisTargetPanel)
 }
 
 
-bool Analysis::OpenStreamOutputFiles()
+bool Estimation::OpenStreamOutputFiles()
 {
-
-
     bool gzip=MyAllVariables->myOutFormat.gzip;
 
-
-    if(MyAllVariables->myOutFormat.vcfOutput)
+    m3vcfPrintStringPointer = (char*)malloc(sizeof(char) * (MyAllVariables->myOutFormat.PrintBuffer));
+    m3vcfpartial = ifopen(MyAllVariables->myOutFormat.OutPrefix + ".m3vcf" + (gzip ? ".gz" : ""), "wb", gzip ?InputFile::BGZF:InputFile::UNCOMPRESSED);
+    if(m3vcfpartial==NULL)
     {
-        VcfPrintStringPointer = (char*)malloc(sizeof(char) * (MyAllVariables->myOutFormat.PrintBuffer));
-
-        vcfdosepartial = ifopen(MyAllVariables->myOutFormat.OutPrefix + ".dose.vcf" + (gzip ? ".gz" : ""), "wb", gzip ?InputFile::BGZF:InputFile::UNCOMPRESSED);
-        if(vcfdosepartial==NULL)
-        {
-            cout <<"\n\n ERROR !!! \n Could NOT create the following file : "<< MyAllVariables->myOutFormat.OutPrefix + ".dose.vcf" + (gzip ? ".gz" : "") <<endl;
-            return false;
-        }
-
-        ifprintf(vcfdosepartial,"##fileformat=VCFv4.1\n");
-        time_t t = time(0);
-        struct tm * now = localtime( & t );
-        ifprintf(vcfdosepartial,"##filedate=%d.%d.%d\n",(now->tm_year + 1900),(now->tm_mon + 1) ,now->tm_mday);
-        ifprintf(vcfdosepartial,"##source=Minimac4.v%s\n",VERSION);
-        ifprintf(vcfdosepartial,"##contig=<ID=%s>\n",referencePanel.finChromosome.c_str());
-        ifprintf(vcfdosepartial,"##INFO=<ID=AF,Number=1,Type=Float,Description=\"Estimated Alternate Allele Frequency\">\n");
-        ifprintf(vcfdosepartial,"##INFO=<ID=MAF,Number=1,Type=Float,Description=\"Estimated Minor Allele Frequency\">\n");
-        ifprintf(vcfdosepartial,"##INFO=<ID=R2,Number=1,Type=Float,Description=\"Estimated Imputation Accuracy (R-square)\">\n");
-        ifprintf(vcfdosepartial,"##INFO=<ID=ER2,Number=1,Type=Float,Description=\"Empirical (Leave-One-Out) R-square (available only for genotyped variants)\">\n");
-        ifprintf(vcfdosepartial,"##INFO=<ID=IMPUTED,Number=0,Type=Flag,Description=\"Marker was imputed but NOT genotyped\">\n");
-        ifprintf(vcfdosepartial,"##INFO=<ID=TYPED,Number=0,Type=Flag,Description=\"Marker was genotyped AND imputed\">\n");
-        ifprintf(vcfdosepartial,"##INFO=<ID=TYPED_ONLY,Number=0,Type=Flag,Description=\"Marker was genotyped but NOT imputed\">\n");
-
-        if(MyAllVariables->myOutFormat.GT)
-            ifprintf(vcfdosepartial,"##FORMAT=<ID=GT,Number=1,Type=String,Description=\"Genotype\">\n");
-        if(MyAllVariables->myOutFormat.DS)
-            ifprintf(vcfdosepartial,"##FORMAT=<ID=DS,Number=1,Type=Float,Description=\"Estimated Alternate Allele Dosage : [P(0/1)+2*P(1/1)]\">\n");
-        if(MyAllVariables->myOutFormat.HDS)
-            ifprintf(vcfdosepartial,"##FORMAT=<ID=HDS,Number=1,Type=String,Description=\"Estimated Haploid Alternate Allele Dosage \">\n");
-        if(MyAllVariables->myOutFormat.GP)
-            ifprintf(vcfdosepartial,"##FORMAT=<ID=GP,Number=3,Type=Float,Description=\"Estimated Posterior Probabilities for Genotypes 0/0, 0/1 and 1/1 \">\n");
-        if(MyAllVariables->myOutFormat.SD)
-            ifprintf(vcfdosepartial,"##FORMAT=<ID=SD,Number=1,Type=Float,Description=\"Variance of Posterior Genotype Probabilities\">\n");
-
-        ifprintf(vcfdosepartial,"##minimac4_Command=%s\n",MyAllVariables->myOutFormat.CommandLine.c_str());
-        ifprintf(vcfdosepartial,"#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT");
-
-        for(int Id=0;Id<targetPanel.numSamples;Id++)
-        {
-            ifprintf(vcfdosepartial,"\t%s",targetPanel.individualName[Id].c_str());
-        }
-        ifprintf(vcfdosepartial,"\n");
-
-    }
-
-    if(MyAllVariables->myOutFormat.meta)
-    {
-
-        vcfLoodosepartial = ifopen(MyAllVariables->myOutFormat.OutPrefix + ".empiricalDose.vcf" + (gzip ? ".gz" : ""), "wb", gzip ?InputFile::BGZF:InputFile::UNCOMPRESSED);
-
-        if(vcfLoodosepartial==NULL)
-        {
-            cout <<"\n\n ERROR !!! \n Could NOT create the following file : "<< MyAllVariables->myOutFormat.OutPrefix + ".empiricalDose.vcf" + (gzip ? ".gz" : "") <<endl;
-            return false;
-        }
-
-        ifprintf(vcfLoodosepartial,"##fileformat=VCFv4.1\n");
-        time_t t = time(0);
-        struct tm * now = localtime( & t );
-        ifprintf(vcfLoodosepartial,"##filedate=%d.%d.%d\n",(now->tm_year + 1900),(now->tm_mon + 1) ,now->tm_mday);
-        ifprintf(vcfLoodosepartial,"##source=Minimac4.v%s\n",VERSION);
-        ifprintf(vcfLoodosepartial,"##contig=<ID=%s>\n",referencePanel.finChromosome.c_str());
-        ifprintf(vcfLoodosepartial,"##INFO=<ID=TYPED,Number=0,Type=Flag,Description=\"Marker was genotyped AND imputed\">\n");
-        ifprintf(vcfLoodosepartial,"##FORMAT=<ID=GT,Number=1,Type=String,Description=\"Genotyped alleles from Array\">\n");
-        ifprintf(vcfLoodosepartial,"##FORMAT=<ID=LDS,Number=1,Type=String,Description=\"Leave-one-out Imputed Dosage : Estimated Haploid Alternate Allele Dosage assuming site was NOT genotyped \">\n");
-        ifprintf(vcfdosepartial,"##minimac4_Command=%s\n",MyAllVariables->myOutFormat.CommandLine.c_str());
-        ifprintf(vcfLoodosepartial,"#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT");
-
-        for(int Id=0;Id<targetPanel.numSamples;Id++)
-        {
-            ifprintf(vcfLoodosepartial,"\t%s",targetPanel.individualName[Id].c_str());
-        }
-        ifprintf(vcfLoodosepartial,"\n");
-
-    }
-
-    if(MyAllVariables->myOutFormat.doseOutput)
-    {
-        dosages = ifopen(MyAllVariables->myOutFormat.OutPrefix + ".dose" + (gzip ? ".gz" : ""), "wb",(gzip ? InputFile::BGZF:InputFile::UNCOMPRESSED) );
-        if(dosages==NULL)
-        {
-            cout <<"\n\n ERROR !!! \n Could NOT create the following file : "<< MyAllVariables->myOutFormat.OutPrefix + ".dose" + (gzip ? ".gz" : "") <<endl;
-            return false;
-        }
-    }
-
-    InfoPrintStringPointer = (char*)malloc(sizeof(char) * (MyAllVariables->myOutFormat.PrintBuffer));
-    info = ifopen(MyAllVariables->myOutFormat.OutPrefix + ".info", "wb");
-    if(info==NULL)
-    {
-        cout <<"\n\n ERROR !!! \n Could NOT create the following file : "<< MyAllVariables->myOutFormat.OutPrefix + ".info" <<endl;
+        cout <<"\n\n ERROR !!! \n Could NOT create the following file : "<< MyAllVariables->myOutFormat.OutPrefix + ".m3vcf" + (gzip ? ".gz" : "") <<endl;
         return false;
     }
-    ifprintf(info, "SNP\tREF(0)\tALT(1)\tALT_Frq\tMAF\tAvgCall\tRsq\tGenotyped\tLooRsq\tEmpR\tEmpRsq\tDose0\tDose1\n");
+
+    ifprintf(m3vcfpartial,"##fileformat=M3VCFv2.0\n");
+    time_t t = time(0);
+    struct tm * now = localtime( & t );
+    ifprintf(m3vcfpartial,"##filedate=%d.%d.%d\n",(now->tm_year + 1900),(now->tm_mon + 1) ,now->tm_mday);
+    ifprintf(m3vcfpartial,"##source=Minimac4.v%s\n",VERSION);
+    ifprintf(m3vcfpartial,"##contig=<ID=%s>\n",referencePanel.finChromosome.c_str());
+    ifprintf(m3vcfpartial,"##INFO=<ID=Recom,Number=1,Type=Float,Description=\"Estimated Recombination Fraction\">\n");
+    ifprintf(m3vcfpartial,"##INFO=<ID=Err,Number=1,Type=Float,Description=\"Estimated Genotyping Error\">\n");
+    ifprintf(m3vcfpartial,"##minimac4_Command=%s\n",MyAllVariables->myOutFormat.CommandLine.c_str());
+    ifprintf(m3vcfpartial,"#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT");
+
+    for(int Id=0;Id<referencePanel.numSamples;Id++)
+    {
+        ifprintf(m3vcfpartial,"\t%s",referencePanel.individualName[Id].c_str());
+    }
+    ifprintf(m3vcfpartial,"\n");
+    ifclose(m3vcfpartial);
+
+    recPrintStringPointer = (char*)malloc(sizeof(char) * (MyAllVariables->myOutFormat.PrintBuffer));
+    recfile = ifopen(MyAllVariables->myOutFormat.OutPrefix + ".rec", "wb");
+    if(recfile==NULL)
+    {
+        cout <<"\n\n ERROR !!! \n Could NOT create the following file : "<< MyAllVariables->myOutFormat.OutPrefix + ".rec" <<endl;
+        return false;
+    }
 
     return true;
 }
 
-void Analysis::MemDisplay()
+void Estimation::MemDisplay()
 {
     ifclose(info);
 
@@ -1042,7 +877,7 @@ void Analysis::MemDisplay()
 
 }
 
-void Analysis::CloseStreamOutputFiles()
+void Estimation::CloseStreamOutputFiles()
 {
     cout<<endl<<" ------------------------------------------------------------------------------"<<endl;
     cout<<"                              SUMMARY OF ANALYSIS                              "<<endl;
@@ -1100,59 +935,9 @@ void Analysis::CloseStreamOutputFiles()
 
 
 
-void Analysis::CreatePrintIndices(int ChunkNo, HaplotypeSet &ThisRefPanel, HaplotypeSet &ThisTarPanel)
+void Estimation::CreatePrintIndices(int ChunkNo, HaplotypeSet &ThisRefPanel)
 {
-    if(MyTypdedOnlyVariantNumber[ChunkNo][2]>0)
-    {
-        int TOnlyStartPos =  MyTypdedOnlyVariantNumber[ChunkNo][0];
-        int TOnlyEndPos =  MyTypdedOnlyVariantNumber[ChunkNo][1];
-        int i=TOnlyStartPos;
 
-        if(ChunkNo==0)
-        {
-            if(MyAllVariables->myHapDataVariables.CHR!="")
-            {
-                while(targetPanel.TypedOnlyVariantList[i].bp <  MyAllVariables->myHapDataVariables.start)
-                {
-                    i++;
-                }
-            }
-        }
-        else
-        {
-           while(targetPanel.TypedOnlyVariantList[i].bp < MyChunks[ChunkNo][1])
-            {
-                i++;
-            }
-        }
-        ThisTarPanel.PrintTypedOnlyStartIndex=i-TOnlyStartPos;
-
-
-        if(ChunkNo==(noChunks-1))
-        {
-            if(MyAllVariables->myHapDataVariables.CHR!="")
-            {
-                for(; i <= TOnlyEndPos; i++)
-                    if(targetPanel.TypedOnlyVariantList[i].bp > MyAllVariables->myHapDataVariables.end)
-                        break;
-            }
-            else
-                i=TOnlyEndPos+1;
-        }
-        else
-        {
-            for(; i <= TOnlyEndPos; i++)
-                if(targetPanel.TypedOnlyVariantList[i].bp > MyChunks[ChunkNo][2])
-                    break;
-        }
-        ThisTarPanel.PrintTypedOnlyEndIndex=i-TOnlyStartPos-1;
-
-//        assert(ThisTarPanel.PrintTypedOnlyStartIndex <= ThisTarPanel.numTypedOnlyMarkers);
-//        assert(ThisTarPanel.PrintTypedOnlyEndIndex <= ThisTarPanel.numTypedOnlyMarkers);
-
-
-
-    }
 
     int RefStartPos =  MyRefVariantNumber[ChunkNo][0];
     int RefEndPos =  MyRefVariantNumber[ChunkNo][1];
@@ -1170,7 +955,7 @@ void Analysis::CreatePrintIndices(int ChunkNo, HaplotypeSet &ThisRefPanel, Haplo
     }
     else
     {
-       while(referencePanel.VariantList[i].bp < MyChunks[ChunkNo][1])
+        while(referencePanel.VariantList[i].bp < MyChunks[ChunkNo][1])
         {
             i++;
         }
@@ -1204,34 +989,25 @@ void Analysis::CreatePrintIndices(int ChunkNo, HaplotypeSet &ThisRefPanel, Haplo
 }
 
 
-void Analysis::GetCurrentPanelReady(int ChunkNo, HaplotypeSet &ThisRefPanel,
-                                    HaplotypeSet &ThisRefChipOnlyPanel, HaplotypeSet &ThisTarPanel,
-                                    Imputation &thisDataFast)
+void Estimation::GetCurrentPanelReady(int ChunkNo, HaplotypeSet &ThisRefPanel,
+                                     Imputation &thisDataFast)
 {
 
     int RefStartPos =  MyRefVariantNumber[ChunkNo][0];
     int RefEndPos =  MyRefVariantNumber[ChunkNo][1];
-    int TarStartPos =  MyTargetVariantNumber[ChunkNo][0];
-//    int TarEndPos =  MyTargetVariantNumber[ChunkNo][1];
     int RefStartInfo =  MyChunksInfoNumber[ChunkNo][0];
     int RefEndInfo =  MyChunksInfoNumber[ChunkNo][1];
 
 
     int NoRefMarkers = RefEndPos - RefStartPos + 1;
-    int NoGwasMarkers =MyTargetVariantNumber[ChunkNo][2];
-    int NoTOnlyMarkers =MyTypdedOnlyVariantNumber[ChunkNo][2];
 
     // initialize typical variants
 
     ThisRefPanel.numMarkers=NoRefMarkers;
-    ThisRefChipOnlyPanel.numMarkers=NoGwasMarkers;
     ThisRefPanel.NoBlocks = MyChunksInfoNumber[ChunkNo][2];
-    ThisTarPanel.numMarkers=NoGwasMarkers;
-    ThisTarPanel.numOverlapMarkers=NoGwasMarkers;
-    ThisTarPanel.numTypedOnlyMarkers=NoTOnlyMarkers;
     int i;
 
-     // create new start and end indices for RefInfo
+    // create new start and end indices for RefInfo
 
     {
         ThisRefPanel.ReducedStructureInfo[0].startIndex = 0;
@@ -1243,7 +1019,7 @@ void Analysis::GetCurrentPanelReady(int ChunkNo, HaplotypeSet &ThisRefPanel,
             ThisRefPanel.ReducedStructureInfo[i - RefStartInfo + 1 ].startIndex =  temp1;
         }
         ThisRefPanel.ReducedStructureInfo[RefEndInfo - RefStartInfo].endIndex = (ThisRefPanel.ReducedStructureInfo[RefEndInfo - RefStartInfo].startIndex )
-                                                            + (referencePanel.ReducedStructureInfoSummary[RefEndInfo].BlockSize) - 1;
+                                                                                + (referencePanel.ReducedStructureInfoSummary[RefEndInfo].BlockSize) - 1;
 
 //        assert(ThisRefPanel.ReducedStructureInfo[RefEndInfo - RefStartInfo].endIndex == (NoRefMarkers-1));
 //        assert((RefEndInfo - RefStartInfo + 1)==ThisRefPanel.NoBlocks);
@@ -1264,152 +1040,53 @@ void Analysis::GetCurrentPanelReady(int ChunkNo, HaplotypeSet &ThisRefPanel,
             }
 
             if(i==(ThisRefPanel.NoBlocks-1))
-                 Mapper[j]=i;
+                Mapper[j]=i;
         }
-        
-    }
-
-
-    // create the combined vector RefTypedIndex
-
-    {
-        ThisRefPanel.RefTypedIndex.clear();
-        int ThisIndex=0,ThisMappedIndex=0;
-        while(  ThisIndex<(int) targetPanel.TargetMissingTypedOnly.size() && targetPanel.TargetMissingTypedOnly[ThisIndex] < (RefStartPos))
-        {
-            ThisIndex++;
-        }
-        int counter=RefStartPos;
-        while(counter<=RefEndPos && ThisIndex<(int) targetPanel.TargetMissingTypedOnly.size())
-        {
-            if(counter<=targetPanel.TargetMissingTypedOnly[ThisIndex])
-            {
-                ThisRefPanel.RefTypedIndex.push_back(-1);
-                counter++;
-            }
-            else
-            {
-    //            assert(ThisMappedIndex<NoTOnlyMarkers);
-                ThisRefPanel.RefTypedIndex.push_back(ThisMappedIndex++);
-                ThisIndex++;
-            }
-        }
-        while(counter<=RefEndPos)
-        {
-            ThisRefPanel.RefTypedIndex.push_back(-1);
-            counter++;
-        }
-        if(ChunkNo==(noChunks-1))
-        {
-            while(ThisIndex<(int)targetPanel.TargetMissingTypedOnly.size())
-            {
-                if(counter>targetPanel.TargetMissingTypedOnly[ThisIndex])
-                {
-    //                assert(ThisMappedIndex<NoTOnlyMarkers);
-                    ThisRefPanel.RefTypedIndex.push_back(ThisMappedIndex++);
-                    ThisIndex++;
-                }
-                else
-                    break;
-            }
-    }
-    ThisRefPanel.RefTypedTotalCount=(int)ThisRefPanel.RefTypedIndex.size();
-//    assert(ThisRefPanel.RefTypedTotalCount == (NoRefMarkers+NoTOnlyMarkers));
 
     }
 
 
     // Create Print Indices
-    CreatePrintIndices(ChunkNo,ThisRefPanel,ThisTarPanel);
-
-    // Create unscaffold And Flank Start and End Region for target and Targetmissing for ref and TARTOREF for REF
-
-    {
-        fill(ThisRefPanel.Targetmissing.begin(), ThisRefPanel.Targetmissing.end(), true);
-        ThisTarPanel.FlankRegionStart[0]=0;
-
-        for(i=0;i<NoGwasMarkers;i++)
-        {
-
-    //        assert((i+TarStartPos)<targetPanel.numOverlapMarkers);
-    //        assert( (targetPanel.MapTarToRef[i+TarStartPos] - RefStartPos ) >= 0);
-    //        assert( (targetPanel.MapTarToRef[i+TarStartPos] - RefStartPos ) < NoRefMarkers);
-            ThisRefPanel.MapTarToRef[i] = targetPanel.MapTarToRef[i+TarStartPos] - RefStartPos;
-            ThisRefPanel.Targetmissing[ThisRefPanel.MapTarToRef[i]]=false;
-
-    //        ThisTarPanel.VariantList[i]=targetPanel.OverlapOnlyVariantList[i+TarStartPos];
-
-            if(i>0)
-            {
-                ThisTarPanel.FlankRegionEnd[i-1]= (ThisRefPanel.MapTarToRef[i-1] + ThisRefPanel.MapTarToRef[i])/2;
-                ThisTarPanel.FlankRegionStart[i]=ThisTarPanel.FlankRegionEnd[i-1]+1;
-            }
-        }
-        ThisTarPanel.FlankRegionEnd[i-1]=NoRefMarkers-1;
-    }
+    CreatePrintIndices(ChunkNo,ThisRefPanel);
 
 
-    // Create PrintStart and End Index and scaffold for target and Recom and Error and MAPTOREF for REF
+
+
+    // Create scaffold for target and Recom and Error and MAPTOREF for REF
 
     {
-
-        fill(ThisRefPanel.MapRefToTar.begin(), ThisRefPanel.MapRefToTar.end(), -1);
 
         for(i=RefStartPos; i<=RefEndPos; i++)
         {
             if(MyAllVariables->myOutFormat.verbose)
                 ThisRefPanel.VariantList[i-RefStartPos]=referencePanel.VariantList[i];
 
-    //        ThisTarPanel.missing[i-RefStartPos]=targetPanel.missing[i];
-            if(i<RefEndPos)
-                ThisRefPanel.Recom[i-RefStartPos]=referencePanel.Recom[i];
-            ThisRefPanel.Error[i-RefStartPos]=referencePanel.Error[i];
-
-            if( targetPanel.MapRefToTar[i] != -1 )
+            //        ThisTarPanel.missing[i-RefStartPos]=targetPanel.missing[i];
+            if(referencePanel.Recom.size()>0)
             {
-    //            assert( (targetPanel.MapRefToTar[i] - TarStartPos) >= 0);
-    //            assert( (targetPanel.MapRefToTar[i] - TarStartPos) < NoGwasMarkers);
-                ThisRefPanel.MapRefToTar[i-RefStartPos] = targetPanel.MapRefToTar[i] - TarStartPos;
-            }
+                if (i < RefEndPos)
+                    ThisRefPanel.Recom[i - RefStartPos] = referencePanel.Recom[i];
 
+                ThisRefPanel.Error[i - RefStartPos] = referencePanel.Error[i];
+            }
         }
     }
 
     ThisRefPanel.CalculateAlleleFreq();
-    ThisTarPanel.CalculateGWASOnlyAlleleFreq();
-        
-    if(!MyAllVariables->myModelVariables.minimac3)
+
+
+
+    int time_prev = time(0);
+
+
+
+    for(int i=0;i<MyAllVariables->myModelVariables.cpus;i++)
     {
-        int time_prev = time(0);
+        thisDataFast.MainMarkovModel[i].AssignPanels(ThisRefPanel,MyAllVariables);
+        thisDataFast.MainMarkovModel[i].initializeMatricesMinimac3();
 
-        cout << "\n Compressing reference panel at GWAS sites ... "<<endl;
-
-        ThisRefChipOnlyPanel.UncompressTypedSitesNew(ThisRefPanel,ThisTarPanel,ChunkNo);
-
-        thisDataFast.TimeToCompress = time(0) - time_prev;
-        time_prev=time(0);
-        cout << " Re-compression successful (" << thisDataFast.TimeToCompress<< " seconds) !!!"<<endl;
-
-        for(int i=0;i<MyAllVariables->myModelVariables.cpus;i++)
-        {
-            thisDataFast.MainMarkovModel[i].AssignPanels(ThisRefPanel,ThisRefChipOnlyPanel,ThisTarPanel,ThisTarPanel,MyAllVariables);
-            thisDataFast.MainMarkovModel[i].initializeMatrices();
-
-        }     
     }
-    else
-    {
-        int time_prev = time(0);
 
-      
-       
-        for(int i=0;i<MyAllVariables->myModelVariables.cpus;i++)
-        {
-            thisDataFast.MainMarkovModel[i].AssignPanels(ThisRefPanel,ThisTarPanel,MyAllVariables);
-            thisDataFast.MainMarkovModel[i].initializeMatricesMinimac3();
-
-        }     
-    }
 
 
 }
@@ -1418,7 +1095,7 @@ void Analysis::GetCurrentPanelReady(int ChunkNo, HaplotypeSet &ThisRefPanel,
 
 
 
- void Analysis::InitializeRefFileStream(String &Reffilename)
+void Estimation::InitializeRefFileStream(String &Reffilename)
 {
 
     RefFileStream = ifopen(Reffilename, "r");
@@ -1443,21 +1120,25 @@ void Analysis::GetCurrentPanelReady(int ChunkNo, HaplotypeSet &ThisRefPanel,
     PrevChunkStartFromTar=0;
     PrevChunkFilledTillTarOnly=0;
     PrevChunkStartFromTarOnly=0;
+    MaxGwasMarkerSize=MaxRefMarkerSize;
 
     InitializeRefChunkData(CurrentRefPanel);
-    InitializeRefChipOnlyChunkData(CurrentRefPanelChipOnly);
-    stats.PreInitialize(MaxRefMarkerSize);
+    InitializeRefChunkData(CurrentRefPanelLoo);
+    InitializeTargetLooChunkData(CurrentTarPanelLoo);
+
+    //InitializeRefChipOnlyChunkData(CurrentRefPanelChipOnly);
+    // stats.PreInitialize(MaxRefMarkerSize);
 
 //    if(MyAllVariables->myOutFormat.memUsage)
 //    {
 //        RefMem = CurrentRefPanel.size();
 //        ComRefMem = CurrentRefPanelChipOnly.size();
 //    }
- }
+}
 
 
- void Analysis::InitializeTargetFileStream(String &Tarfilename)
- {
+void Estimation::InitializeTargetFileStream(String &Tarfilename)
+{
     VcfHeader header;
 
     TarFileStream.open(Tarfilename, header);
@@ -1476,10 +1157,10 @@ void Analysis::GetCurrentPanelReady(int ChunkNo, HaplotypeSet &ThisRefPanel,
 //        TarMem = CurrentTarPanelChipOnly.size();
 //    }
 
- }
+}
 
 
- String Analysis::RunEstimation(String &Reffilename, String &Recomfilename, String &Errorfilename)
+String Estimation::RunEstimation(String &Reffilename, String &Recomfilename, String &Errorfilename)
 {
 //    int time_prev=time(0);
 
@@ -1496,11 +1177,11 @@ void Analysis::GetCurrentPanelReady(int ChunkNo, HaplotypeSet &ThisRefPanel,
     cout<<" ------------------------------------------------------------------------------"<<endl;
 
     if (!CreateChunksForParamEstimation())
-	{
-		cout << "\n Program Exiting ... \n\n";
-		return "Chunk.Create.Error";
+    {
+        cout << "\n Program Exiting ... \n\n";
+        return "Chunk.Create.Error";
 
-	}
+    }
 
 //
 //    InitializeRefFileStream(Reffilename);
@@ -1511,15 +1192,15 @@ void Analysis::GetCurrentPanelReady(int ChunkNo, HaplotypeSet &ThisRefPanel,
 //    if(!MyAllVariables->myOutFormat.memUsage)
 //    {
 //        cout<<" ------------------------------------------------------------------------------"<<endl;
-//        cout<<"                           MAIN IMPUTATION ANALYSIS                            "<<endl;
+//        cout<<"                           MAIN IMPUTATION Estimation                            "<<endl;
 //        cout<<" ------------------------------------------------------------------------------"<<endl;
 //
-//        std::cout << "\n Starting imputation analysis of "<<noChunks <<" chunk(s) ... "  << endl;
+//        std::cout << "\n Starting imputation Estimation of "<<noChunks <<" chunk(s) ... "  << endl;
 //    }
 //    else
 //    {
 //        cout<<" ------------------------------------------------------------------------------"<<endl;
-//        cout<<"                             MEMORY USAGE ANALYSIS                             "<<endl;
+//        cout<<"                             MEMORY USAGE Estimation                             "<<endl;
 //        cout<<" ------------------------------------------------------------------------------"<<endl;
 //    }
 //
@@ -1602,10 +1283,10 @@ void Analysis::GetCurrentPanelReady(int ChunkNo, HaplotypeSet &ThisRefPanel,
 
 
 
- String Analysis::AnalyzeExperiment(String &Reffilename, String &Tarfilename, String &Recomfilename, String &Errorfilename, AllVariable& MyAllVariable)
+String Estimation::AnalyzeExperiment(String &Reffilename, String &Tarfilename, String &Recomfilename, String &Errorfilename, AllVariable& MyAllVariable)
 {
     String mysuccessresult="Error";
-    cout << " Starting Main Imputation/Estimation Analysis ... " << endl;
+    cout << " Starting Main Imputation Estimation ... " << endl;
     cout << "\n Performing preliminary check on input parameters... "  ;
 
     MyOutFormat=&MyAllVariable.myOutFormat;
@@ -1620,15 +1301,14 @@ void Analysis::GetCurrentPanelReady(int ChunkNo, HaplotypeSet &ThisRefPanel,
     if(mysuccessresult!="Success")
         return mysuccessresult;
 
-    if(!MyModelVariables->processReference)
-    {
-        mysuccessresult=RunAnalysis(Reffilename, Tarfilename, Recomfilename, Errorfilename);
-    }
-    else
-    {
-        Estimation MyEstimation;
-        mysuccessresult = MyEstimation.RunEstimation(Reffilename, Recomfilename, Errorfilename, MyAllVariable);
-    }
+//    if(!MyModelVariables->processReference)
+//    {
+//        mysuccessresult=RunEstimation(Reffilename, Tarfilename, Recomfilename, Errorfilename);
+//    }
+//    else
+//    {
+//        mysuccessresult=RunEstimation(Reffilename, Recomfilename, Errorfilename);
+//    }
     if(mysuccessresult!="Success")
         return mysuccessresult;
 
@@ -1638,57 +1318,7 @@ void Analysis::GetCurrentPanelReady(int ChunkNo, HaplotypeSet &ThisRefPanel,
 
 }
 
- 
- 
-bool Analysis::CheckGeneticMapFile()
-{
-    std::cout << "\n Checking genetic map file : "<<MyAllVariables->myHapDataVariables.mapFile << endl<<endl;
-    IFILE fileStream = ifopen(MyAllVariables->myHapDataVariables.mapFile, "r");
-    string line;
-    GeneticMapData.clear();
-    const char* tabSep="\t";
-    vector<string> Pieces(4);
-    vector<double> AppendPiece(2);
-    double PrevSumVal=0.0;
-    
-    if(fileStream)
-    {  
-        while(fileStream->readLine(line)!=-1)
-        {
-            MyTokenize(Pieces, line.c_str(), tabSep,4);
-            if(Pieces[0]==targetPanel.finChromosome)
-            {
-                AppendPiece[0]=atof(Pieces[3].c_str());
-                AppendPiece[1]=atof(Pieces[2].c_str())-PrevSumVal;
-                PrevSumVal=atof(Pieces[2].c_str());
-                GeneticMapData.push_back(AppendPiece);
-                //cout<<GeneticMapData.back()[0]<<endl;
-            }
-            line.clear();
-        }
-    }
-    else
-    {
-        cout << "\n ERROR !!! \n Program could NOT open genetic map file : " << MyAllVariables->myHapDataVariables.mapFile << endl;
-        cout << "\n Program Exiting ... \n\n";
-        return false;
-    }
-    
-    
-    if(GeneticMapData.size()<2)
-    {
-        cout << "\n ERROR !!! Chromosome "<<targetPanel.finChromosome <<" not found in genetic map file : " << MyAllVariables->myHapDataVariables.mapFile << endl;
-        cout << "\n Program Exiting ... \n\n";
-        return false;
-    }
-        
-    ifclose(fileStream);
-    
-    cout<<" Successful !!! "<<endl;
-    return true; 
- }
- 
- String Analysis::CheckValidity(String &Reffilename, String &Tarfilename, String &Recomfilename, String &Errorfilename)
+String Estimation::CheckValidity(String &Reffilename, String &Tarfilename, String &Recomfilename, String &Errorfilename)
 {
     cout<<endl<<endl;
     if (Reffilename == "")
@@ -1729,15 +1359,14 @@ bool Analysis::CheckGeneticMapFile()
             return "Command.Line.Error";
         }
     }
-    else if (Tarfilename != "")
+    else
     {
-        cout <<" ERROR !!! \n \"--haps\" is NOT valid when \"--estimate\" is ON.\n";
-        cout <<" Parameter estimation only requires a reference panel. \n";
-        cout <<" No GWAS panel is required.\n";
+        cout << "\n ERROR !!! The current version of Minimac4 does NOT support \"--processReference\"  "<<endl;
+        cout <<   " Please use Minimac3 if you need to process a VCF file"<<endl;
+        cout<<    " We will implement this feature in Minimac4 very soon "<<endl;
         cout << "\n Program Exiting ... \n\n";
         return "Command.Line.Error";
     }
-
 
     cout<<" ------------------------------------------------------------------------------"<<endl;
     cout<<"                             PRELIMINARY FILE CHECK                            "<<endl;
@@ -1752,15 +1381,524 @@ bool Analysis::CheckGeneticMapFile()
             return "Target.Panel.Load.Error";
         }
     }
-
-    if(!MyAllVariables->myModelVariables.referenceEstimates)
+    else
     {
-        if (!CheckGeneticMapFile())
+        if (!referencePanel.BasicCheckForVCFReferenceHaplotypes(Reffilename, "Reference", *MyAllVariables))
         {
-            return "Genetic.Map.File.Load.Error";
+            return "Reference.Panel.Load.Error";
         }
     }
 
     return "Success";
 
 }
+
+
+void Estimation::InitializeRefChunkData(HaplotypeSet &ThisRefPanel)
+{
+
+
+    int NoRefHaps=referencePanel.numHaplotypes;
+
+    ThisRefPanel.numHaplotypes=NoRefHaps;
+    ThisRefPanel.numSamples=referencePanel.numSamples;
+    ThisRefPanel.SampleNoHaplotypes=referencePanel.SampleNoHaplotypes;
+    ThisRefPanel.CummulativeSampleNoHaplotypes=referencePanel.CummulativeSampleNoHaplotypes;
+    ThisRefPanel.individualName=referencePanel.individualName;
+    ThisRefPanel.maxBlockSize=referencePanel.maxBlockSize;
+    ThisRefPanel.maxRepSize=referencePanel.maxRepSize;
+    ThisRefPanel.ReducedStructureInfo.resize(MaxInfoVectorSize);
+    ThisRefPanel.MyAllVariables=MyAllVariables;
+
+
+    ThisRefPanel.MapRefToTar.resize(MaxRefMarkerSize);
+    ThisRefPanel.MapTarToRef.resize(MaxRefMarkerSize);
+
+    int Mem=0;
+    for(int i=0;i<MaxInfoVectorSize;i++)
+    {
+        ThisRefPanel.ReducedStructureInfo[i].uniqueIndexMap.resize(NoRefHaps);
+        ThisRefPanel.ReducedStructureInfo[i].uniqueCardinality.resize(referencePanel.maxRepSize);
+        ThisRefPanel.ReducedStructureInfo[i].InvuniqueCardinality.resize(referencePanel.maxRepSize);
+        ThisRefPanel.ReducedStructureInfo[i].TransposedUniqueHaps.resize(referencePanel.maxBlockSize);
+
+        for(int j=0;j<referencePanel.maxBlockSize;j++)
+            ThisRefPanel.ReducedStructureInfo[i].TransposedUniqueHaps[j].resize(referencePanel.maxRepSize);
+
+        Mem+=ThisRefPanel.ReducedStructureInfo[i].size();
+    }
+
+    ThisRefPanel.Targetmissing.resize(MaxRefMarkerSize);
+
+    ThisRefPanel.MarkerToReducedInfoMapper.resize(MaxRefMarkerSize);
+    ThisRefPanel.Recom.resize(MaxRefMarkerSize);
+    ThisRefPanel.Error.resize(MaxRefMarkerSize);
+    ThisRefPanel.AlleleFreq.resize(MaxRefMarkerSize);
+    if(MyAllVariables->myOutFormat.verbose)
+    {
+        ThisRefPanel.VariantList.resize(MaxRefMarkerSize);
+    }
+
+}
+
+
+void Estimation::InitializeRefChipOnlyChunkData(HaplotypeSet &ThisRefPanel)
+{
+
+    int NoRefHaps=referencePanel.numHaplotypes;
+
+    ThisRefPanel.numHaplotypes=NoRefHaps;
+    ThisRefPanel.numSamples=referencePanel.numSamples;
+    ThisRefPanel.MarkerToReducedInfoMapper.resize(MaxGwasMarkerSize);
+    ThisRefPanel.Recom.resize(MaxGwasMarkerSize);
+    ThisRefPanel.Error.resize(MaxGwasMarkerSize);
+    ThisRefPanel.AlleleFreq.resize(MaxGwasMarkerSize);
+    ThisRefPanel.MyAllVariables=MyAllVariables;
+
+    if(MyAllVariables->myOutFormat.verbose)
+    {
+        ThisRefPanel.individualName=referencePanel.individualName;
+        ThisRefPanel.SampleNoHaplotypes=referencePanel.SampleNoHaplotypes;
+        ThisRefPanel.VariantList.resize(MaxGwasMarkerSize);
+    }
+}
+
+
+void Estimation::InitializeTargetLooChunkData(HaplotypeSet &ThisTarPanel)
+{
+
+    int tempnumHaplotypes=targetPanel.numHaplotypes;
+
+    ThisTarPanel.MyAllVariables=MyAllVariables;
+    ThisTarPanel.numHaplotypes=1;
+    ThisTarPanel.numSamples=1;
+
+    ThisTarPanel.haplotypesUnscaffolded.resize(1);
+    ThisTarPanel.MissingSampleUnscaffolded.resize(1);
+
+
+
+    for (int i = 0; i<tempnumHaplotypes; i++)
+    {
+        ThisTarPanel.MissingSampleUnscaffolded[i].resize(MaxRefMarkerSize, '0');
+    }
+
+}
+
+
+
+void Estimation::InitializeTargetChipOnlyChunkData(HaplotypeSet &ThisTarPanel)
+{
+
+    int tempnumHaplotypes=targetPanel.numHaplotypes;
+
+    ThisTarPanel.MyAllVariables=MyAllVariables;
+    ThisTarPanel.numHaplotypes=targetPanel.numHaplotypes;
+    ThisTarPanel.numSamples=targetPanel.numSamples;
+    ThisTarPanel.SampleNoHaplotypesPointer=&targetPanel.SampleNoHaplotypes;
+    ThisTarPanel.SampleNoHaplotypes=targetPanel.SampleNoHaplotypes;
+    ThisTarPanel.CummulativeSampleNoHaplotypes=targetPanel.CummulativeSampleNoHaplotypes;
+    ThisTarPanel.individualName=targetPanel.individualName;
+
+    ThisTarPanel.haplotypesUnscaffolded.resize(tempnumHaplotypes);
+    ThisTarPanel.MissingSampleUnscaffolded.resize(tempnumHaplotypes);
+
+
+    if(MyAllVariables->myOutFormat.TypedOnly)
+    {
+        ThisTarPanel.GWASOnlyhaplotypesUnscaffolded.resize(tempnumHaplotypes);
+        ThisTarPanel.GWASOnlyMissingSampleUnscaffolded.resize(tempnumHaplotypes);
+    }
+
+
+
+    for (int i = 0; i<tempnumHaplotypes; i++)
+    {
+        ThisTarPanel.haplotypesUnscaffolded[i].resize(MaxGwasMarkerSize, false);
+        ThisTarPanel.MissingSampleUnscaffolded[i].resize(MaxGwasMarkerSize, false);
+        if(MyAllVariables->myOutFormat.TypedOnly)
+        {
+            ThisTarPanel.TypedOnlyVariantList.resize(MaxTypedOnlyMarkerSize);
+            ThisTarPanel.GWASOnlyhaplotypesUnscaffolded[i].resize(MaxTypedOnlyMarkerSize, false);
+            ThisTarPanel.GWASOnlyMissingSampleUnscaffolded[i].resize(MaxTypedOnlyMarkerSize, false);
+        }
+    }
+
+
+    ThisTarPanel.GWASOnlyAlleleFreq.resize(MaxTypedOnlyMarkerSize);
+    ThisTarPanel.FlankRegionStart.resize(MaxGwasMarkerSize);
+    ThisTarPanel.FlankRegionEnd.resize(MaxGwasMarkerSize);
+
+}
+
+
+
+
+
+void Estimation::InitializeChunkVariables()
+{
+    int i;
+    MyChunks.resize(noChunks);
+    MyChunksInfoNumber.resize(noChunks+1); // extra element added just to reduce checks later on
+    MyRefVariantNumber.resize(noChunks+1); // extra element added just to reduce checks later on
+    MyTargetVariantNumber.resize(noChunks+1); // extra element added just to reduce checks later on
+    MyTypdedOnlyVariantNumber.resize(noChunks+1); // extra element added just to reduce checks later on
+    MyRatio.resize(noChunks+1,-1.0); // extra element added just to reduce checks later on
+
+
+    for(i=0;i<(noChunks);i++)
+    {
+        MyChunks[i].resize(4);
+        MyChunksInfoNumber[i].resize(3);
+        MyRefVariantNumber[i].resize(3);
+        MyTargetVariantNumber[i].resize(3,-3);
+        MyTypdedOnlyVariantNumber[i].resize(3,-3);
+    }
+
+    MyChunksInfoNumber[i].resize(1,99999999); // extra element added just to reduce checks later on
+    MyRefVariantNumber[i].resize(1,99999999); // extra element added just to reduce checks later on
+    MyTargetVariantNumber[i].resize(1,99999999);  // extra element added just to reduce checks later on
+    MyTypdedOnlyVariantNumber[i].resize(1,99999999);  // extra element added just to reduce checks later on
+
+
+
+
+}
+
+
+void Estimation::CreateChunksFromReference()
+{
+    vector<ReducedHaplotypeInfoSummary> &RefInfo=referencePanel.ReducedStructureInfoSummary;
+    vector<variant> &VarList=referencePanel.VariantList;
+    vector<int> &InfoMapper=referencePanel.MarkerToReducedInfoMapper;
+    int NoMarkers=referencePanel.numMarkers;
+
+    int i=0,index;
+    MyChunksInfoNumber[0][0]=0;
+    MyRefVariantNumber[0][0]=0;
+    MyChunks[0][0]=VarList[0].bp;
+    MyChunks[0][1]=VarList[0].bp;
+
+
+    if(noChunks>1)
+    {
+
+        MyChunksInfoNumber[0][1]=InfoMapper[0 + MyHapDataVariables->ChunkSize + MyHapDataVariables->ChunkWindow];
+        MyRefVariantNumber[0][1]= RefInfo[MyChunksInfoNumber[0][1]].endIndex ;
+
+        MyChunks[0][2]=VarList[0 + MyHapDataVariables->ChunkSize].bp;
+        MyChunks[0][3]=VarList[MyRefVariantNumber[0][1]].bp;
+
+
+        for(i=1;i<(noChunks-1);i++)
+        {
+            index=(i*MyHapDataVariables->ChunkSize);
+
+            MyChunksInfoNumber[i][0]=InfoMapper[index-MyHapDataVariables->ChunkWindow];
+            MyChunksInfoNumber[i][1]=InfoMapper[index+MyHapDataVariables->ChunkSize+MyHapDataVariables->ChunkWindow];
+
+            MyRefVariantNumber[i][0]=RefInfo[MyChunksInfoNumber[i][0]].startIndex;
+            MyRefVariantNumber[i][1]= RefInfo[MyChunksInfoNumber[i][1]].endIndex;
+
+            MyChunks[i][0]=VarList[MyRefVariantNumber[i][0]].bp;
+            MyChunks[i][1]=MyChunks[i-1][2]+1;
+            MyChunks[i][2]=VarList[index+MyHapDataVariables->ChunkSize].bp;
+            MyChunks[i][3]=VarList[MyRefVariantNumber[i][1]].bp;
+
+        }
+
+        index=(i*MyHapDataVariables->ChunkSize);
+
+        MyChunksInfoNumber[i][0]=InfoMapper[index-MyHapDataVariables->ChunkWindow];
+        MyRefVariantNumber[i][0]=RefInfo[MyChunksInfoNumber[i][0]].startIndex;
+
+        MyChunks[i][0]=VarList[MyRefVariantNumber[i][0]].bp;
+        MyChunks[i][1]=MyChunks[i-1][2]+1;
+
+    }
+
+    MyChunks[i][2]=VarList[NoMarkers-1].bp;
+    MyChunks[i][3]=VarList[NoMarkers-1].bp;
+    MyChunksInfoNumber[i][1]=InfoMapper[NoMarkers-1];
+    MyRefVariantNumber[i][1]=NoMarkers-1;
+
+
+    for(int i=0;i<noChunks;i++)
+    {
+        MyChunksInfoNumber[i][2] = MyChunksInfoNumber[i][1] - MyChunksInfoNumber[i][0] + 1;
+        MyRefVariantNumber[i][2] = MyRefVariantNumber[i][1] - MyRefVariantNumber[i][0] + 1;
+    }
+
+}
+
+void Estimation::CreateChunksFromVCFReference()
+{
+    MyChunks.resize(noChunks);
+    MyRefVariantNumber.resize(noChunks+1); // extra element added just to reduce checks later on
+    int i=0;
+    for( i=0;i<(noChunks);i++)
+    {
+        MyChunks[i].resize(4);
+        MyRefVariantNumber[i].resize(3);
+    }
+    MyRefVariantNumber[i].resize(1,99999999); // extra element added just to reduce checks later on
+
+
+    vector<variant> &VarList=referencePanel.VariantList;
+    int NoMarkers=referencePanel.numMarkers;
+    int index;
+
+    MyRefVariantNumber[0][0]=0;
+    MyChunks[0][0]=VarList[0].bp;
+    MyChunks[0][1]=VarList[0].bp;
+    i=0;
+
+    if(noChunks>1)
+    {
+        MyChunks[0][2]=VarList[0 + MyHapDataVariables->ChunkSize].bp;
+        MyChunks[0][3]=VarList[0 + MyHapDataVariables->ChunkSize + MyHapDataVariables->ChunkWindow].bp;
+        MyRefVariantNumber[0][1]=MyHapDataVariables->ChunkSize + MyHapDataVariables->ChunkWindow;
+
+        for(i=1;i<(noChunks-1);i++)
+        {
+            index=(i*MyHapDataVariables->ChunkSize);
+
+            MyRefVariantNumber[i][0]=index-MyHapDataVariables->ChunkWindow;
+            MyChunks[i][0]=VarList[index-MyHapDataVariables->ChunkWindow].bp;
+            MyChunks[i][1]=MyChunks[i-1][2]+1;
+            MyChunks[i][2]=VarList[index+MyHapDataVariables->ChunkSize].bp;
+            MyChunks[i][3]=VarList[index+MyHapDataVariables->ChunkSize+MyHapDataVariables->ChunkWindow].bp;
+            MyRefVariantNumber[i][1]= index+MyHapDataVariables->ChunkSize+MyHapDataVariables->ChunkWindow;
+
+        }
+
+        index=(i*MyHapDataVariables->ChunkSize);
+
+        MyRefVariantNumber[i][0]=index-MyHapDataVariables->ChunkWindow;
+        MyChunks[i][0]=VarList[index-MyHapDataVariables->ChunkWindow].bp;
+        MyChunks[i][1]=MyChunks[i-1][2]+1;
+
+    }
+    MyChunks[i][2]=VarList[NoMarkers-1].bp;
+    MyChunks[i][3]=VarList[NoMarkers-1].bp;
+    MyRefVariantNumber[i][1]=NoMarkers-1;
+
+    for(int i=0;i<noChunks;i++)
+    {
+        MyRefVariantNumber[i][2] = MyRefVariantNumber[i][1] - MyRefVariantNumber[i][0] + 1;
+    }
+
+}
+
+
+
+void Estimation::ImportChunksToTarget()
+{
+    OverCount =0;
+    TypOnlyCount = 0;
+    RefCOUNT = 0;
+
+    int i=0;
+    for(int CurrentChunkNo=0; CurrentChunkNo<noChunks; CurrentChunkNo++)
+    {
+
+        while(i<targetPanel.numOverlapMarkers && targetPanel.MapTarToRef[i]<MyRefVariantNumber[CurrentChunkNo][0])
+        {
+            i++;
+        }
+
+        MyTargetVariantNumber[CurrentChunkNo][0]=i;
+
+        while(i<targetPanel.numOverlapMarkers && targetPanel.MapTarToRef[i] <= MyRefVariantNumber[CurrentChunkNo][1] )
+        {
+            i++;
+        }
+        MyTargetVariantNumber[CurrentChunkNo][1]=i-1;
+        i=MyTargetVariantNumber[CurrentChunkNo][0];
+    }
+
+//    assert(MyTargetVariantNumber[noChunks-1][1]==(targetPanel.numOverlapMarkers-1));  // Last position of Target Panel indexed should be number of overlapping markers
+
+    i=0;
+    for(int CurrentChunkNo=0; CurrentChunkNo<noChunks; CurrentChunkNo++)
+    {
+        if(CurrentChunkNo>0)
+        {
+            while(i<targetPanel.numTypedOnlyMarkers && targetPanel.TypedOnlyVariantList[i].bp < MyChunks[CurrentChunkNo][0] )
+            {
+                i++;
+            }
+        }
+        MyTypdedOnlyVariantNumber[CurrentChunkNo][0]=i;
+
+        while(i<targetPanel.numTypedOnlyMarkers && targetPanel.TypedOnlyVariantList[i].bp <= MyChunks[CurrentChunkNo][3] )
+        {
+            i++;
+        }
+        MyTypdedOnlyVariantNumber[CurrentChunkNo][1]=i-1;
+        i=MyTypdedOnlyVariantNumber[CurrentChunkNo][0];
+
+    }
+    MyTypdedOnlyVariantNumber[noChunks-1][1]=targetPanel.numTypedOnlyMarkers-1;
+
+
+    for(int i=0;i<noChunks;i++)
+    {
+        MyTargetVariantNumber[i][2]=0;
+        MyTypdedOnlyVariantNumber[i][2]=0;
+
+        MyTargetVariantNumber[i][2] = ( MyTargetVariantNumber[i][1] + 1 > MyTargetVariantNumber[i][0]? MyTargetVariantNumber[i][1] + 1 - MyTargetVariantNumber[i][0]: 0 );
+        MyTypdedOnlyVariantNumber[i][2] = ( MyTypdedOnlyVariantNumber[i][1] + 1 >MyTypdedOnlyVariantNumber[i][0]? MyTypdedOnlyVariantNumber[i][1] + 1 - MyTypdedOnlyVariantNumber[i][0]: 0 );
+    }
+
+}
+
+
+bool Estimation::CheckChunkValidityandPrintChunkForEstimation()
+{
+
+    int MinRefMarkerSize=MyRefVariantNumber[0][2], InIndex=0;
+
+    MaxInfoVectorSize=0;
+    MaxRefMarkerSize=0;
+
+    cout<<" No   LeftBuffer      LeftEnd   RightPoint  RightBuffer       #Sites"<<endl;
+    cout<<" -------------------------------------------------------------------------------"<<endl;
+
+    for(int i=0;i<noChunks;i++)
+    {
+        if( MyChunksInfoNumber[i][2]  > MaxInfoVectorSize )
+            MaxInfoVectorSize = MyChunksInfoNumber[i][2];
+
+        if( MyRefVariantNumber[i][2]  > MaxRefMarkerSize )
+            MaxRefMarkerSize = MyRefVariantNumber[i][2];
+        if( MyRefVariantNumber[i][2]  < MinRefMarkerSize )
+        {
+            InIndex=i;
+            MinRefMarkerSize = MyRefVariantNumber[i][2];
+        }
+
+
+        cout<<setw(3)<<i+1<<"  "
+            <<setw(11)<<MyChunks[i][0]<<"  "
+            <<setw(11)<<MyChunks[i][1]<<"  "
+            <<setw(11)<<MyChunks[i][2]<<"  "
+            <<setw(11)<<MyChunks[i][3]<<"  "
+            <<setw(11)<<MyRefVariantNumber[i][2]<<"\n";
+
+    }
+    cout<<endl<<endl;
+
+
+    if(MinRefMarkerSize==0)
+    {
+        cout<<"\n ERROR !!! ERROR !!! ERROR !!! "<<endl;
+        cout<<" Chunk "<< InIndex+1<<" has 0 variants from the reference panel in it ... "<<endl;
+        cout<<" Please increase the value of \"--chunkSize\" to analyze larger chunks ..." <<endl<<endl;
+        return false;
+
+    }
+    return true;
+
+}
+
+
+bool Estimation::CheckChunkValidityandPrintChunk()
+{
+    int MinRefMarkerSize=MyRefVariantNumber[0][2], InIndex=0;
+    MaxRefMarkerSize=0;
+
+    cout<<" No   LeftBuffer      LeftEnd   RightPoint  RightBuffer       #Sites"<<endl;
+    cout<<" -------------------------------------------------------------------------------"<<endl;
+
+    for(int i=0;i<noChunks;i++)
+    {
+
+        if( MyRefVariantNumber[i][2]  > MaxRefMarkerSize )
+            MaxRefMarkerSize = MyRefVariantNumber[i][2];
+
+        if( MyRefVariantNumber[i][2]  < MinRefMarkerSize )
+        {
+            InIndex=i;
+            MinRefMarkerSize = MyRefVariantNumber[i][2];
+        }
+
+        cout<<setw(3)<<i+1<<"  "
+            <<setw(11)<<MyChunks[i][0]<<"  "
+            <<setw(11)<<MyChunks[i][1]<<"  "
+            <<setw(11)<<MyChunks[i][2]<<"  "
+            <<setw(11)<<MyChunks[i][3]<<"  "
+            <<setw(8)<<MyRefVariantNumber[i][2]<<"/";
+
+    }
+    cout<<endl<<endl;
+
+    if(MinRefMarkerSize==0)
+    {
+        cout<<"\n ERROR !!! ERROR !!! ERROR !!! "<<endl;
+        cout<<" Chunk "<< InIndex+1<<" has 0 variants from the reference panel in it ... "<<endl;
+        cout<<" Please increase the value of \"--chunkSize\" to analyze larger chunks ..." <<endl<<endl;
+        return false;
+
+    }
+    return true;
+
+}
+
+bool Estimation::CreateChunks()
+{
+
+    GetNumChunks();
+
+    std::cout << "\n Chunking region into "<<noChunks <<" chunk(s) with atleast "<<
+              MyHapDataVariables->ChunkSize <<" variants in each chunk ... "  << endl<<endl;
+    std::cout << " Details of chunks is given below ..."  << endl<<endl;
+
+    InitializeChunkVariables();
+    CreateChunksFromReference();
+
+    return CheckChunkValidityandPrintChunkForEstimation();
+
+}
+
+
+
+bool Estimation::CreateChunksForParamEstimation()
+{
+
+    GetNumChunks();
+
+    std::cout << "\n Chunking region into "<<noChunks <<" chunk(s) with atleast "<<
+              MyHapDataVariables->ChunkSize <<" variants in each chunk ... "  << endl<<endl;
+    std::cout << " Details of chunks is given below ..."  << endl<<endl;
+
+    CreateChunksFromVCFReference();
+
+    return CheckChunkValidityandPrintChunkForEstimation();
+
+}
+
+
+
+void Estimation::GetNumChunks()
+{
+
+    int NoMarkers=referencePanel.numMarkers;
+    int StartPos = referencePanel.VariantList[0].bp;
+    int EndPos = referencePanel.VariantList[NoMarkers-1].bp;
+
+    int noOverLaps = ((int)(EndPos-StartPos)/(int)(1000000 *MyAllVariables->myHapDataVariables.ChunkOverlapMb));
+    if(noOverLaps==0)
+        noOverLaps=1;
+
+    MyHapDataVariables->ChunkWindow=(NoMarkers/noOverLaps);
+
+    noChunks = ((int)(EndPos-StartPos)/(int)(1000000 *MyAllVariables->myHapDataVariables.ChunkLengthMb));
+    if(noChunks==0)
+        noChunks=1;
+
+    MyHapDataVariables->ChunkSize=(NoMarkers/noChunks);
+
+    return;
+}
+

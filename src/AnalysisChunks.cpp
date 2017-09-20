@@ -44,6 +44,11 @@
     ThisRefPanel.Recom.resize(MaxRefMarkerSize);
     ThisRefPanel.Error.resize(MaxRefMarkerSize);
     ThisRefPanel.AlleleFreq.resize(MaxRefMarkerSize);
+    if(MyAllVariables->myOutFormat.verbose)
+    {
+        ThisRefPanel.VariantList.resize(MaxRefMarkerSize);
+    }
+
  }
 
 
@@ -54,13 +59,20 @@
 
     ThisRefPanel.numHaplotypes=NoRefHaps;
     ThisRefPanel.numSamples=referencePanel.numSamples;
-    ThisRefPanel.MyAllVariables=MyAllVariables;
-
     ThisRefPanel.MarkerToReducedInfoMapper.resize(MaxGwasMarkerSize);
     ThisRefPanel.Recom.resize(MaxGwasMarkerSize);
     ThisRefPanel.Error.resize(MaxGwasMarkerSize);
     ThisRefPanel.AlleleFreq.resize(MaxGwasMarkerSize);
+    ThisRefPanel.MyAllVariables=MyAllVariables;
+
+    if(MyAllVariables->myOutFormat.verbose)
+    {
+        ThisRefPanel.individualName=referencePanel.individualName;
+        ThisRefPanel.SampleNoHaplotypes=referencePanel.SampleNoHaplotypes;
+        ThisRefPanel.VariantList.resize(MaxGwasMarkerSize);
+    }
  }
+
 
  void Analysis::InitializeTargetChipOnlyChunkData(HaplotypeSet &ThisTarPanel)
  {
@@ -89,13 +101,13 @@
 
 	for (int i = 0; i<tempnumHaplotypes; i++)
 	{
-		ThisTarPanel.haplotypesUnscaffolded[i].resize(MaxGwasMarkerSize, false);
-        ThisTarPanel.MissingSampleUnscaffolded[i].resize(MaxGwasMarkerSize, false);
+		ThisTarPanel.haplotypesUnscaffolded[i].resize(MaxGwasMarkerSize, '0');
+        ThisTarPanel.MissingSampleUnscaffolded[i].resize(MaxGwasMarkerSize, '0');
         if(MyAllVariables->myOutFormat.TypedOnly)
         {
             ThisTarPanel.TypedOnlyVariantList.resize(MaxTypedOnlyMarkerSize);
-            ThisTarPanel.GWASOnlyhaplotypesUnscaffolded[i].resize(MaxTypedOnlyMarkerSize, false);
-            ThisTarPanel.GWASOnlyMissingSampleUnscaffolded[i].resize(MaxTypedOnlyMarkerSize, false);
+            ThisTarPanel.GWASOnlyhaplotypesUnscaffolded[i].resize(MaxTypedOnlyMarkerSize, '0');
+            ThisTarPanel.GWASOnlyMissingSampleUnscaffolded[i].resize(MaxTypedOnlyMarkerSize, '0');
         }
 	}
 
@@ -276,13 +288,15 @@ void Analysis::ImportChunksToTarget()
     int i=0;
     for(int CurrentChunkNo=0; CurrentChunkNo<noChunks; CurrentChunkNo++)
     {
-        while(i<targetPanel.numOverlapMarkers && targetPanel.OverlapOnlyVariantList[i].bp < MyChunks[CurrentChunkNo][0] )
+
+        while(i<targetPanel.numOverlapMarkers && targetPanel.MapTarToRef[i]<MyRefVariantNumber[CurrentChunkNo][0])
         {
             i++;
         }
+
         MyTargetVariantNumber[CurrentChunkNo][0]=i;
 
-        while(i<targetPanel.numOverlapMarkers && targetPanel.OverlapOnlyVariantList[i].bp <= MyChunks[CurrentChunkNo][3] )
+        while(i<targetPanel.numOverlapMarkers && targetPanel.MapTarToRef[i] <= MyRefVariantNumber[CurrentChunkNo][1] )
         {
             i++;
         }

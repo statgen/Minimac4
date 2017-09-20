@@ -214,13 +214,11 @@ double findUnique::FlushBlocks(vector<ReducedHaplotypeInfo> &HapInfo, int Lastfl
 
         for (int i = blockStart; i <= blockEnd; i++)
         {
-            vector<bool> &TempHap = tempInfo.TransposedUniqueHaps[i-blockStart];
+            vector<AlleleType> &TempHap = tempInfo.TransposedUniqueHaps[i-blockStart];
             haplotypes.RetrieveVariant(i);
             for (int j = 0; j < tempInfo.RepSize; j++)
             {
-//                assert(haplotypes.GetVal(examplars[j])==haplotypes.GetVal(examplars[j],i));
-
-                TempHap[j]=haplotypes.GetVal(examplars[j]) =='0'?false:true;
+                TempHap[j]=haplotypes.GetVal(examplars[j]) ;
             }
         }
 
@@ -314,7 +312,7 @@ double findUnique::FlushBlocks(vector<ReducedHaplotypeInfo> &HapInfo, int Lastfl
 
            for (int i = blockStart; i <= blockEnd; i++)
             {
-                tempInfo.TransposedUniqueHaps[i-blockStart][j]=haplotypes[examplars[j]][i]=='0'?false:true;
+                tempInfo.TransposedUniqueHaps[i-blockStart][j]=haplotypes[examplars[j]][i];
             }
         }
 

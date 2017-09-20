@@ -1,5 +1,6 @@
 # Minimac4
 
+
 THIS IS FOR TESTING PURPOSES ONLY !!!
 
 Minimac4 is a lower memory and more computationally efficient
@@ -37,5 +38,3 @@ minimac4 --refHaps refPanel.m3vcf \
 Here refPanel.vcf is the reference panel used in M3VCF format (e.g. 1000 Genomes), 
 targetStudy.vcf is the phased GWAS data in VCF format, 
 and testRun is the prefix for the output files.
-
-<<< SEE http://genome.sph.umich.edu/wiki/Minimac4 FOR DOCUMENTATION>>>

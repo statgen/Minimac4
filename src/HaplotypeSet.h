@@ -29,8 +29,9 @@ class HaplotypeSet
         int RefTypedTotalCount;
         string finChromosome;
         bool PseudoAutosomal;
+        int m3vcfVERSION;
         bool  vcfType,m3vcfxType;
-        vector<int>        optEndPoints;
+      //  vector<int>        optEndPoints;
 
 
 
@@ -47,10 +48,10 @@ class HaplotypeSet
 
         // Special Haplotype Variables for GWAS Panel
 
-        vector<vector<bool> >     haplotypesUnscaffolded;
-		vector<vector<bool> >     MissingSampleUnscaffolded;
-        vector<vector<bool> >     GWASOnlyhaplotypesUnscaffolded;
-		vector<vector<bool> >     GWASOnlyMissingSampleUnscaffolded;
+        vector<vector<AlleleType> >     haplotypesUnscaffolded;
+		vector<vector<AlleleType> >     MissingSampleUnscaffolded;
+        vector<vector<AlleleType> >     GWASOnlyhaplotypesUnscaffolded;
+		vector<vector<AlleleType> >     GWASOnlyMissingSampleUnscaffolded;
 
 
         // Variant and Sample Information and Allele Freq
@@ -107,9 +108,10 @@ class HaplotypeSet
             S+=RefAlleleSwap.size() * sizeof(bool);
 
 
-            S+=optEndPoints.size() * sizeof(int);
+            S+=RefTypedIndex.size() * sizeof(int);
+//            S+=optEndPoints.size() * sizeof(int);
+            S+=CummulativeSampleNoHaplotypes.size() * sizeof(int);
             S+=SampleNoHaplotypes.size() * sizeof(bool);
-            S+=Targetmissing.size() * sizeof(int);
             S+=MarkerToReducedInfoMapper.size() * sizeof(int);
             S+=AlleleFreq.size() * sizeof(double);
             S+=GWASOnlyAlleleFreq.size() * sizeof(double);
@@ -142,17 +144,33 @@ class HaplotypeSet
             {
                 S+=ReducedStructureInfo[i].size();
             }
+            for(int i=0;i<(int)ReducedStructureInfoSummary.size();i++)
+            {
+                S+=ReducedStructureInfoSummary[i].size();
+            }
+
+
+
+
+            for(int j=0;j<(int)ReducedStructureInfoBuffer.size();j++)
+                for(int i=0;i<(int)ReducedStructureInfoBuffer[j].size();i++)
+                {
+                    S+=ReducedStructureInfoBuffer[j][i].size();
+                }
+
+
+
 
             for(int i=0;i<(int)haplotypesUnscaffolded.size();i++)
             {
-                S+=haplotypesUnscaffolded[i].size() * sizeof(bool);
-                S+=MissingSampleUnscaffolded[i].size() * sizeof(bool);
+                S+=haplotypesUnscaffolded[i].size() * sizeof(AlleleType);
+                S+=MissingSampleUnscaffolded[i].size() * sizeof(AlleleType);
             }
 
             for(int i=0;i<(int)GWASOnlyhaplotypesUnscaffolded.size();i++)
             {
-                S+=GWASOnlyhaplotypesUnscaffolded[i].size() * sizeof(bool);
-                S+=GWASOnlyMissingSampleUnscaffolded[i].size() * sizeof(bool);
+                S+=GWASOnlyhaplotypesUnscaffolded[i].size() * sizeof(AlleleType);
+                S+=GWASOnlyMissingSampleUnscaffolded[i].size() * sizeof(AlleleType);
             }
             return (S);
         };
@@ -184,19 +202,21 @@ class HaplotypeSet
 
 
 
-
-void UncompressTypedSitesNew(HaplotypeSet &rHap,HaplotypeSet &tHap);
+void UpdatePloidySummary(string line);
+void UncompressTypedSitesNew(HaplotypeSet &rHap,HaplotypeSet &tHap,int ChunkNo);
 void CreateScaffoldedParameters(HaplotypeSet &rHap);
 void CreateAfterUncompressSummary();
 void InvertUniqueIndexMap();
 void CreateSiteSummary();
-void getm3VCFSampleNames(string line);
+void getm3VCFSampleNames(string &line);
 void UpdateParameterList();
+void GetTransUniqueHapsVERSION2(int index, ReducedHaplotypeInfo &tempBlock, string &tempString);
 bool ReadBlockHeaderSummary(string &line, ReducedHaplotypeInfoSummary &tempBlocktoCheck);
 void GetVariantInfoFromBlock(IFILE m3vcfxStream, ReducedHaplotypeInfoSummary &tempBlock,int &NoMarkersImported);
 bool ReadBlockHeader(string &line, ReducedHaplotypeInfo &tempBlocktoCheck);
 void ReadThisBlock(IFILE m3vcfxStream, int blockIndex, ReducedHaplotypeInfo &tempBlock);
-
+void Create(int index, HaplotypeSet &rHap);
+void reconstructHaplotype(vector<AlleleType> &reHaplotypes,int &index);
 bool BasicCheckForM3VCFReferenceHaplotypes(String &Reffilename, AllVariable& MyAllVariable);
 bool BasicCheckForTargetHaplotypes(String &VCFFileName, String TypeofFile, AllVariable& MyAllVariable);
 bool BasicCheckForVCFReferenceHaplotypes(String &VCFFileName, String TypeofFile, AllVariable& MyAllVariable);
@@ -212,8 +232,8 @@ void    writem3vcfFile                              (String filename,bool &gzip)
 string  DetectFileType                        (String filename);
 void CalculateGWASOnlyAlleleFreq();
 void CalculateAlleleFreq();
-bool RetrieveMissingScaffoldedHaplotype(int sample,int marker);
-bool RetrieveScaffoldedHaplotype(int sample,int marker);
+AlleleType RetrieveMissingScaffoldedHaplotype(int sample,int marker);
+AlleleType RetrieveScaffoldedHaplotype(int sample,int marker);
 void MyTokenize(vector<string> &result,const char *input,const char *delimiter, int Number);
 string FindTokenWithPrefix(const char *input,const char *delimiter,string CheckPrefix);
 int CheckBlockPosFlag(string &input,String &CHR,int &START,int &END);
