@@ -1230,7 +1230,7 @@ void HaplotypeSet::GetSummary(IFILE m3vcfxStream)
 bool HaplotypeSet::ReadM3VCFChunkingInformation(String &Reffilename,string checkChr)
 {
     string line;
-    int blockIndex=0, NoMarkersImported=0;
+    int blockIndex=0, NoMarkersImported=0, ReadHeader=0;
     NoLinesToDiscardatBeginning=0;
     finChromosome="NULL";
     StartedThisPanel=false;
@@ -1264,40 +1264,42 @@ bool HaplotypeSet::ReadM3VCFChunkingInformation(String &Reffilename,string check
 
         while(m3vcfxStream->readLine(line)!=-1)
         {
-            if(blockIndex==0)
+            if(ReadHeader==0)
             {
                 string tempLine = line.c_str() ;
 //                tempLine.assign(line);
                 //strcpy(tempLine.c_str(), line.c_str());
                 UpdatePloidySummary(tempLine);
-            int j=9;
+                ReadHeader=1;
             }
 //            cout<<line<<endl;
             ReducedHaplotypeInfoSummary tempBlock;
             if(ReadBlockHeaderSummary(line, tempBlock))
             {
 
+
+
                 if(!AlreadyReadMiddle)
                     NoLinesToDiscardatBeginning += (tempBlock.BlockSize+1);
                 for(int tempIndex=0;tempIndex<tempBlock.BlockSize;tempIndex++)
                     m3vcfxStream->discardLine();
+                line.clear();
                 continue;
             }
 
             AlreadyReadMiddle=true;
             if(blockIndex==0)
             {
-               if(checkChr!="" && finChromosome!=checkChr)
-               {
+                if(checkChr!="" && finChromosome!=checkChr)
+                {
                     cout << "\n ERROR !!! \n Reference Panel is on chromosome "<<finChromosome<<" which is ";
                     cout <<" different from chromosome "<< checkChr<<" of the GWAS panel  "<<endl;
                     cout << " Please check the file properly..\n";
                     cout << "\n Program Exiting ... \n\n";
                     return false;
 
-               }
+                }
             }
-
             GetVariantInfoFromBlock(m3vcfxStream, tempBlock, NoMarkersImported);
             ReducedStructureInfoSummary.push_back(tempBlock);
             line.clear();
