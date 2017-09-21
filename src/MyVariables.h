@@ -4,7 +4,9 @@
 #include<fstream>
 #include "StringBasics.h"
 #include<vector>
+#if defined(_OPENMP)
 #include <omp.h>
+#endif
 #include <unordered_set>
 #include "assert.h"
 using namespace std;

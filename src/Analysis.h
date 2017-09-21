@@ -2,7 +2,9 @@
 #define ANALYSIS_H_INCLUDED
 
 
+#if defined(_OPENMP)
 #include <omp.h>
+#endif
 #include "MyVariables.h"
 #include "Unique.h"
 #include "Imputation.h"
