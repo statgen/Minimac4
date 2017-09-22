@@ -653,7 +653,7 @@ void MarkovModel::unfoldProbabilitiesWithThreshold(int bridgeIndex,
         sum = 0.0;
 
         int Index=0;
-        for (int i=0; i<noReducedStatesCurrent; ++i,++Index)
+        for (int i=0; i<noReducedStatesCurrent; i++)
         {
             double tempVal=probHap[i]*tempInvSum;
             if(maxVal<tempVal)
@@ -661,7 +661,7 @@ void MarkovModel::unfoldProbabilitiesWithThreshold(int bridgeIndex,
             if(tempVal >= MyAllVariables->myModelVariables.probThreshold)
             {
                 sum+=tempVal;
-                BestMatchHaps[Index]=i;
+                BestMatchHaps[Index++]=i;
                 NoBestMatchHaps++;
             }
         }
