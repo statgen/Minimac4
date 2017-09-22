@@ -214,7 +214,7 @@ public:
     
     ModelVariable()
     {
-        referenceEstimates=false;
+        referenceEstimates=true;
         constantParam=0.0;
         processReference = false;
         reEstimate=false;
