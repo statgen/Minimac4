@@ -676,6 +676,9 @@ void MarkovModel::unfoldProbabilitiesWithThreshold(int bridgeIndex,
     NoBestMatchFullRefHaps=0;
     double temp,tempInvCardinality;
     int i;
+    vector<float> &LeftPrev=junctionLeftProb[bridgeIndex];
+    vector<float> &RightPrev=PrevjunctionRightProb;
+    int UnMappedIndex;
 
     for (int index=0; index<NoBestMatchHaps; index++)
     {
@@ -690,25 +693,15 @@ void MarkovModel::unfoldProbabilitiesWithThreshold(int bridgeIndex,
         temp=RightNoRecomProb[i];
         RightAdj_Rec[i] = (RightTotalProb[i] - temp )  * tempInvCardinality;
         RightAdj_NoRec[i] = RightNoRecomProb[i] / PrevRightFoldedProb[i];
-    }
 
-
-    vector<float> &LeftPrev=junctionLeftProb[bridgeIndex];
-    vector<float> &RightPrev=PrevjunctionRightProb;
-    int UnMappedIndex;
-
-    for (int index=0; index<NoBestMatchHaps; index++)
-    {
-        i=BestMatchHaps[index];
         for(int K=0;K< thisInfo.uniqueCardinality[i];K++)
         {
             UnMappedIndex=thisInfo.uniqueIndexReverseMaps[i][K];
             probHapFullAverage[UnMappedIndex]=(LeftAdj_Rec[i] + LeftAdj_NoRrec[i]*LeftPrev[UnMappedIndex])
-                                               * (RightAdj_Rec[i] + RightAdj_NoRec[i]*RightPrev[UnMappedIndex]);
+                                              * (RightAdj_Rec[i] + RightAdj_NoRec[i]*RightPrev[UnMappedIndex]);
             BestMatchFullRefHaps[NoBestMatchFullRefHaps++]=UnMappedIndex;
         }
     }
-
 }
 
 
