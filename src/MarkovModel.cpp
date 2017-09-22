@@ -649,11 +649,11 @@ void MarkovModel::unfoldProbabilitiesWithThreshold(int bridgeIndex,
 
     if(MyAllVariables->myOutFormat.verbose && MyAllVariables->myModelVariables.probThreshold>0.0)
     {
-        int Index=0;
         NoBestMatchHaps=0;
         sum = 0.0;
 
-        for (int i=0; i<noReducedStatesCurrent;i++)
+        int Index=0;
+        for (int i=0; i<noReducedStatesCurrent; ++i,++Index)
         {
             double tempVal=probHap[i]*tempInvSum;
             if(maxVal<tempVal)
@@ -661,7 +661,7 @@ void MarkovModel::unfoldProbabilitiesWithThreshold(int bridgeIndex,
             if(tempVal >= MyAllVariables->myModelVariables.probThreshold)
             {
                 sum+=tempVal;
-                BestMatchHaps[Index++]=i;
+                BestMatchHaps[Index]=i;
                 NoBestMatchHaps++;
             }
         }
@@ -1068,14 +1068,14 @@ void MarkovModel::ReCreateLeftNoRecoProbMinimac3(HaplotypeSet &tHap, int &hapID,
 
 void MarkovModel::foldProbabilities(vector<float> &foldProb,int bridgeIndex,ReducedHaplotypeInfo &Info,int direction,int noReference) //0 - left; 1 - right
 {
-    vector<int> *TempuniqueIndexMap=&Info.uniqueIndexMap;
+    vector<int>& TempuniqueIndexMap = Info.uniqueIndexMap;
     fill(foldProb.begin(), foldProb.end(), 0.0);
     if(direction==0)
     {
-        vector<float> *PrevjunctionLeftProb=&junctionLeftProb[bridgeIndex];
+        vector<float>& PrevjunctionLeftProb = junctionLeftProb[bridgeIndex];
         for(int i=0;i<noReference;i++)
         {
-            foldProb[(*TempuniqueIndexMap)[i]]+=(*PrevjunctionLeftProb)[i];
+            foldProb[TempuniqueIndexMap[i]]+=PrevjunctionLeftProb[i];
         }
     }
     else if(direction==1)
@@ -1083,7 +1083,7 @@ void MarkovModel::foldProbabilities(vector<float> &foldProb,int bridgeIndex,Redu
 
         for(int i=0;i<noReference;i++)
         {
-            foldProb[(*TempuniqueIndexMap)[i]]+=PrevjunctionRightProb[i];
+            foldProb[TempuniqueIndexMap[i]]+=PrevjunctionRightProb[i];
         }
     }
     
@@ -1104,11 +1104,9 @@ void MarkovModel::unfoldProbabilities(int bridgeIndex,vector<float> &recomProb,
     for (int i=0; i<N; i++)
     {
         adj_rec[i] = recomProb[i] * thisInfo.InvuniqueCardinality[i];
-    }
-    for (int i=0; i<N; i++)
-    {
         adj_norec[i] = noRecomProb[i] / PrevFoldedProb[i];
     }
+
     vector<float> &prev = direction ? PrevjunctionRightProb : junctionLeftProb[bridgeIndex];
     vector<float> &next = direction ? PrevjunctionRightProb : junctionLeftProb[bridgeIndex+1];
 
@@ -1123,7 +1121,7 @@ void MarkovModel::unfoldProbabilities(int bridgeIndex,vector<float> &recomProb,
     }
     else
     {
-         for (int i=0; i<noReference; i++)
+        for (int i=0; i<noReference; i++)
         {
             int m = thisInfo.uniqueIndexMap[i];
             next[i] = adj_rec[m] + adj_norec[m]*prev[i];
@@ -1138,7 +1136,7 @@ void MarkovModel::RightCondition(int markerPos,vector<float> &FromProb,vector<fl
                             vector<float> &FromNoRecomProb, vector<float> &ToNoRecomProb,
                             AlleleType observed,double e,double freq,ReducedHaplotypeInfo &Info)
 {
-
+    // TODO: test overhead of double float convertsion
     double prandom = e*freq+backgroundError;
     double pmatch = (1.0 - e)+e*freq+backgroundError;
 
