@@ -80,8 +80,8 @@ class DosageData
 
 
 
-void PrintDiploidLooDosage(float &x, float &y, bool a, bool b);
-void PrintHaploidLooDosage(float &x, bool a);
+void PrintDiploidLooDosage(float &x, float &y, AlleleType a, AlleleType b);
+void PrintHaploidLooDosage(float &x, AlleleType a);
 
         void InitializePartialDosageData(HaplotypeSet &tarInitializer, int MaxNoSamples,
                                              int MaxNoRefVariants, int MaxNoTarVariants,

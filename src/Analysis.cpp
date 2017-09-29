@@ -905,6 +905,7 @@ bool Analysis::OpenStreamOutputFiles()
             ifprintf(vcfdosepartial,"##FORMAT=<ID=SD,Number=1,Type=Float,Description=\"Variance of Posterior Genotype Probabilities\">\n");
 
         ifprintf(vcfdosepartial,"##minimac4_Command=%s\n",MyAllVariables->myOutFormat.CommandLine.c_str());
+
         ifprintf(vcfdosepartial,"#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT");
 
         for(int Id=0;Id<targetPanel.numSamples;Id++)
@@ -935,7 +936,7 @@ bool Analysis::OpenStreamOutputFiles()
         ifprintf(vcfLoodosepartial,"##INFO=<ID=TYPED,Number=0,Type=Flag,Description=\"Marker was genotyped AND imputed\">\n");
         ifprintf(vcfLoodosepartial,"##FORMAT=<ID=GT,Number=1,Type=String,Description=\"Genotyped alleles from Array\">\n");
         ifprintf(vcfLoodosepartial,"##FORMAT=<ID=LDS,Number=1,Type=String,Description=\"Leave-one-out Imputed Dosage : Estimated Haploid Alternate Allele Dosage assuming site was NOT genotyped \">\n");
-        ifprintf(vcfdosepartial,"##minimac4_Command=%s\n",MyAllVariables->myOutFormat.CommandLine.c_str());
+        ifprintf(vcfLoodosepartial,"##minimac4_Command=%s\n",MyAllVariables->myOutFormat.CommandLine.c_str());
         ifprintf(vcfLoodosepartial,"#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT");
 
         for(int Id=0;Id<targetPanel.numSamples;Id++)
