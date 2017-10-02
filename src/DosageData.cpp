@@ -200,19 +200,19 @@ void DosageData::PrintHaploidDosage(float &x)
 }
 
 
-void DosageData::PrintDiploidLooDosage(float &x, float &y, bool a, bool b)
+void DosageData::PrintDiploidLooDosage(float &x, float &y, AlleleType a, AlleleType b)
 {
     PrintEmpStringLength+=sprintf(PrintEmpStringPointer+PrintEmpStringLength,"\t");
-    PrintEmpStringLength+=sprintf(PrintEmpStringPointer+PrintEmpStringLength,"%d|%d",(a),(b));
+    PrintEmpStringLength+=sprintf(PrintEmpStringPointer+PrintEmpStringLength,"%c|%c",a,b);
     PrintEmpStringLength+=sprintf(PrintEmpStringPointer+PrintEmpStringLength,":");
     PrintEmpStringLength+=sprintf(PrintEmpStringPointer+PrintEmpStringLength,"%.3f|%.3f",x , y);
 }
 
 
-void DosageData::PrintHaploidLooDosage(float &x, bool a)
+void DosageData::PrintHaploidLooDosage(float &x, AlleleType a)
 {
     PrintEmpStringLength+=sprintf(PrintEmpStringPointer+PrintEmpStringLength,"\t");
-    PrintEmpStringLength+=sprintf(PrintEmpStringPointer+PrintEmpStringLength,"%d",(a));
+    PrintEmpStringLength+=sprintf(PrintEmpStringPointer+PrintEmpStringLength,"%c",a);
     PrintEmpStringLength+=sprintf(PrintEmpStringPointer+PrintEmpStringLength,":");
     PrintEmpStringLength+=sprintf(PrintEmpStringPointer+PrintEmpStringLength,"%.3f",x);
 }
@@ -238,7 +238,6 @@ void DosageData::PrintDosageForVcfOutputForID(int MarkerIndex)
         {
 
             int gwasHapIndex = tHapFull->CummulativeSampleNoHaplotypes[SampleIndex[IndexId]];
-//int FullSamID=;
 
             int TypedMarkerIndex = rHapFull->MapRefToTar[MarkerIndex];
 
@@ -248,7 +247,8 @@ void DosageData::PrintDosageForVcfOutputForID(int MarkerIndex)
 
             if(NoHaps==2)
             {
-                 if( tHapFull->MissingSampleUnscaffolded[gwasHapIndex][TypedMarkerIndex] || tHapFull->MissingSampleUnscaffolded[gwasHapIndex+1][TypedMarkerIndex])
+                 if( tHapFull->MissingSampleUnscaffolded[gwasHapIndex][TypedMarkerIndex] =='1'
+                     || tHapFull->MissingSampleUnscaffolded[gwasHapIndex+1][TypedMarkerIndex]=='1')
                  {
                      PrintEmpStringLength+=sprintf(PrintEmpStringPointer+PrintEmpStringLength,"\t.|.:.|.");
                  }
@@ -262,7 +262,7 @@ void DosageData::PrintDosageForVcfOutputForID(int MarkerIndex)
             }
             else if(NoHaps==1)
             {
-                 if( tHapFull->MissingSampleUnscaffolded[gwasHapIndex][TypedMarkerIndex])
+                 if( tHapFull->MissingSampleUnscaffolded[gwasHapIndex][TypedMarkerIndex]=='1')
                  {
                      PrintEmpStringLength+=sprintf(PrintEmpStringPointer+PrintEmpStringLength,"\t.:.");
                  }
@@ -299,27 +299,27 @@ void DosageData::PrintGWASOnlyForVcfOutputForID(int MarkerIndex)
 
         if(NoHaps==2)
         {
-            bool a1=tHapFull->GWASOnlyMissingSampleUnscaffolded[gwasHapIndex][MarkerIndex];
-            bool a2=tHapFull->GWASOnlyMissingSampleUnscaffolded[gwasHapIndex+1][MarkerIndex];
+            AlleleType a1=tHapFull->GWASOnlyMissingSampleUnscaffolded[gwasHapIndex][MarkerIndex];
+            AlleleType a2=tHapFull->GWASOnlyMissingSampleUnscaffolded[gwasHapIndex+1][MarkerIndex];
 
-            if(a1 || a2)
+            if(a1=='1' || a2=='1')
                 PrintDiploidDosage(freq,freq);
             else
              {
-                 x=(float)tHapFull->GWASOnlyhaplotypesUnscaffolded[gwasHapIndex][MarkerIndex];
-                 y=(float)tHapFull->GWASOnlyhaplotypesUnscaffolded[gwasHapIndex+1][MarkerIndex];
+                 x=(float)(tHapFull->GWASOnlyhaplotypesUnscaffolded[gwasHapIndex][MarkerIndex]-'0');
+                 y=(float)(tHapFull->GWASOnlyhaplotypesUnscaffolded[gwasHapIndex+1][MarkerIndex]-'0');
                  PrintDiploidDosage(x, y);
             }
         }
 
         else if(NoHaps==1)
         {
-            bool a1=tHapFull->GWASOnlyMissingSampleUnscaffolded[gwasHapIndex][MarkerIndex];
-            if(a1)
+            AlleleType a1=tHapFull->GWASOnlyMissingSampleUnscaffolded[gwasHapIndex][MarkerIndex];
+            if(a1=='1')
                 PrintHaploidDosage(freq);
             else
              {
-                 x=(float)tHapFull->GWASOnlyhaplotypesUnscaffolded[gwasHapIndex][MarkerIndex];
+                 x=(float)(tHapFull->GWASOnlyhaplotypesUnscaffolded[gwasHapIndex][MarkerIndex]-'0');
                  PrintHaploidDosage(x);
              }
 
