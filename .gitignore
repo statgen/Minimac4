@@ -1,0 +1,15 @@
+.idea/
+
+*.so
+*.dylib
+*.dll
+
+*.lai
+*.la
+*.a
+*.lib
+
+*.slo
+*.lo
+*.o
+*.obj

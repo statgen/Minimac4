@@ -992,24 +992,41 @@ bool HaplotypeSet::GetVariantInfofromVCFFile(String &VCFFileName, String TypeofF
 //    if(outSideRegion + duplicates + notBiallelic + failFilter + inconsistent>0) {cout<<endl;}
     if(MyAllVariable.myOutFormat.verbose)
     {
-        if(outSideRegion>0){std::cout << " NOTE ! "<< outSideRegion<< " variants lie outside region ..." << endl;}
+        std::cout << " NOTE ! "<< numActualRecords << " variants in file ..." << endl;
+        if(outSideRegion>0){std::cout << " NOTE ! "<< outSideRegion<< " variants lie outside region ["
+                                      <<MyAllVariable.myHapDataVariables.CHR
+                                      <<":"<<MyAllVariable.myHapDataVariables.START
+                                      <<"-"<<MyAllVariable.myHapDataVariables.END
+                                      <<"] ... "<< endl;}
         if(duplicates>0){std::cout << " NOTE ! "<< duplicates<< " instance(s) of duplicated variants discarded ..." << endl;}
         if(notBiallelic>0){std::cout << " NOTE ! "<< notBiallelic<< " multi-allelic variant(s) discarded ..." << endl;}
         if(failFilter>0){std::cout << " NOTE ! "<< failFilter<< " variant(s) failed FILTER = PASS and were discarded ..." << endl;}
         if(inconsistent>0){std::cout << " NOTE ! "<< inconsistent<< " SNP(s) with inconsistent REF/ALT alleles discarded ..." << endl;}
         if(outSideRegion + duplicates + notBiallelic + failFilter + inconsistent>0) {cout<<endl;}
     }
-    cout<<" Successful !!! "<<endl;
-
-
     if(numReadRecords==0)
     {
-        cout << "\n ERROR !!! \n No variants left to imported from "<< TypeofFile <<" File "<<endl;
-		cout << " Please check the filtering conditions properly ...\n";
-		cout << "\n Program Exiting ... \n\n";
+
+        if(MyAllVariable.myHapDataVariables.CHR=="")
+        {
+            cout << "\n ERROR !!! \n No variants left to imported from "<< TypeofFile <<" File "<<endl;
+            cout << " Please check the filtering conditions properly ...\n";
+        }
+        else
+        {
+
+            cout << "\n ERROR !!! \n No variants found in region ["<<MyAllVariable.myHapDataVariables.CHR
+                 <<":"<<MyAllVariable.myHapDataVariables.START<<"-"<<MyAllVariable.myHapDataVariables.END
+                 <<"] in "
+                 << TypeofFile << " File : " << VCFFileName << endl;
+            cout << " Please check the filtering conditions/input region properly..\n";
+        }
+
+        cout << "\n Program Exiting ... \n\n";
         return false;
     }
 
+    cout<<" Successful !!! "<<endl;
     return true;
 
 }
@@ -1231,7 +1248,7 @@ void HaplotypeSet::GetSummary(IFILE m3vcfxStream)
 bool HaplotypeSet::ReadM3VCFChunkingInformation(String &Reffilename,string checkChr)
 {
     string line;
-    int blockIndex=0, NoMarkersImported=0;
+    int blockIndex=0, NoMarkersImported=0, ReadHeader=0;
     NoLinesToDiscardatBeginning=0;
     finChromosome="NULL";
     StartedThisPanel=false;
@@ -1265,40 +1282,34 @@ bool HaplotypeSet::ReadM3VCFChunkingInformation(String &Reffilename,string check
 
         while(m3vcfxStream->readLine(line)!=-1)
         {
-            if(blockIndex==0)
+            if(ReadHeader==0)
             {
                 string tempLine = line.c_str() ;
-//                tempLine.assign(line);
-                //strcpy(tempLine.c_str(), line.c_str());
                 UpdatePloidySummary(tempLine);
-            int j=9;
+                ReadHeader=1;
             }
-//            cout<<line<<endl;
+
             ReducedHaplotypeInfoSummary tempBlock;
              if(ReadBlockHeaderSummary(line, tempBlock))
             {
-
-                if(!AlreadyReadMiddle)
-                    NoLinesToDiscardatBeginning += (tempBlock.BlockSize+1);
-                for(int tempIndex=0;tempIndex<tempBlock.BlockSize;tempIndex++)
-                    m3vcfxStream->discardLine();
-                continue;
-            }
-
-            AlreadyReadMiddle=true;
-            if(blockIndex==0)
-            {
-               if(checkChr!="" && finChromosome!=checkChr)
-               {
-                    cout << "\n ERROR !!! \n Reference Panel is on chromosome "<<finChromosome<<" which is ";
-                    cout <<" different from chromosome "<< checkChr<<" of the GWAS panel  "<<endl;
+                if(finChromosome!=checkChr)
+                {
+                    cout << "\n ERROR !!! \n Reference Panel is on chromosome ["<<finChromosome<<"] which is ";
+                    cout <<" different from chromosome ["<< checkChr<<"] of the GWAS panel  "<<endl;
                     cout << " Please check the file properly..\n";
                     cout << "\n Program Exiting ... \n\n";
                     return false;
 
-               }
+                }
+                if(!AlreadyReadMiddle)
+                    NoLinesToDiscardatBeginning += (tempBlock.BlockSize+1);
+                for(int tempIndex=0;tempIndex<tempBlock.BlockSize;tempIndex++)
+                    m3vcfxStream->discardLine();
+                line.clear();
+                continue;
             }
 
+            AlreadyReadMiddle=true;
             GetVariantInfoFromBlock(m3vcfxStream, tempBlock, NoMarkersImported);
             ReducedStructureInfoSummary.push_back(tempBlock);
             line.clear();
@@ -1313,9 +1324,21 @@ bool HaplotypeSet::ReadM3VCFChunkingInformation(String &Reffilename,string check
 
     if (numMarkers == 0)
     {
-        cout << "\n ERROR !!! \n No variants left to imported from reference haplotype file "<<endl;
-		cout << " Please check the filtering conditions OR the file properly ...\n";
-		cout << "\n Program Exiting ... \n\n";
+        if(MyAllVariables->myHapDataVariables.CHR=="")
+        {
+            cout << "\n ERROR !!! \n No variants left to imported from reference haplotype file "<<endl;
+            cout << " Please check the filtering conditions OR the file properly ..."<<endl;
+        }
+        else
+        {
+
+            cout << "\n ERROR !!! \n No variants found in region ["
+                 <<MyAllVariables->myHapDataVariables.CHR<<":"
+                 <<MyAllVariables->myHapDataVariables.START<<"-"<<MyAllVariables->myHapDataVariables.END
+                 <<"] in reference haplotype file "<<endl;
+            cout << " Please check the filtering conditions OR the file properly ..."<<endl;
+        }
+        cout << "\n Program Exiting ... \n\n";
         return false;
     }
 
@@ -1642,6 +1665,8 @@ int HaplotypeSet::CheckBlockPosFlag(string &input, String &CHR, int &START, int 
     MyTokenize(PosTokens, tokens[1].c_str(), dashSep, 2);
     int tempStartBlock=atoi(PosTokens[0].c_str());
     int tempEndBlock=atoi(PosTokens[1].c_str());
+    if(finChromosome=="NULL")
+        finChromosome=tempChr;
 
     if(CHR!="")
     {
@@ -1656,8 +1681,6 @@ int HaplotypeSet::CheckBlockPosFlag(string &input, String &CHR, int &START, int 
         }
     }
 
-    if(finChromosome=="NULL")
-        finChromosome=tempChr;
 
     return 0;
 
