@@ -56,8 +56,9 @@ bool Analysis::CreateRecombinationMap()
             denom += GeneticMapData[i][0] - GeneticMapData[i-1][0];
             num = referencePanel.VariantList[SecondIndex].bp - referencePanel.VariantList[SecondIndex-1].bp;
             Val += GeneticMapData[i][1];
-            referencePanel.Recom[SecondIndex-1]=(1-exp(-Val*num/denom/50))/2;
-            //cout<<SecondIndex-1<<"\t"<<referencePanel.Recom[SecondIndex-1]<<"\t"<<num/denom<<endl;
+            //referencePanel.Recom[SecondIndex-1]=(1-exp(-Val*num/denom/50))/2;
+            referencePanel.Recom[SecondIndex-1]=Val*num/denom;
+            //cout<<SecondIndex-1<<"\t"<<referencePanel.Recom[SecondIndex-1]<<"\t"<<num/denom<<"\t"<<Val*num/denom<<endl;
             SecondIndex++;
             denom = 0.0;
             Val = 0.0;

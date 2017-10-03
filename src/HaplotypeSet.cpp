@@ -345,6 +345,7 @@ void HaplotypeSet::UpdatePloidySummary(string line)
         CummulativeSampleNoHaplotypes[i] += CummulativeSampleNoHaplotypes[i - 1] + SampleNoHaplotypes[i - 1];
 
     numHaplotypes = CummulativeSampleNoHaplotypes.back()+SampleNoHaplotypes.back();
+
 }
 
 
@@ -1274,7 +1275,7 @@ bool HaplotypeSet::ReadM3VCFChunkingInformation(String &Reffilename,string check
             }
 //            cout<<line<<endl;
             ReducedHaplotypeInfoSummary tempBlock;
-            if(ReadBlockHeaderSummary(line, tempBlock))
+             if(ReadBlockHeaderSummary(line, tempBlock))
             {
 
                 if(!AlreadyReadMiddle)
