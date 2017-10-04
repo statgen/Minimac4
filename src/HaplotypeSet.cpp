@@ -483,7 +483,7 @@ void HaplotypeSet::GetVariantInfoFromBlock(IFILE m3vcfxStream, ReducedHaplotypeI
             if(MyAllVariables->myModelVariables.constantParam>0.0)
             {
                 Recom.push_back(MyAllVariables->myModelVariables.constantParam);
-                Error.push_back(0.005);
+                Error.push_back(0.00999);
             }
             else
             {
@@ -495,7 +495,7 @@ void HaplotypeSet::GetVariantInfoFromBlock(IFILE m3vcfxStream, ReducedHaplotypeI
                     abort();
                 }
                 Recom.push_back(tempRecom);
-                Error.push_back(tempError);
+                Error.push_back(0.00999);
             }
             NewBlockSizeCount++;
             NoMarkersImported++;

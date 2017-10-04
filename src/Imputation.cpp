@@ -911,6 +911,8 @@ void Imputation::ConditionJunctionProb(HaplotypeSet &rHap, int markerPos,vector<
     {
         Prob[i]*= TempHap[Info.uniqueIndexMap[i]] ==observed ? pmatch : prandom;
     }
+    int h=0;
+
 }
 
 
