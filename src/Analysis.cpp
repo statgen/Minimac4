@@ -2,6 +2,8 @@
 #include "Estimation.h"
 #include <iomanip>
 #include "assert.h"
+# define RECOM_MIN = 1e-07
+
 
 void MyTokenize(vector<string> &result, const char *input, const char *delimiter, int Number)
 {
@@ -41,8 +43,7 @@ bool Analysis::CreateRecombinationMap()
     int FirstIndex=0;
     while(referencePanel.VariantList[FirstIndex].bp<GeneticMapData[0][0])
     {
-        referencePanel.Recom[FirstIndex]=0.0;
-        //cout<<FirstIndex<<"\t"<<referencePanel.Recom[FirstIndex]<<endl;
+        referencePanel.Recom[FirstIndex]=RECOM_MIN;
         FirstIndex++;
 
     }
@@ -56,13 +57,13 @@ bool Analysis::CreateRecombinationMap()
             denom += GeneticMapData[i][0] - GeneticMapData[i-1][0];
             num = referencePanel.VariantList[SecondIndex].bp - referencePanel.VariantList[SecondIndex-1].bp;
             Val += GeneticMapData[i][1];
-            //referencePanel.Recom[SecondIndex-1]=(1-exp(-Val*num/denom/50))/2;
+            referencePanel.Recom[SecondIndex-1]=(1-exp(-Val*num/denom/50))/2;
             if(num==0  || Val==0)
-                referencePanel.Recom[SecondIndex-1]=1e-7;
+                referencePanel.Recom[SecondIndex-1]=RECOM_MIN;
             else
                 referencePanel.Recom[SecondIndex-1]=Val*num/denom;
 
-            cout<<" RECOM = "<<SecondIndex-1<<"\t"<<referencePanel.Recom[SecondIndex-1]<<"\t"<<num/denom<<"\t"<<Val*num/denom<<endl;
+//            cout<<" RECOM = "<<SecondIndex-1<<"\t"<<referencePanel.Recom[SecondIndex-1]<<"\t"<<num/denom<<"\t"<<Val*num/denom<<endl;
             SecondIndex++;
             denom = 0.0;
             Val = 0.0;
