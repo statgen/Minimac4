@@ -57,11 +57,12 @@ bool Analysis::CreateRecombinationMap()
             num = referencePanel.VariantList[SecondIndex].bp - referencePanel.VariantList[SecondIndex-1].bp;
             Val += GeneticMapData[i][1];
             //referencePanel.Recom[SecondIndex-1]=(1-exp(-Val*num/denom/50))/2;
-            if(num==0)
-                referencePanel.Recom[SecondIndex-1]=Val*1/denom;
+            if(num==0  || Val==0)
+                referencePanel.Recom[SecondIndex-1]=1e-7;
             else
                 referencePanel.Recom[SecondIndex-1]=Val*num/denom;
-            //cout<<SecondIndex-1<<"\t"<<referencePanel.Recom[SecondIndex-1]<<"\t"<<num/denom<<"\t"<<Val*num/denom<<endl;
+
+            cout<<" RECOM = "<<SecondIndex-1<<"\t"<<referencePanel.Recom[SecondIndex-1]<<"\t"<<num/denom<<"\t"<<Val*num/denom<<endl;
             SecondIndex++;
             denom = 0.0;
             Val = 0.0;
@@ -1669,6 +1670,9 @@ bool Analysis::CheckGeneticMapFile()
                 GeneticMapData.push_back(AppendPiece);
                 //cout<<GeneticMapData.back()[0]<<endl;
             }
+//            else
+//                cout<<Pieces[0]<<endl;
+
             line.clear();
         }
     }
