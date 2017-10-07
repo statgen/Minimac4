@@ -2,7 +2,7 @@
 #include "Estimation.h"
 #include <iomanip>
 #include "assert.h"
-# define RECOM_MIN 1e-10
+# define RECOM_MIN 0.0
 
 
 void MyTokenize(vector<string> &result, const char *input, const char *delimiter, int Number)
