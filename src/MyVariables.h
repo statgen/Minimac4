@@ -395,7 +395,7 @@ class HaplotypeDataVariables
             ignoreDuplicates=false;
             allowRefDuplicates=false;
             minRatio=0.1;
-            mapFile="/net/fantasia/home/sayantan/Softwares/Beagle/Version4/plink.chr20.GRCh37.map";
+            mapFile="Softwares/Beagle/Version4/plink.chr20.GRCh37.map";
         };
 
         bool CheckValidity()
