@@ -1259,7 +1259,7 @@ bool HaplotypeSet::ReadM3VCFChunkingInformation(String &Reffilename,string check
 
     if(MyHapDataVariables->CHR!="")
     {
-        std::cout << "\n Loading markers in region chr" << MyHapDataVariables->CHR<<":"<<MyHapDataVariables->START<<"-"<<MyHapDataVariables->END<<" ..."<< endl;
+        std::cout << "\n Loading markers in region " << MyHapDataVariables->CHR<<":"<<MyHapDataVariables->START<<"-"<<MyHapDataVariables->END<<" ..."<< endl;
     }
 
     IFILE m3vcfxStream = ifopen(Reffilename, "r");
@@ -1307,6 +1307,16 @@ bool HaplotypeSet::ReadM3VCFChunkingInformation(String &Reffilename,string check
                     m3vcfxStream->discardLine();
                 line.clear();
                 continue;
+            }
+
+            if(finChromosome!=checkChr)
+            {
+                cout << "\n ERROR !!! \n Reference Panel is on chromosome ["<<finChromosome<<"] which is ";
+                cout <<" different from chromosome ["<< checkChr<<"] of the GWAS panel  "<<endl;
+                cout << " Please check the file properly..\n";
+                cout << "\n Program Exiting ... \n\n";
+                return false;
+
             }
 
             AlreadyReadMiddle=true;
