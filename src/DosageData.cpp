@@ -23,7 +23,7 @@ void DosageData::FlushPartialVcf(int NovcfParts)
     PartialVcfFileName+=(".chunk."+(string)(strs1.str())+ ".dose.vcf.part."+ (string)(strs.str()));
     PartialMetaVcfFileName+=(".chunk."+(string)(strs1.str())+ ".empiricalDose.vcf.part."+ (string)(strs.str()));
 
-    IFILE vcfdosepartial = ifopen(PartialVcfFileName.c_str(), "wb", InputFile::UNCOMPRESSED);
+    IFILE vcfdosepartial = ifopen(PartialVcfFileName.c_str(), "wb", InputFile::BGZF);
     IFILE vcfLoodosepartial = NULL;
 
     if(MyAllVariables->myOutFormat.meta)
