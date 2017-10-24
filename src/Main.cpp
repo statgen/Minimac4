@@ -112,7 +112,8 @@ int main(int argc, char ** argv)
 		LONG_PARAMETER("unphasedOutput", &MyOutFormat.unphasedOutput)
 		END_LONG_PARAMETERS();
 
-		MyOutFormat.CreateCommandLine(argc,argv);
+	//MyHapDataVariables.GetMapFileLocation(argc,argv);
+    MyOutFormat.CreateCommandLine(argc,argv);
 
 	inputParameters.Add(new LongParameters(" Command Line Options: ",longParameterList));
 

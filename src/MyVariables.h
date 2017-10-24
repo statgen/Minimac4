@@ -175,21 +175,6 @@ public:
     };
 
 
-void GetMapFileLocation(int argc, char ** argv)
-{
-    int len = strlen(argv[0]);
-    string tempString(argv[0]);
-
-    BinaryLocation=tempString.substr(0,len-8)+"../docs/";
-
-    int k=0;
-
-//    char MyCommandLine;
-//    strcpy(MyCommandLine,argv[0]);
-
-}
-
-
 
 void CreateCommandLine(int argc, char ** argv)
 {
@@ -414,7 +399,7 @@ class HaplotypeDataVariables
             ignoreDuplicates=false;
             allowRefDuplicates=false;
             minRatio=0.1;
-            mapFile="Softwares/Beagle/Version4/plink.chr20.GRCh37.map";
+            mapFile="docs/geneticMapFile.b38.map.txt.g";
         };
 
         bool CheckValidity()
@@ -591,6 +576,23 @@ class HaplotypeDataVariables
             return true;
 
         };
+
+
+
+    void GetMapFileLocation(int argc, char ** argv)
+    {
+        int len = strlen(argv[0]);
+        string tempString(argv[0]),tempMap;
+
+        tempMap=tempString.substr(0,len-8)+"../docs/geneticMapFile.b38.map.txt.gz";
+
+        mapFile=tempMap.c_str();
+        int k=0;
+
+//    char MyCommandLine;
+//    strcpy(MyCommandLine,argv[0]);
+
+    }
 
 };
 
