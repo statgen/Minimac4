@@ -399,7 +399,7 @@ class HaplotypeDataVariables
             ignoreDuplicates=false;
             allowRefDuplicates=false;
             minRatio=0.1;
-            mapFile="docs/geneticMapFile.b38.map.txt.g";
+            mapFile="docs/geneticMapFile.b38.map.txt.gz";
         };
 
         bool CheckValidity()
