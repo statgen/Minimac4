@@ -1170,7 +1170,7 @@ bool HaplotypeSet::ScaffoldGWAStoReference(HaplotypeSet &rHap, AllVariable& MyAl
     cout<<"\n Reference Panel   : Found "<<rHap.numSamples<< " samples ("<< rHap.numHaplotypes  <<" haplotypes) and "<< (int)rHap.VariantList.size()<<" variants ..."<<endl;
 
 
-    cout<<"\n Target/GWAS Panel : Found "<<numSamples<< " samples ("<< numHaplotypes  <<" haplotypes) and "<< numOverlapMarkers  + numTypedOnlyMarkers<<" variants ..."<<endl;
+    cout<<"\n Target/GWAS Panel : Found "<<numSamples<< " samples ("<< numHaplotypes  <<" haplotypes) and "<< (int)VariantList.size()<<" variants ..."<<endl;
     cout<<"                     "<<numOverlapMarkers<<" variants overlap with Reference panel "<<endl;
     cout<<"                     "<< numTypedOnlyMarkers<<" variants imported that exist only in Target/GWAS panel"<<endl;
 
