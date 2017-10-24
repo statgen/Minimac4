@@ -25,6 +25,7 @@ public:
     String OutPrefix;
     string CommandLine;
     char* MyCommandLine;
+    string BinaryLocation;
     bool onlyrefmarkers;
     bool gzip,RsId,nobgzip,meta;
 //    vector<bool> format;
@@ -174,12 +175,30 @@ public:
     };
 
 
+void GetMapFileLocation(int argc, char ** argv)
+{
+    int len = strlen(argv[0]);
+    string tempString(argv[0]);
+
+    BinaryLocation=tempString.substr(0,len-8)+"../docs/";
+
+    int k=0;
+
+//    char MyCommandLine;
+//    strcpy(MyCommandLine,argv[0]);
+
+}
+
+
+
 void CreateCommandLine(int argc, char ** argv)
 {
     int len = 0;
 
     for (int i=0; i<argc; i++)
         len += strlen(argv[i]) + 1;
+
+
 
     char MyCommandLine[len];
     strcpy(MyCommandLine,argv[0]);
