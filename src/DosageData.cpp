@@ -99,6 +99,54 @@ void DosageData::PrintDiploidDosage(float &x, float &y)
     bool colonIndex=false;
     PrintStringLength+=sprintf(PrintStringPointer+PrintStringLength,"\t");
 
+    if(x<0.0005 && y<0.0005)
+    {
+        if(MyAllVariables->myOutFormat.GT)
+        {
+
+            if(!MyAllVariables->myOutFormat.unphasedOutput)
+                PrintStringLength+=sprintf(PrintStringPointer+PrintStringLength,"0|0");
+            else
+            {
+                PrintStringLength+=sprintf(PrintStringPointer+PrintStringLength,"0/0");
+            }
+            colonIndex=true;
+        }
+        if(MyAllVariables->myOutFormat.DS)
+        {
+
+            if(colonIndex)
+                PrintStringLength+=sprintf(PrintStringPointer+PrintStringLength,":");
+            PrintStringLength+=sprintf(PrintStringPointer+PrintStringLength,"0");
+            colonIndex=true;
+        }
+        if(MyAllVariables->myOutFormat.HDS)
+        {
+
+            if(colonIndex)
+                PrintStringLength+=sprintf(PrintStringPointer+PrintStringLength,":");
+            PrintStringLength+=sprintf(PrintStringPointer+PrintStringLength,"0,0");
+            colonIndex=true;
+        }
+        if(MyAllVariables->myOutFormat.GP)
+        {
+
+            if(colonIndex)
+                PrintStringLength+=sprintf(PrintStringPointer+PrintStringLength,":");
+            colonIndex=true;
+            PrintStringLength+=sprintf(PrintStringPointer+PrintStringLength,"1,0,0");
+        }
+        if(MyAllVariables->myOutFormat.SD)
+        {
+            if(colonIndex)
+                PrintStringLength+=sprintf(PrintStringPointer+PrintStringLength,":");
+            colonIndex=true;
+            PrintStringLength+=sprintf(PrintStringPointer+PrintStringLength,"0");
+        }
+        return;
+    }
+
+
     if(MyAllVariables->myOutFormat.GT)
     {
 
@@ -160,6 +208,50 @@ void DosageData::PrintHaploidDosage(float &x)
 {
     bool colonIndex=false;
     PrintStringLength+=sprintf(PrintStringPointer+PrintStringLength,"\t");
+
+    if(x<0.0005)
+    {
+        if(MyAllVariables->myOutFormat.GT)
+        {
+            PrintStringLength+=sprintf(PrintStringPointer+PrintStringLength,"0");
+            colonIndex=true;
+        }
+        if(MyAllVariables->myOutFormat.DS)
+        {
+
+            if(colonIndex)
+                PrintStringLength+=sprintf(PrintStringPointer+PrintStringLength,":");
+            PrintStringLength+=sprintf(PrintStringPointer+PrintStringLength,"0");
+            colonIndex=true;
+        }
+        if(MyAllVariables->myOutFormat.HDS)
+        {
+
+            if(colonIndex)
+                PrintStringLength+=sprintf(PrintStringPointer+PrintStringLength,":");
+            PrintStringLength+=sprintf(PrintStringPointer+PrintStringLength,"0");
+            colonIndex=true;
+        }
+        if(MyAllVariables->myOutFormat.GP)
+        {
+
+            if(colonIndex)
+                PrintStringLength+=sprintf(PrintStringPointer+PrintStringLength,":");
+            colonIndex=true;
+            PrintStringLength+=sprintf(PrintStringPointer+PrintStringLength,"1,0");
+        }
+        if(MyAllVariables->myOutFormat.SD)
+        {
+            if(colonIndex)
+                PrintStringLength+=sprintf(PrintStringPointer+PrintStringLength,":");
+            colonIndex=true;
+            PrintStringLength+=sprintf(PrintStringPointer+PrintStringLength,"0");
+        }
+        return;
+
+    }
+
+
 
     if(MyAllVariables->myOutFormat.GT)
     {
