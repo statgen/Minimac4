@@ -525,7 +525,7 @@ void HaplotypeSet::reconstructHaplotype(vector<AlleleType> &reHaplotypes,int &in
 
         if(j==(NoBlocks-1))
         {
-            reHaplotypes[markerIndex]=reHaplotypes[markerIndex++]=ReducedStructureInfo[j].TransposedUniqueHaps[k][ThisIndex];
+            reHaplotypes[markerIndex]=ReducedStructureInfo[j].TransposedUniqueHaps[k][ThisIndex];
         }
     }
 }
