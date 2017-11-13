@@ -76,6 +76,8 @@ class MarkovModel : public MarkovParameters
         // Precision Jump Variables
         vector<bool> LeftPrecisionJump, RightPrecisionJump;
         int NoPrecisionJumps;
+        float JumpThreshHold = 1e-20;
+        float JumpFix = 1e10;
 
 
         // Current Variables for Support

@@ -76,6 +76,8 @@ bool Analysis::CreateRecombinationMap()
         referencePanel.Recom[SecondIndex-1]=0.0;
         SecondIndex++;
     }
+    int h=0;
+    
     return true;
     
 }

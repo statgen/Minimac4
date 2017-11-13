@@ -219,7 +219,7 @@ void MarkovModel::ImputeChunkMinimac3( int group, int hapID, int position,
     }
 
     ptotal=Pref+Palt;
-    (*DosageHap)[position] =  min(1.0,(double)((Palt / ptotal)));
+    (*DosageHap)[position] =  min(1.0f,((Palt / ptotal)));
  
 
     
@@ -459,10 +459,10 @@ void MarkovModel::FindPosteriorProbWithThreshold( int group, int position,
     vector<AlleleType> &TempHap = Info.TransposedUniqueHaps[position-Info.startIndex];
 
     if(LeftPrecisionJump[position+1])
-        InvPrevTotalSum*=1e15;
+        InvPrevTotalSum*=JumpFix;
 
     if(RightPrecisionJump[position])
-        InvPrevTotalSum*=1e-15;
+        InvPrevTotalSum/=JumpFix;
     SumOfProb[position-Info.startIndex]=InvPrevTotalSum;
 
 
@@ -507,6 +507,7 @@ void MarkovModel::FindPosteriorProbWithThreshold( int group, int position,
     KeepMovingLeft=0;
     for(int i=0; i<noReducedStatesCurrent; i++)
     {
+        assert(leftNoRecoProb[i]<1e18);
         // careful: order of operations is important to avoid overflows
         probHap[i] = Constants[i]*(leftNoRecoProb[i]*rightNoRecoProb[i]/(leftEndProb[i]*rightEndProb[i]))
             +(Leftprob[i]*rightProb[i]-leftNoRecoProb[i]*rightNoRecoProb[i])*(Info.InvuniqueCardinality[i]);
@@ -556,6 +557,8 @@ void MarkovModel::FindPosteriorProbWithThreshold( int group, int position,
     }
 
     ptotal=Pref+Palt;
+
+    assert(ptotal!=0.0);
     (*DosageHap)[CurrentTypedSite] =  (Palt / ptotal);
 
     if(CurrentObsMissing=='0')
@@ -985,7 +988,7 @@ void MarkovModel::ReCreateLeftNoRecoProb(HaplotypeSet &tHap, int &hapID,
         {
             for (int i = 0; i <noReducedStatesCurrent; i++)
             {
-                NextnoRecomProb[i]*=(1e15);
+                NextnoRecomProb[i]*=(JumpFix);
             }
         }
 
@@ -1036,7 +1039,7 @@ void MarkovModel::ReCreateLeftNoRecoProbMinimac3(HaplotypeSet &tHap, int &hapID,
         {
             for (int i = 0; i <noReducedStatesCurrent; i++)
             {
-                NextnoRecomProb[i]*=(1e15);
+                NextnoRecomProb[i]*=(JumpFix);
             }
         }
 
@@ -1176,8 +1179,11 @@ void MarkovModel::LeftCondition(int markerPos,vector<float> &Prob,
     vector<AlleleType> &TempHap = Info.TransposedUniqueHaps[markerPos-Info.startIndex];
 
 
+    double sum1=0.0, sum2=0.0;
+
     for (int i = 0; i<noReducedStatesCurrent; i++)
     {
+        sum1+=Prob[i];
 
         AlleleType allele=TempHap[i];
         if(allele==observed)
@@ -1190,7 +1196,10 @@ void MarkovModel::LeftCondition(int markerPos,vector<float> &Prob,
             Prob[i]*=prandom;
             noRecomProb[i]*=prandom;
         }
+
+        sum2+=Prob[i];
     }
+//    cout<<" COND_CHECK SUM_AFTER = "<<sum2<<endl;
     
 }
 
@@ -1215,13 +1224,13 @@ bool MarkovModel::RightTranspose(vector<float> &fromTo, vector<float> &noRecomPr
     double complement = 1. - reco;
 
     // avoid underflows
-    if (sum < 1e-10)
+    if (sum < JumpThreshHold)
     {
         tempPrecisionJumpFlag=true;
-        sum*= 1e15;
-        complement *= 1e15;
+        sum*= JumpFix;
+        complement *= JumpFix;
         for(int i=0;i<noReducedStatesCurrent;i++)
-            noRecomProb[i]*=1e15;
+            noRecomProb[i]*=JumpFix;
         NoPrecisionJumps++;
     }
 
@@ -1255,25 +1264,32 @@ bool MarkovModel::LeftTranspose(vector<float> &from,
         noRecomProb[i]*=(1.-reco);
     }
 
+   // cout<<" SUM_FROM = "<<sum<<"\t";
+    assert(sum<1e13);
+
     sum*=(reco/(double)refCount);
     double complement = 1. - reco;
 
     // avoid underflows
-    if (sum < 1e-10)
+    if (sum < JumpThreshHold)
     {
         tempPrecisionJumpFlag=true;
-        sum*= 1e15;
-        complement *= 1e15;
+        sum*= JumpFix;
+        complement *= JumpFix;
         for(int i=0;i<noReducedStatesCurrent;i++)
-            noRecomProb[i]*=1e15;
+            noRecomProb[i]*=JumpFix;
         NoPrecisionJumps++;
     }
+
+    double sum2=0.0;
 
     for (int i = 0; i <noReducedStatesCurrent; i++)
     {
         to[i]=from[i]*complement+(uniqueCardinality[i]*sum);
+        sum2+=to[i];
     }
 
+//    cout<<" SUM_TRANS = "<<sum2<<"\t"<<endl;
     return tempPrecisionJumpFlag;
 
 
@@ -1329,7 +1345,7 @@ double MarkovModel::CountRecombinants(vector<float> &from, vector<float> &to,
     double rsum = fromSum*r*toSum/(double)refCount;
 
     if(PrecisionMultiply)
-        return (1e15*rsum / totalSum);
+        return (JumpFix*rsum / totalSum);
     else
         return (rsum / totalSum);
 }
