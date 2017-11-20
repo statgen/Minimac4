@@ -1237,7 +1237,7 @@ bool MarkovModel::RightTranspose(vector<float> &fromTo, vector<float> &noRecomPr
         noRecomProb[i]*=(1.-reco);
     }
 
-    assert(sum/min<1e8);
+    //assert(sum/min<1e8);
 
     sum*=(reco/(double)refCount);
     double complement = 1. - reco;
@@ -1287,12 +1287,20 @@ bool MarkovModel::LeftTranspose(vector<float> &from,
     }
 
     double sum = 0.0;
+
+    double min=fromTo[0], max=0.0;
     for (int i = 0; i <noReducedStatesCurrent; i++)
     {
         sum += from[i];
+        if(max<fromTo[i])
+            max=fromTo[i];
+
+        if(min>fromTo[i])
+            min=fromTo[i];
+
         noRecomProb[i]*=(1.-reco);
     }
-
+    cout<<" MIN = "<<min<<"\t MAX = "<<max<<endl;
    // cout<<" SUM_FROM = "<<sum<<"\t";
     assert(sum<1e13);
 
