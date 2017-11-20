@@ -1288,15 +1288,15 @@ bool MarkovModel::LeftTranspose(vector<float> &from,
 
     double sum = 0.0;
 
-    double min=fromTo[0], max=0.0;
+    double min=from[0], max=0.0;
     for (int i = 0; i <noReducedStatesCurrent; i++)
     {
         sum += from[i];
-        if(max<fromTo[i])
-            max=fromTo[i];
+        if(max<from[i])
+            max=from[i];
 
-        if(min>fromTo[i])
-            min=fromTo[i];
+        if(min>from[i])
+            min=from[i];
 
         noRecomProb[i]*=(1.-reco);
     }
