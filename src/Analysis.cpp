@@ -1393,7 +1393,19 @@ void Analysis::GetCurrentPanelReady(int ChunkNo, HaplotypeSet &ThisRefPanel,
 
         cout << "\n Compressing reference panel at GWAS sites ... "<<endl;
 
-        ThisRefChipOnlyPanel.UncompressTypedSitesNew(ThisRefPanel,ThisTarPanel,ChunkNo);
+        if(MyAllVariables->myOutFormat.verbose)
+            ThisRefChipOnlyPanel.UncompressTypedSitesNew(ThisRefPanel,ThisTarPanel,ChunkNo);
+        else {
+            string ss = "INTERMEDIATE_FILE.chunk.1.GWAS.m3vcf.gz";
+            String temp1, temp = "";
+            temp1.Copy(ss.c_str());
+            ThisRefChipOnlyPanel.readm3vcfFile(temp1, temp, 0, 0, 0);
+
+            ThisRefChipOnlyPanel.CalculateAlleleFreq();
+            ThisRefChipOnlyPanel.CreateScaffoldedParameters(ThisRefPanel);
+        }
+
+
 
         thisDataFast.TimeToCompress = time(0) - time_prev;
         time_prev=time(0);

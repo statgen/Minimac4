@@ -558,7 +558,7 @@ void MarkovModel::FindPosteriorProbWithThreshold( int group, int position,
 
     ptotal=Pref+Palt;
 
-    assert(ptotal!=0.0);
+    assert(isnan(ptotal)==false);
     (*DosageHap)[CurrentTypedSite] =  (Palt / ptotal);
 
     if(CurrentObsMissing=='0')
@@ -1087,6 +1087,9 @@ void MarkovModel::foldProbabilities(vector<float> &foldProb,int bridgeIndex,Redu
         for(int i=0;i<noReference;i++)
         {
             foldProb[(*TempuniqueIndexMap)[i]]+=PrevjunctionRightProb[i];
+
+                        assert(PrevjunctionRightProb[i]>=0.0);
+            assert((*TempuniqueIndexMap)[i]>=0.0);
         }
     }
     
@@ -1130,6 +1133,7 @@ void MarkovModel::unfoldProbabilities(int bridgeIndex,vector<float> &recomProb,
         {
             int m = thisInfo.uniqueIndexMap[i];
             next[i] = adj_rec[m] + adj_norec[m]*prev[i];
+            assert(next[i]>=0.0);
         }
     }
 
@@ -1152,6 +1156,8 @@ void MarkovModel::RightCondition(int markerPos,vector<float> &FromProb,vector<fl
     {
 
         AlleleType allele=TempHap[i];
+
+        assert(FromProb[i]>0.0);
         if(allele==observed)
         {
             ToProb[i] = FromProb[i] * pmatch;
@@ -1162,7 +1168,10 @@ void MarkovModel::RightCondition(int markerPos,vector<float> &FromProb,vector<fl
             ToProb[i] = FromProb[i] * prandom;
             ToNoRecomProb[i] = FromNoRecomProb[i] * prandom;
         }
+        assert(ToProb[i]>0.0);
+        assert(ToNoRecomProb[i]>0.0);
     }
+    int h=0;
 
 
 }
@@ -1214,11 +1223,21 @@ bool MarkovModel::RightTranspose(vector<float> &fromTo, vector<float> &noRecomPr
     }
 
     double sum = 0.0;
+    double min=fromTo[0], max=0.0;
     for (int i = 0; i <noReducedStatesCurrent; i++)
     {
+        assert(fromTo[i]>=0.0);
+
+        if(max<fromTo[i])
+            max=fromTo[i];
+
+        if(min>fromTo[i])
+            min=fromTo[i];
         sum += fromTo[i];
         noRecomProb[i]*=(1.-reco);
     }
+
+    assert(sum/min<1e8);
 
     sum*=(reco/(double)refCount);
     double complement = 1. - reco;
@@ -1230,13 +1249,23 @@ bool MarkovModel::RightTranspose(vector<float> &fromTo, vector<float> &noRecomPr
         sum*= JumpFix;
         complement *= JumpFix;
         for(int i=0;i<noReducedStatesCurrent;i++)
+        {
             noRecomProb[i]*=JumpFix;
+
+            assert(noRecomProb[i]<1e20);
+            assert(noRecomProb[i]>1e-19);
+        }
         NoPrecisionJumps++;
     }
 
     for (int i = 0; i <noReducedStatesCurrent; i++)
     {
+
+        assert(fromTo[i]>=0);
+
         fromTo[i]= (fromTo[i]*complement+(uniqueCardinality[i]*sum));
+
+        assert(fromTo[i]>=0);
     }
 
     return tempPrecisionJumpFlag;
@@ -1277,7 +1306,11 @@ bool MarkovModel::LeftTranspose(vector<float> &from,
         sum*= JumpFix;
         complement *= JumpFix;
         for(int i=0;i<noReducedStatesCurrent;i++)
+        {
             noRecomProb[i]*=JumpFix;
+
+            assert(noRecomProb[i]<1e20);
+        }
         NoPrecisionJumps++;
     }
 

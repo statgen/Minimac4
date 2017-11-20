@@ -890,6 +890,7 @@ void Imputation::splitFoldedProb(vector<float> &SplitProb, vector<float> &totalP
     for(int i=0;i<(int)totalProb.size();i++)
     {
         SplitProb[i]=totalProb[i]-noRecomProb[i];
+        assert(SplitProb[i]>=0.0);
     }
 }
 
