@@ -1157,7 +1157,7 @@ void MarkovModel::RightCondition(int markerPos,vector<float> &FromProb,vector<fl
 
         AlleleType allele=TempHap[i];
 
-        assert(FromProb[i]>0.0);
+        assert(FromProb[i]>=0.0);
         if(allele==observed)
         {
             ToProb[i] = FromProb[i] * pmatch;
@@ -1167,9 +1167,11 @@ void MarkovModel::RightCondition(int markerPos,vector<float> &FromProb,vector<fl
         {
             ToProb[i] = FromProb[i] * prandom;
             ToNoRecomProb[i] = FromNoRecomProb[i] * prandom;
+
+           // assert(ToProb[i]>=ToNoRecomProb[i]);
         }
-        assert(ToProb[i]>0.0);
-        assert(ToNoRecomProb[i]>0.0);
+        assert(ToProb[i]>=0.0);
+        assert(ToNoRecomProb[i]>=0.0);
     }
     int h=0;
 
@@ -1252,8 +1254,8 @@ bool MarkovModel::RightTranspose(vector<float> &fromTo, vector<float> &noRecomPr
         {
             noRecomProb[i]*=JumpFix;
 
-            assert(noRecomProb[i]<1e20);
-            assert(noRecomProb[i]>1e-19);
+             assert(noRecomProb[i]<1e20);
+            //assert(noRecomProb[i]>1e-19);
         }
         NoPrecisionJumps++;
     }
@@ -1266,6 +1268,7 @@ bool MarkovModel::RightTranspose(vector<float> &fromTo, vector<float> &noRecomPr
         fromTo[i]= (fromTo[i]*complement+(uniqueCardinality[i]*sum));
 
         assert(fromTo[i]>=0);
+        //assert(fromTo[i]>=noRecomProb[i]);
     }
 
     return tempPrecisionJumpFlag;
@@ -1288,21 +1291,24 @@ bool MarkovModel::LeftTranspose(vector<float> &from,
 
     double sum = 0.0;
 
-    double min=fromTo[0], max=0.0;
+    double min=from[0], max=0.0;
     for (int i = 0; i <noReducedStatesCurrent; i++)
     {
         sum += from[i];
-        if(max<fromTo[i])
-            max=fromTo[i];
+        if(max<from[i])
+            max=from[i];
 
-        if(min>fromTo[i])
-            min=fromTo[i];
+        if(min>from[i])
+            min=from[i];
 
         noRecomProb[i]*=(1.-reco);
     }
-    cout<<" MIN = "<<min<<"\t MAX = "<<max<<endl;
+   // cout<<" MIN = "<<min<<"\t MAX = "<<max<<endl;
    // cout<<" SUM_FROM = "<<sum<<"\t";
     assert(sum<1e13);
+
+   // assert(sum/min<1e15);
+
 
     sum*=(reco/(double)refCount);
     double complement = 1. - reco;
