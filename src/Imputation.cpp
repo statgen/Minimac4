@@ -889,7 +889,13 @@ void Imputation::splitFoldedProb(vector<float> &SplitProb, vector<float> &totalP
 
     for(int i=0;i<(int)totalProb.size();i++)
     {
-        SplitProb[i]=totalProb[i]-noRecomProb[i];
+
+        if(noRecomProb[i]>totalProb[i])
+            cout<<" DIFFERENCE = "<<(noRecomProb[i]-totalProb[i])<<"\t"<<totalProb[i]<<"\t"<<(noRecomProb[i]-totalProb[i])/totalProb[i] <<endl;
+        
+        SplitProb[i]=max(totalProb[i]-noRecomProb[i],0.0f);
+
+        assert(SplitProb[i]>=0.0);
     }
 }
 

@@ -1521,6 +1521,589 @@ string HaplotypeSet::DetectFileType(String filename)
 }
 
 
+bool HaplotypeSet::readm3vcfFile(String m3vcfFile,String CHR,int START,int END,int WINDOW)
+{
+    string line,tempString,tempBlockPos,tempString2,tempString3,tempName,tempRsId,tempChr;
+    variant tempVariant;
+    variant tempVariant2;
+    int InitialNMarkers=0,blockIndex,startIndexFlag=0,readIndex=0,writeBlockIndex=0,NoBlocks=0,tempPos,NoMarkersWritten=0,tempVarCount,tempRepCount;
+    int OrigStartPos=START;
+    int OrigEndPos=END;
+
+    //cout<<"\n Reading Reference Haplotype information from M3VCF files : "<<m3vcfFile<<endl<<endl;
+     if (CHR!="" && WINDOW > 0)
+    {
+        if (START-WINDOW < 0)
+            START = 0;
+        else
+            START -= WINDOW;
+
+        END += WINDOW;
+    }
+    if(CHR!="")
+    {
+        std::cout << "\n Loading markers from chromosome " << CHR;
+        if(END>0)
+            std::cout << " from base position "<<START<<" to base position "<<END<<"."<< endl;
+        else
+            std::cout << " from base position "<<START<<" till end of M3VCF file."<< endl;
+    }
+
+
+    PrintStartIndex=99999999;
+    PrintEndIndex=-1;
+
+
+    IFILE m3vcfxStream = ifopen(m3vcfFile, "r");
+
+    if(m3vcfxStream)
+    {
+
+
+        m3vcfxStream->readLine(line);
+        if(line.compare("##fileformat=M3VCF")!=0 && line.compare("##fileformat=OPTM")!=0)
+        {
+            cout<<" Incorrect Header Information : "<<line<<endl;
+            cout<<" Header line should be : ##fileformat=M3VCF "<<endl<<endl;
+            printErr(m3vcfFile);
+        }
+
+        bool Header=true;
+//        char * pch_split,* pch_split2,* pch_split3;
+        char * pch;
+        char *end_str1,*end_str2;
+
+        while(Header)
+        {
+            line.clear();
+            m3vcfxStream->readLine(line);
+            if(line.substr(0,2).compare("##")==0)
+                Header=true;
+            else
+                break;
+            tempString = (string) strtok_r ((char*)line.c_str(),"=", &end_str1);
+            pch = strtok_r (NULL, "=", &end_str1);
+
+            if(tempString.compare("##n_blocks")==0)
+            {
+                NoBlocks=atoi(pch);
+                continue;
+            }
+            else if(tempString.compare("##n_haps")==0)
+            {
+                numHaplotypes=atoi(pch);
+                continue;
+            }
+            else if(tempString.compare("##n_markers")==0)
+            {
+                InitialNMarkers=atoi(pch);
+//                abort();
+                continue;
+
+            }
+            else if(tempString.compare("##chrxRegion")==0)
+            {
+                tempString = (string) pch;
+                if(tempString.compare("NonPseudoAutosomal")==0)
+                    PseudoAutosomal=false;
+                else if(tempString.compare("PseudoAutosomal")==0)
+                    PseudoAutosomal=true;
+                else
+                {
+                    cout << "\n Inconsistent Tag for Chr X. "<<endl;
+                    cout << " Please check the file properly..\n";
+                    cout << " Program Aborting ... "<<endl;
+                    return false;
+
+                }
+                continue;
+
+            }
+
+        }
+
+        int colCount=0;
+        pch = strtok_r ((char*)line.c_str(),"\t", &end_str2);
+
+
+        while(pch!=NULL)
+        {
+            colCount++;
+            if(colCount>9)
+            {
+                tempString2=string(pch);
+                ///////////////////////////
+//                if(colCount%2==0)
+                individualName.push_back(tempString2.substr(0,tempString2.size()-6));
+            }
+            pch = strtok_r (NULL,"\t", &end_str2);
+        }
+
+
+        cout<<" Reading  "<<numHaplotypes<< " haplotypes from data ..."<<endl<<endl;
+        ///////////////////////////
+
+        if((int)individualName.size()!=numHaplotypes)
+        {
+            cout<<endl<<" Error in Data consistency !!! "<<endl<<endl;
+            cout<<" Number of Haplotypes should be : "<< numHaplotypes<<", but "<<individualName.size()<<" Haplotypes found in header row !!!"<< endl<<endl;
+            printErr(m3vcfFile);
+        }
+
+
+        if(individualName.size()==0)
+        {
+            cout << "\n No haplotypes recorded from M3VCF Input File : "<<m3vcfFile<<endl;
+            cout << " Please check the file properly..\n";
+            cout << " Program Aborting ... "<<endl;
+            return false;
+        }
+
+
+
+        for(blockIndex=0;blockIndex<NoBlocks;blockIndex++)
+        {
+
+
+            if (blockIndex % 1000 == 0)
+            {
+            //   printf("  Loading Block %d out of %d blocks to be loaded... [%.1f%%] "
+            //            , blockIndex + 1, NoBlocks, 100*(double)(blockIndex + 1)/(double)NoBlocks);
+            //    cout<<endl;
+            }
+
+            int flag=0,blockEnterFlag=0,blocktoSave=0;
+            line.clear();
+            m3vcfxStream->readLine(line);
+            char *end_str_new;
+
+            pch = strtok_r ((char*)line.c_str(),"\t", &end_str_new);
+            tempChr=string(pch);
+
+            pch = strtok_r (NULL,"\t", &end_str_new);
+            tempBlockPos=string(pch);
+
+            char *end_str_new1;
+            char *pch1;
+
+            pch1 = strtok_r ((char*)tempBlockPos.c_str(),"-", &end_str_new1);
+            int tempStartBlock=atoi(pch1);
+
+            pch1 = strtok_r (NULL,"-", &end_str_new1);
+            int tempEndBlock=atoi(pch1);
+
+            if(CHR!="")
+            {
+                if(tempChr.compare(CHR.c_str())!=0)
+                    flag=1;
+                else
+                {
+                    if(END>0)
+                    {
+                        if(tempStartBlock>END)
+                            flag=1;
+                    }
+                    if(tempEndBlock<START)
+                        flag=1;
+                }
+            }
+
+
+            pch = strtok_r (NULL,"\t", &end_str_new);
+            string blockName=string(pch);
+
+            pch = strtok_r (NULL,"\t", &end_str_new);
+            pch = strtok_r (NULL,"\t", &end_str_new);
+            pch = strtok_r (NULL,"\t", &end_str_new);
+            pch = strtok_r (NULL,"\t", &end_str_new);
+
+            pch = strtok_r (NULL,"\t", &end_str_new);
+            tempString2=string(pch);
+
+            char *pch2,*end_str_new2;
+            pch2 = strtok_r ((char*)tempString2.c_str(),";", &end_str_new2);
+
+            stringstream strs;
+            strs<<(blockIndex+1);
+
+            tempString3="B"+ (string)(strs.str());
+
+            if(tempString3.compare((string)pch2)!=0)
+            {
+                cout<<endl<<" Error in INFO column (Block Identifier) for block : "<<blockName <<endl;
+                cout<<" Block Identifier should be : "<< tempString3<<" but is : "<<pch2<<endl<<endl;
+                printErr(m3vcfFile);
+            }
+
+
+
+            tempString3 = (string)strtok_r (NULL,";", &end_str_new2);
+            char *pch3,*end_str_new3;
+            pch3 = strtok_r ((char*)tempString3.c_str(),"=", &end_str_new3);
+            pch3 = strtok_r (NULL,"=", &end_str_new3);
+            tempVarCount=atoi(pch3);
+
+            tempString3 = (string)strtok_r (NULL,";", &end_str_new2);
+            end_str_new3=NULL;
+            pch3 = strtok_r ((char*)tempString3.c_str(),"=", &end_str_new3);
+            pch3 = strtok_r (NULL,"=", &end_str_new3);
+            tempRepCount=atoi(pch3);
+
+            ReducedHaplotypeInfo tempBlock;
+
+            if(flag==1)
+            {
+                for(int tempIndex=0;tempIndex<tempVarCount;tempIndex++)
+                    m3vcfxStream->discardLine();
+                continue;
+            }
+
+            tempBlock.TransposedUniqueHaps.resize(tempVarCount);
+
+            tempBlock.RepSize=tempRepCount;
+            tempBlock.BlockSize=tempVarCount;
+
+            tempBlock.uniqueCardinality.resize(tempRepCount,0.0);
+            tempBlock.InvuniqueCardinality.resize(tempRepCount,0.0);
+
+//            vector<AlleleType> &TempHap = tempBlock.TransposedUniqueHaps[tempIndex];
+
+    //tempBlock.TransposedUniqueHaps  uniqueHaps.resize(tempRepCount);
+            tempBlock.uniqueIndexMap.resize(numHaplotypes);
+
+            pch = strtok_r (NULL,"\t", &end_str_new);
+            pch = strtok_r (NULL,"\t", &end_str_new);
+
+
+
+            int check=0;
+            while(pch!=NULL)
+            {
+                int tempval=atoi(pch);
+                tempBlock.uniqueIndexMap[check]=tempval;
+                tempBlock.uniqueCardinality[tempval]++;
+
+                check++;
+                pch = strtok_r (NULL,"\t", &end_str_new);
+            }
+
+            for (int i = 0; i < tempRepCount; i++)
+            {
+                tempBlock.InvuniqueCardinality[i]=1.0/(float)tempBlock.uniqueCardinality[i];
+            }
+
+
+
+            if(check!=numHaplotypes)
+            {
+                cout<<endl<<" Error in Data consistency !!! "<<endl;
+                cout<<" Number of Haplotypes should be : "<< numHaplotypes<<", but "<<check<<" indices found in block"<<blockName << endl<<endl;
+                printErr(m3vcfFile);
+            }
+
+
+
+
+            for(int tempIndex=0;tempIndex<tempVarCount;tempIndex++)
+            {
+                flag=0;
+                line.clear();
+                m3vcfxStream->readLine(line);
+
+                end_str_new3=NULL;
+
+
+                pch3 = strtok_r ((char*)line.c_str(),"\t", &end_str_new3);
+                tempChr=(string)pch3;
+
+                pch3 = strtok_r (NULL,"\t", &end_str_new3);
+                tempPos=atoi(pch3);
+
+                stringstream strs3;
+                strs3<<tempPos;
+
+
+                tempName=tempChr+":"+(string)strs3.str();
+
+                pch3 = strtok_r (NULL,"\t", &end_str_new3);
+                tempRsId=(string)(pch3);
+
+
+
+                if(CHR!="")
+                {
+                    if(tempChr.compare(CHR.c_str())!=0)
+                        flag=1;
+                    else
+                    {
+                        if(END>0)
+                        {
+                            if(tempPos>END || tempPos<START)
+                                flag=1;
+                        }
+                        else
+                        if(tempPos<START)
+                            flag=1;
+                        if(tempIndex==(tempVarCount-1) && writeBlockIndex==0)
+                            flag=1;
+                    }
+
+                }
+                readIndex++;
+
+                if(flag==1)
+                    continue;
+                else
+                {
+                    if(blockEnterFlag==0)
+                        tempBlock.startIndex=writeBlockIndex;
+                    else
+                        tempBlock.endIndex=writeBlockIndex;
+                    if(tempIndex<(tempVarCount-1) && tempIndex>0) // to ensure a single marker from a block is NOT read.
+                        blocktoSave=1;
+                    blockEnterFlag=1;
+
+                }
+
+                if(tempPos>=OrigStartPos && startIndexFlag==0)
+                {
+                    PrintStartIndex=writeBlockIndex;
+                    startIndexFlag=1;
+                }
+
+//                if(CHR=="" || tempPos<=OrigEndPos)
+//                    PrintEndIndex=writeBlockIndex;
+//
+
+
+                if(CHR=="")
+                {
+                    PrintEndIndex=writeBlockIndex;
+                }
+                else
+                {
+                    if(OrigEndPos==0 || tempPos<=OrigEndPos)
+                        PrintEndIndex=writeBlockIndex;
+                }
+
+
+                variant tempVariant;
+
+                tempVariant.assignValues(tempName,tempName,tempChr,tempPos);
+                tempVariant.rsid=tempRsId;
+
+                double tempRecom=-3.0,tempError=0.0;
+
+                pch3 = strtok_r (NULL,"\t", &end_str_new3);
+                string tempString98=(string)(pch3);
+
+                pch3 = strtok_r (NULL,"\t", &end_str_new3);
+                string tempString99=(string)(pch3);
+
+                tempVariant.assignRefAlt(tempString98,tempString99);
+
+                pch3 = strtok_r (NULL,"\t", &end_str_new3);
+                pch3 = strtok_r (NULL,"\t", &end_str_new3);
+                pch3 = strtok_r (NULL,"\t", &end_str_new3);
+
+                tempString=(string)(pch3);
+
+                char *pch4, *end_str_new4;
+
+                pch4=strtok_r ((char*)tempString.c_str(),";", &end_str_new4);
+                stringstream strs1,strs2;
+                strs1<<(blockIndex+1);
+                strs2<<(tempIndex+1);
+                tempString3="B"+ (string)(strs1.str())+ ".M"+ (string)(strs2.str());
+                if(tempString3.compare((string)pch4)!=0)
+                {
+                    cout<<endl<<" Error in INFO column (Block Identifier) for variant : "<<tempName <<endl;
+                    cout<<" Block Identifier should be : "<< tempString3<<" but is : "<<pch4<<endl<<endl;
+                    printErr(m3vcfFile);
+                }
+
+
+                pch4=strtok_r (NULL,";", &end_str_new4);
+
+                while(pch4!=NULL)
+                {
+                    tempString3=(string)(pch4);
+                    char *pch5,*pch6,*end_str_new5;
+                    pch5=strtok_r ((char*)tempString3.c_str(),"=", &end_str_new5);
+                    pch6=strtok_r (NULL,"=", &end_str_new5);
+
+                    if((string)pch5=="Err")
+                    {
+                        tempError=atof(pch6);
+                    }
+                    if((string)pch5=="Recom")
+                    {
+                        tempRecom=atof(pch6);
+                    }
+                    pch4=strtok_r (NULL,";", &end_str_new4);
+                }
+
+                char Rallele=0,Aallele=0;
+
+
+                string refAllele=tempVariant.refAlleleString;
+                string altAllele=tempVariant.altAlleleString;
+
+                if (strlen(refAllele.c_str()) == 1
+                    && strlen(altAllele.c_str()) == 1)
+                {
+                    switch (refAllele[0])
+                    {
+                        case 'A': case 'a': Rallele = 1; break;
+                        case 'C': case 'c': Rallele = 2; break;
+                        case 'G': case 'g': Rallele = 3; break;
+                        case 'T': case 't': Rallele = 4; break;
+                        case 'D': case 'd': Rallele = 5; break;
+                        case 'I': case 'i': Rallele = 6; break;
+                        case 'R': case 'r': Rallele = 7; break;
+                        default:
+                        {
+                            cout << "\n\n Data Inconsistency !!! \n";
+                            cout << " Error with reference allele for marker : " << tempVariant.rsid<< " in M3VCF File : " << m3vcfFile;
+                            cout << "\n VCF reference alleles for SNPs can only be A(a), C(c), G(g), or T(t).\n";
+                            cout << " " << tempVariant.rsid << " has " << refAllele << endl;
+                            cout << "\n Program Aborting ... \n\n";
+                            abort();
+//                                       return false;
+                        }
+                    }
+
+                    switch (altAllele[0])
+                    {
+                        case 'A': case 'a': Aallele = 1; break;
+                        case 'C': case 'c': Aallele = 2; break;
+                        case 'G': case 'g': Aallele = 3; break;
+                        case 'T': case 't': Aallele = 4; break;
+                        case 'D': case 'd': Aallele = 5; break;
+                        case 'I': case 'i': Aallele = 6; break;
+                        case 'R': case 'r': Aallele = 7; break;
+                        default:
+                        {
+                            cout << "\n\n Data Inconsistency !!! \n";
+                            cout << " Error with alternate allele for marker : " <<tempVariant.rsid<< " in M3VCF File : " << m3vcfFile;
+                            cout << "\n VCF alternate alleles for SNPs can only be A(a), C(c), G(g), or T(t).\n";
+                            cout << " " << tempVariant.rsid << " has " << altAllele << endl;
+                            cout << "\n Program Aborting ... \n\n";
+                            abort();
+                        }
+                    }
+                }
+                else
+                {
+                    Rallele = 7;
+                    if(strlen(refAllele.c_str())<strlen(altAllele.c_str()))
+                        Aallele=6;
+                    else
+                        Aallele=5;
+                }
+                //tempVariant.refAllele=Rallele;
+                //tempVariant.altAllele=Aallele;
+
+
+
+                if(tempIndex<(tempVarCount-1) || blockIndex==(NoBlocks-1))
+                {
+
+                    VariantList.push_back(tempVariant);
+                    //refAlleleList.push_back(tempVariant.refAllele);
+                    //markerName.push_back(tempName);
+//                    if(tempRecom!=-3.0)
+//                    {
+//                        Recom.push_back(tempRecom);
+//                        Error.push_back(tempError);
+//                    }
+                    writeBlockIndex++;
+                }
+
+                pch3 = strtok_r (NULL,"\t", &end_str_new3);
+                tempString=(string)(pch3);
+                vector<AlleleType> &TempHap = tempBlock.TransposedUniqueHaps[tempIndex];
+                TempHap.resize(tempRepCount);
+
+                for(check=0;check<tempRepCount;check++)
+                {
+
+                    char testVal=tempString[check];
+
+                    TempHap[check] = testVal;
+
+                    //tempBlock.uniqueHaps[check].push_back(t=='0'? false:true);
+
+                }
+
+            }
+
+            NoMarkersWritten+=(tempVarCount-1);
+            if(blocktoSave==1)
+            {
+                //optEndPoints.push_back(tempBlock.startIndex);
+
+                ReducedStructureInfo.push_back(tempBlock);
+            }
+
+
+
+        }
+//        if(ReducedStructureInfo.size()>0)
+//            optEndPoints.push_back(ReducedStructureInfo[ReducedStructureInfo.size()-1].endIndex);
+
+        if(Recom.size()>0)
+            Recom.pop_back();
+
+        finChromosome=tempChr;
+
+    }
+    else
+    {
+        cout<<" Following M3VCF File Not Available : "<<m3vcfFile<<endl;
+        cout<<" Program Exiting ... "<<endl<<endl;
+        abort();
+    }
+
+
+    numMarkers=writeBlockIndex;
+
+   // cout<<endl<<" Reference Haplotype information succesfully recorded. "<<endl;
+    CreateAfterUncompressSummary();
+    InvertUniqueIndexMap();
+    CalculateAlleleFreq();
+
+//    if(finChromosome=="X")
+//    {
+//        cout<<"\n Chromosome X Detected !!! \n";
+//    }
+
+//    std::cout << "\n Number of Markers in File                           : " << InitialNMarkers << endl;
+//    std::cout << "\n Number of Markers Recorded                          : " << numMarkers << endl;
+//    std::cout << " Number of Haplotypes Recorded                       : " << numHaplotypes << endl;
+
+    ifclose(m3vcfxStream);
+
+    if(numMarkers<2)
+    {
+        cout << "\n None/Single marker left after filtering from Input File : "<<m3vcfFile<<endl;
+        cout << " Please check the file or the filtering options properly ...\n";
+        cout << " Program Aborting ... "<<endl;
+        return false;
+    }
+
+
+
+//    std::cout << "\n Haplotype Set successfully loaded from M3VCF File     : " << m3vcfFile << endl;
+
+    return true;
+
+
+
+
+}
+
+
 
 void HaplotypeSet::CalculateAlleleFreq()
 {

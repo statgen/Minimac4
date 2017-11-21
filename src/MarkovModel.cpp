@@ -558,7 +558,7 @@ void MarkovModel::FindPosteriorProbWithThreshold( int group, int position,
 
     ptotal=Pref+Palt;
 
-    assert(ptotal!=0.0);
+    assert(isnan(ptotal)==false);
     (*DosageHap)[CurrentTypedSite] =  (Palt / ptotal);
 
     if(CurrentObsMissing=='0')
@@ -1087,6 +1087,12 @@ void MarkovModel::foldProbabilities(vector<float> &foldProb,int bridgeIndex,Redu
         for(int i=0;i<noReference;i++)
         {
             foldProb[(*TempuniqueIndexMap)[i]]+=PrevjunctionRightProb[i];
+
+//            assert(PrevjunctionRightProb[i]>=0.0f);
+//            assert(PrevjunctionRightProb[i]<1e18);
+//            assert(foldProb[(*TempuniqueIndexMap)[i]]>=0.0f);
+//            assert(foldProb[(*TempuniqueIndexMap)[i]]<1e18);
+
         }
     }
     
@@ -1122,6 +1128,10 @@ void MarkovModel::unfoldProbabilities(int bridgeIndex,vector<float> &recomProb,
             int m = thisInfo.uniqueIndexMap[i];
             prev[i]*=adj_norec[m];
             prev[i]+=adj_rec[m];
+
+
+            assert(prev[i]>=0.0f);
+            assert(prev[i]<1e18);
         }
     }
     else
@@ -1130,6 +1140,10 @@ void MarkovModel::unfoldProbabilities(int bridgeIndex,vector<float> &recomProb,
         {
             int m = thisInfo.uniqueIndexMap[i];
             next[i] = adj_rec[m] + adj_norec[m]*prev[i];
+
+            assert(next[i]>=0.0f);
+            assert(next[i]<1e18);
+
         }
     }
 
@@ -1142,6 +1156,7 @@ void MarkovModel::RightCondition(int markerPos,vector<float> &FromProb,vector<fl
                             AlleleType observed,double e,double freq,ReducedHaplotypeInfo &Info)
 {
 
+  //  cout<< " RIGHT MARKER POS = "<<markerPos<<endl;
     double prandom = e*freq+backgroundError;
     double pmatch = (1.0 - e)+e*freq+backgroundError;
 
@@ -1152,6 +1167,8 @@ void MarkovModel::RightCondition(int markerPos,vector<float> &FromProb,vector<fl
     {
 
         AlleleType allele=TempHap[i];
+
+        assert(FromProb[i]>=0.0);
         if(allele==observed)
         {
             ToProb[i] = FromProb[i] * pmatch;
@@ -1161,7 +1178,15 @@ void MarkovModel::RightCondition(int markerPos,vector<float> &FromProb,vector<fl
         {
             ToProb[i] = FromProb[i] * prandom;
             ToNoRecomProb[i] = FromNoRecomProb[i] * prandom;
+
+           // assert(ToProb[i]>=ToNoRecomProb[i]);
         }
+
+
+        assert(ToProb[i]>=0.0f);
+        assert(ToNoRecomProb[i]>=0.0f);
+        assert(ToProb[i]<1e18);
+        assert(ToNoRecomProb[i]<1e18);
     }
 
 
@@ -1172,6 +1197,7 @@ void MarkovModel::RightCondition(int markerPos,vector<float> &FromProb,vector<fl
 void MarkovModel::LeftCondition(int markerPos,vector<float> &Prob,
                             vector<float> &noRecomProb, AlleleType observed,double e,double freq,ReducedHaplotypeInfo &Info)
 {
+   // cout<< " LEFT MARKER POS = "<<markerPos<<endl;
 
     double prandom = e*freq+backgroundError;
     double pmatch = (1.0 - e)+e*freq+backgroundError;
@@ -1179,11 +1205,11 @@ void MarkovModel::LeftCondition(int markerPos,vector<float> &Prob,
     vector<AlleleType> &TempHap = Info.TransposedUniqueHaps[markerPos-Info.startIndex];
 
 
-    double sum1=0.0, sum2=0.0;
+ //   double sum1=0.0, sum2=0.0;
 
     for (int i = 0; i<noReducedStatesCurrent; i++)
     {
-        sum1+=Prob[i];
+     //   sum1+=Prob[i];
 
         AlleleType allele=TempHap[i];
         if(allele==observed)
@@ -1197,7 +1223,13 @@ void MarkovModel::LeftCondition(int markerPos,vector<float> &Prob,
             noRecomProb[i]*=prandom;
         }
 
-        sum2+=Prob[i];
+        assert(Prob[i]>=0.0f);
+        assert(noRecomProb[i]>=0.0f);
+        assert(Prob[i]<1e18);
+        assert(noRecomProb[i]<1e18);
+
+
+       // sum2+=Prob[i];
     }
 //    cout<<" COND_CHECK SUM_AFTER = "<<sum2<<endl;
     
@@ -1214,11 +1246,14 @@ bool MarkovModel::RightTranspose(vector<float> &fromTo, vector<float> &noRecomPr
     }
 
     double sum = 0.0;
+//    double min=fromTo[0], max=0.0;
     for (int i = 0; i <noReducedStatesCurrent; i++)
     {
         sum += fromTo[i];
         noRecomProb[i]*=(1.-reco);
     }
+
+    assert(sum<1e20);
 
     sum*=(reco/(double)refCount);
     double complement = 1. - reco;
@@ -1230,13 +1265,24 @@ bool MarkovModel::RightTranspose(vector<float> &fromTo, vector<float> &noRecomPr
         sum*= JumpFix;
         complement *= JumpFix;
         for(int i=0;i<noReducedStatesCurrent;i++)
+        {
             noRecomProb[i]*=JumpFix;
+        }
         NoPrecisionJumps++;
     }
 
     for (int i = 0; i <noReducedStatesCurrent; i++)
     {
+
+        assert(fromTo[i]>=0);
+
         fromTo[i]= (fromTo[i]*complement+(uniqueCardinality[i]*sum));
+
+        assert(fromTo[i]>=0.0f);
+        assert(noRecomProb[i]>=0.0f);
+        assert(fromTo[i]<1e18);
+        assert(noRecomProb[i]<1e18);
+        //assert(fromTo[i]>=noRecomProb[i]);
     }
 
     return tempPrecisionJumpFlag;
@@ -1258,14 +1304,21 @@ bool MarkovModel::LeftTranspose(vector<float> &from,
     }
 
     double sum = 0.0;
+
+//    double min=from[0], max=0.0;
     for (int i = 0; i <noReducedStatesCurrent; i++)
     {
         sum += from[i];
         noRecomProb[i]*=(1.-reco);
     }
 
-   // cout<<" SUM_FROM = "<<sum<<"\t";
-    assert(sum<1e13);
+    // cout<<" MIN = "<<min<<"\t MAX = "<<max<<endl;
+    // cout<<" SUM_FROM = "<<sum<<"\t";
+
+
+    assert(sum<1e20);
+
+
 
     sum*=(reco/(double)refCount);
     double complement = 1. - reco;
@@ -1277,19 +1330,23 @@ bool MarkovModel::LeftTranspose(vector<float> &from,
         sum*= JumpFix;
         complement *= JumpFix;
         for(int i=0;i<noReducedStatesCurrent;i++)
+        {
             noRecomProb[i]*=JumpFix;
+        }
         NoPrecisionJumps++;
     }
 
-    double sum2=0.0;
 
     for (int i = 0; i <noReducedStatesCurrent; i++)
     {
         to[i]=from[i]*complement+(uniqueCardinality[i]*sum);
-        sum2+=to[i];
+        assert(to[i]>=0.0f);
+        assert(noRecomProb[i]>=0.0f);
+        assert(to[i]<1e18);
+        assert(noRecomProb[i]<1e18);
+        //assert(to[i]>=noRecomProb[i]);
     }
 
-//    cout<<" SUM_TRANS = "<<sum2<<"\t"<<endl;
     return tempPrecisionJumpFlag;
 
 

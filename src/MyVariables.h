@@ -214,10 +214,12 @@ public:
     int cpus;
     int minimac3;
     bool referenceEstimates;
+    String intermediate;
     
     
     ModelVariable()
     {
+        intermediate="";
         referenceEstimates=true;
         constantParam=0.0;
         processReference = false;

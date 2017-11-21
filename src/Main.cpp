@@ -83,8 +83,8 @@ int main(int argc, char ** argv)
 //		LONG_INTPARAMETER("states", &MyModelVariables.states)
 		LONG_PARAMETER("minimac3", &MyModelVariables.minimac3)
 		LONG_DOUBLEPARAMETER("probThreshold", &MyModelVariables.probThreshold)
-                LONG_DOUBLEPARAMETER("diffThreshold", &MyModelVariables.diffThreshold)
-                LONG_DOUBLEPARAMETER("topThreshold", &MyModelVariables.topThreshold)
+		LONG_DOUBLEPARAMETER("diffThreshold", &MyModelVariables.diffThreshold)
+		LONG_DOUBLEPARAMETER("topThreshold", &MyModelVariables.topThreshold)
 
 
 
@@ -99,6 +99,7 @@ int main(int argc, char ** argv)
 
 
 		BEGIN_LEGACY_PARAMETERS()
+		LONG_STRINGPARAMETER("intermediate", &MyModelVariables.intermediate)
 		LONG_PARAMETER("reEstimate", &MyModelVariables.reEstimate)
 		LONG_DOUBLEPARAMETER("constantParam", &MyModelVariables.constantParam)
 		LONG_INTPARAMETER("printBuffer", &MyOutFormat.PrintBuffer)

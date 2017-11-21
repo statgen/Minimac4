@@ -76,8 +76,8 @@ class MarkovModel : public MarkovParameters
         // Precision Jump Variables
         vector<bool> LeftPrecisionJump, RightPrecisionJump;
         int NoPrecisionJumps;
-        float JumpThreshHold = 1e-20;
-        float JumpFix = 1e10;
+        float JumpThreshHold;
+        float JumpFix;
 
 
         // Current Variables for Support
@@ -181,6 +181,9 @@ class MarkovModel : public MarkovParameters
                                                 NoRefMarkers=rHapFull->numMarkers;
                                                 NoChipSites=rHap->numMarkers;
                                                 backgroundError = 1e-5;
+                                                JumpThreshHold = 1e-20;
+                                                JumpFix = 1e10;
+
                                             };
         void AssignPanels                   (HaplotypeSet &refFullHap,
                                              HaplotypeSet &tarFullHap,

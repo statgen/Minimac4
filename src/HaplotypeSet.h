@@ -46,6 +46,7 @@ class HaplotypeSet
 
 
 
+     bool readm3vcfFile(String m3vcfFile,String CHR,int START,int END,int WINDOW);
         // Special Haplotype Variables for GWAS Panel
 
         vector<vector<AlleleType> >     haplotypesUnscaffolded;
