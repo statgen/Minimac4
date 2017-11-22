@@ -887,15 +887,22 @@ void Imputation::splitFoldedProb(vector<float> &SplitProb, vector<float> &totalP
 {
     SplitProb.resize(totalProb.size());
 
-    for(int i=0;i<(int)totalProb.size();i++)
+
+    if(MyAllVariables->myOutFormat.verbose)
     {
+        for(int i=0;i<(int)totalProb.size();i++)
+        {
+            if(noRecomProb[i]>totalProb[i])
+                cout<<" DIFFERENCE = "<<(noRecomProb[i]-totalProb[i])<<"\t"<<totalProb[i]<<"\t"<<(noRecomProb[i]-totalProb[i])/totalProb[i] <<endl;
+            SplitProb[i]=max(totalProb[i]-noRecomProb[i],0.0f);
+        }
+    }
+    else {
+        for (int i = 0; i < (int) totalProb.size(); i++) {
 
-        if(noRecomProb[i]>totalProb[i])
-            cout<<" DIFFERENCE = "<<(noRecomProb[i]-totalProb[i])<<"\t"<<totalProb[i]<<"\t"<<(noRecomProb[i]-totalProb[i])/totalProb[i] <<endl;
-        
-        SplitProb[i]=max(totalProb[i]-noRecomProb[i],0.0f);
-
-        assert(SplitProb[i]>=0.0);
+            SplitProb[i] = max(totalProb[i] - noRecomProb[i], 0.0f);
+            assert(SplitProb[i] >= 0.0);
+        }
     }
 }
 
@@ -917,7 +924,6 @@ void Imputation::ConditionJunctionProb(HaplotypeSet &rHap, int markerPos,vector<
     {
         Prob[i]*= TempHap[Info.uniqueIndexMap[i]] ==observed ? pmatch : prandom;
     }
-    int h=0;
 
 }
 
