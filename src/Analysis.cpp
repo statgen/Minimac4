@@ -326,8 +326,8 @@ void Analysis::AppendtoMainLooVcfFaster(int ChunkNo, int MaxIndex)
         stringstream strs,strs1;
         strs<<(i);
         strs1<<(ChunkNo+1);
-        tempFileIndex+=(".chunk."+(string)(strs1.str())+".empiricalDose.vcf.part." +
-                         (string)(strs.str()));
+        tempFileIndex+=(".chunk."+(string)(strs1.str())+".empiricalDose.part." +
+                         (string)(strs.str())+".vcf.gz");
         vcfLoodosepartialList[i-1] = ifopen(tempFileIndex.c_str(), "r");
     }
     string line;
@@ -389,8 +389,8 @@ void Analysis::AppendtoMainLooVcfFaster(int ChunkNo, int MaxIndex)
         stringstream strs,strs1;
         strs<<(i);
         strs1<<(ChunkNo+1);
-        tempFileIndex+=(".chunk."+(string)(strs1.str())+".empiricalDose.vcf.part." +
-                         (string)(strs.str()));
+        tempFileIndex+=(".chunk."+(string)(strs1.str())+".empiricalDose.part." +
+                         (string)(strs.str())+".vcf.gz");
         remove(tempFileIndex.c_str());
     }
 
@@ -419,8 +419,8 @@ void Analysis::AppendtoMainVcfFaster(int ChunkNo, int MaxIndex)
         stringstream strs,strs1;
         strs<<(i);
         strs1<<(ChunkNo+1);
-        tempFileIndex+=(".chunk."+(string)(strs1.str())+".dose.vcf.part." +
-                         (string)(strs.str()));
+        tempFileIndex+=(".chunk."+(string)(strs1.str())+".dose.part." +
+                         (string)(strs.str())+".vcf.gz");
         vcfdosepartialList[i-1] = ifopen(tempFileIndex.c_str(), "r");
     }
     string line;
@@ -527,8 +527,8 @@ void Analysis::AppendtoMainVcfFaster(int ChunkNo, int MaxIndex)
         stringstream strs,strs1;
         strs<<(i);
         strs1<<(ChunkNo+1);
-        tempFileIndex+=(".chunk."+(string)(strs1.str())+".dose.vcf.part." +
-                         (string)(strs.str()));
+        tempFileIndex+=(".chunk."+(string)(strs1.str())+".dose.part." +
+                         (string)(strs.str())+".vcf.gz");
         remove(tempFileIndex.c_str());
     }
 
