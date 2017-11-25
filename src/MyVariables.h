@@ -155,7 +155,7 @@ public:
         vcfBuffer=200;
         nobgzip=false;
         meta=false;
-        PrintBuffer = 10000000;
+        PrintBuffer = 100000000;
 
         formatString = "GT,DS";
         GT=false;
