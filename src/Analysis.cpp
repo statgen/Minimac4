@@ -61,7 +61,7 @@ bool Analysis::CreateRecombinationMap()
             if(num==0  || Val==0)
                 referencePanel.Recom[SecondIndex-1]=RECOM_MIN;
             else
-                referencePanel.Recom[SecondIndex-1]=min(RECOM_MIN,Val*num/denom);
+                referencePanel.Recom[SecondIndex-1]=max(RECOM_MIN,Val*num/denom);
 
 //            cout<<" RECOM = "<<SecondIndex-1<<"\t"<<referencePanel.Recom[SecondIndex-1]<<"\t"<<num/denom<<"\t"<<Val*num/denom<<endl;
             SecondIndex++;
