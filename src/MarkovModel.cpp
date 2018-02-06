@@ -193,7 +193,7 @@ void MarkovModel::ImputeChunkMinimac3( int group, int hapID, int position,
     for(int i=0; i<noReducedStatesCurrent; i++)
     {
         // careful: order of operations is important to avoid overflows
-        probHapMinimac3[i] = Constants[i]*(leftNoRecoProb[i]*rightNoRecoProb[i]/(leftEndProb[i]*rightEndProb[i]))
+        probHapMinimac3[i] = Constants[i]*(leftNoRecoProb[i]*rightNoRecoProb[i]/(leftEndProb[i]*rightEndProb[i]+1e-30))
             +(Leftprob[i]*rightProb[i]-leftNoRecoProb[i]*rightNoRecoProb[i])*(Info.InvuniqueCardinality[i]);
 
 
@@ -220,7 +220,7 @@ void MarkovModel::ImputeChunkMinimac3( int group, int hapID, int position,
 
     ptotal=Pref+Palt;
     (*DosageHap)[position] =  min(1.0f,((Palt / ptotal)));
- 
+    assert(ptotal>0.0f);
 
     
     if(CurrentObsMissing=='0')
@@ -370,12 +370,18 @@ void MarkovModel::ImputeChunk(int group, int &hapID, int &position,
 
     UnfoldTheseSites[NoSitesToUnfold++]=position;
     vector<vector<float> > &ThisLeftprob = leftProb[group];
+    int StartPoint=0, EndPoint=-1;
 
-    if(KeepMovingLeft==0)
-    {
+    if(  (position==(rHap->ReducedStructureInfo[group].startIndex+1) && position!=1) || (position == 0)  ) {
+        EndPoint = NoSitesToUnfold - 1;
+    }
+    else if (KeepMovingLeft==0) {
+        EndPoint = NoSitesToUnfold-2;
+    }
 
-        int StartPoint = 0;
-        int EndPoint = NoSitesToUnfold-2;
+    if(EndPoint>-1) {
+
+
         MidPoint = (UnfoldTheseSites[StartPoint] + UnfoldTheseSites[EndPoint])/2 - startIndex ;
 
         if(MyAllVariables->myModelVariables.probThreshold>0.0)
@@ -387,58 +393,28 @@ void MarkovModel::ImputeChunk(int group, int &hapID, int &position,
                                              leftEndProb, rightEndProb);
         }
 
-
         for(int i=EndPoint;i>=StartPoint;i--)
         {
-
             int tempPosition = UnfoldTheseSites[i];
             CurrentTypedSite=rHapFull->MapTarToRef[tempPosition];
             ImputeRemainingSitesbyBlock( group, tempPosition,
-                                            tHapFull->FlankRegionStart[tempPosition],
-                                            CurrentTypedSite-1);
+                                         tHapFull->FlankRegionStart[tempPosition],
+                                         CurrentTypedSite-1);
             ImputeRemainingSitesbyBlock( group, tempPosition,
-                                            CurrentTypedSite+1,
-                                            tHapFull->FlankRegionEnd[tempPosition]);
+                                         CurrentTypedSite+1,
+                                         tHapFull->FlankRegionEnd[tempPosition]);
 
         }
 
         UnfoldTheseSites[StartPoint]=UnfoldTheseSites[EndPoint+1];
         NoSitesToUnfold=1;
+        return;
     }
     else if(MyAllVariables->myOutFormat.verbose)
     {
         cout<<" SKIPPED A SITE "<<endl;
     }
-    if(  (position==(rHap->ReducedStructureInfo[group].startIndex+1) && position!=1) || (position == 0)  )
-    {
-        int StartPoint = 0;
-        int EndPoint = NoSitesToUnfold-1;
-        MidPoint = (UnfoldTheseSites[StartPoint] + UnfoldTheseSites[EndPoint])/2 - startIndex ;
 
-        if(MyAllVariables->myModelVariables.probThreshold>0.0)
-        {
-            unfoldProbabilitiesWithThreshold(group, ThisBlockLeftNoRecoProb[MidPoint],
-                                             ThisLeftprob[MidPoint],
-                                             ThisBlockRightNoRecoProb[MidPoint],
-                                             ThisBlockRightProb[MidPoint],
-                                             leftEndProb, rightEndProb);
-        }
-
-
-        for(int i=EndPoint;i>=StartPoint;i--)
-        {
-            int tempPosition = UnfoldTheseSites[i];
-            CurrentTypedSite=rHapFull->MapTarToRef[tempPosition];
-            ImputeRemainingSitesbyBlock( group, tempPosition,
-                                            tHapFull->FlankRegionStart[tempPosition],
-                                            CurrentTypedSite-1);
-            ImputeRemainingSitesbyBlock( group, tempPosition,
-                                            CurrentTypedSite+1,
-                                            tHapFull->FlankRegionEnd[tempPosition]);
-
-        }
-
-    }
 
 }
 
@@ -471,7 +447,7 @@ void MarkovModel::FindPosteriorProbWithThreshold( int group, int position,
         int i=MostProbableTemplate;
         fill(probHap.begin(), probHap.end(), 0);
 
-        probHap[i] = Constants[i]*(leftNoRecoProb[i]*rightNoRecoProb[i]/(leftEndProb[i]*rightEndProb[i]))
+        probHap[i] = Constants[i]*(leftNoRecoProb[i]*rightNoRecoProb[i]/(leftEndProb[i]*rightEndProb[i]+1e-30))
             +(Leftprob[i]*rightProb[i]-leftNoRecoProb[i]*rightNoRecoProb[i])*(Info.InvuniqueCardinality[i]);
 
         tempVal=probHap[i]*InvPrevTotalSum;
@@ -509,7 +485,7 @@ void MarkovModel::FindPosteriorProbWithThreshold( int group, int position,
     {
         assert(leftNoRecoProb[i]<1e18);
         // careful: order of operations is important to avoid overflows
-        probHap[i] = Constants[i]*(leftNoRecoProb[i]*rightNoRecoProb[i]/(leftEndProb[i]*rightEndProb[i]))
+        probHap[i] = Constants[i]*(leftNoRecoProb[i]*rightNoRecoProb[i]/(leftEndProb[i]*rightEndProb[i] +1e-30))
             +(Leftprob[i]*rightProb[i]-leftNoRecoProb[i]*rightNoRecoProb[i])*(Info.InvuniqueCardinality[i]);
 
         tempVal = (probHap[i] - FirstFoldedValue[i]) * InvPrevTotalSum;
@@ -689,11 +665,11 @@ void MarkovModel::unfoldProbabilitiesWithThreshold(int bridgeIndex,
 
         temp=LeftNoRecomProb[i];
         LeftAdj_Rec[i] = (LeftTotalProb[i] - temp ) * tempInvCardinality;
-        LeftAdj_NoRrec[i] = temp / PrevLeftFoldedProb[i];
+        LeftAdj_NoRrec[i] = temp / (PrevLeftFoldedProb[i]+1e-30);
 
         temp=RightNoRecomProb[i];
         RightAdj_Rec[i] = (RightTotalProb[i] - temp )  * tempInvCardinality;
-        RightAdj_NoRec[i] = RightNoRecomProb[i] / PrevRightFoldedProb[i];
+        RightAdj_NoRec[i] = RightNoRecomProb[i] / (PrevRightFoldedProb[i]+1e-30);
     }
 
 
@@ -1081,6 +1057,8 @@ void MarkovModel::foldProbabilities(vector<float> &foldProb,int bridgeIndex,Redu
         for(int i=0;i<noReference;i++)
         {
             foldProb[(*TempuniqueIndexMap)[i]]+=(*PrevjunctionLeftProb)[i];
+
+            assert(foldProb[(*TempuniqueIndexMap)[i]]>=0.0f);
         }
     }
     else if(direction==1)
@@ -1091,7 +1069,7 @@ void MarkovModel::foldProbabilities(vector<float> &foldProb,int bridgeIndex,Redu
             foldProb[(*TempuniqueIndexMap)[i]]+=PrevjunctionRightProb[i];
             assert(PrevjunctionRightProb[i]>=0.0f);
             assert(PrevjunctionRightProb[i]<1e18);
-            assert(foldProb[(*TempuniqueIndexMap)[i]]>=0.0f);
+            assert(foldProb[(*TempuniqueIndexMap)[i]]>0.0f);
             assert(foldProb[(*TempuniqueIndexMap)[i]]<1e18);
 
         }
@@ -1109,8 +1087,7 @@ void MarkovModel::unfoldProbabilities(int bridgeIndex,vector<float> &recomProb,
     ReducedHaplotypeInfo &thisInfo = StructureInfo[bridgeIndex];
     int N = thisInfo.RepSize;
 
-    float *adj_rec = (float *)alloca(N*sizeof(float));
-    float *adj_norec = (float *)alloca(N*sizeof(float));
+    vector<float> adj_rec(N), adj_norec(N);
 
     for (int i=0; i<N; i++)
     {
@@ -1118,35 +1095,59 @@ void MarkovModel::unfoldProbabilities(int bridgeIndex,vector<float> &recomProb,
     }
     for (int i=0; i<N; i++)
     {
-        adj_norec[i] = noRecomProb[i] / PrevFoldedProb[i];
+        adj_norec[i] = noRecomProb[i] / (PrevFoldedProb[i]+1e-30);
+
+        assert(PrevFoldedProb[i]>=0.0f);
+        assert(adj_norec[i]>=0.0f);
+        assert(adj_norec[i]<1e18);
     }
     vector<float> &prev = direction ? PrevjunctionRightProb : junctionLeftProb[bridgeIndex];
     vector<float> &next = direction ? PrevjunctionRightProb : junctionLeftProb[bridgeIndex+1];
 
     if(direction)
     {
+        //double min=adj_rec[thisInfo.uniqueIndexMap[0]] + adj_norec[thisInfo.uniqueIndexMap[0]]*prev[0], max=0.0, sum=0.0;
+
         for (int i=0; i<noReference; i++)
         {
             int m = thisInfo.uniqueIndexMap[i];
             prev[i]*=adj_norec[m];
             prev[i]+=adj_rec[m];
 
+//            if(prev[i]>max)
+//                max=prev[i];
+//            if(prev[i]<min)
+//                min=prev[i];
+//            sum+=prev[i];
+
 
             assert(prev[i]>=0.0f);
             assert(prev[i]<1e18);
         }
+
+
+//        cout<<" RIGHT MIN = "<<min<<" MAX = "<<max<<" SUM = "<<sum<<endl;
     }
     else
     {
+//        double min=adj_rec[thisInfo.uniqueIndexMap[0]] + adj_norec[thisInfo.uniqueIndexMap[0]]*prev[0], max=0.0, sum=0.0;
          for (int i=0; i<noReference; i++)
         {
             int m = thisInfo.uniqueIndexMap[i];
             next[i] = adj_rec[m] + adj_norec[m]*prev[i];
 
+//            if(next[i]>max)
+//                max=next[i];
+//            if(next[i]<min)
+//                min=next[i];
+//            sum+=next[i];
+
+
             assert(next[i]>=0.0f);
             assert(next[i]<1e18);
 
         }
+//        cout<<" LEFT INDEX = "<<bridgeIndex<<" MIN = "<<min<<" MAX = "<<max<<" SUM = "<<sum<<endl;
     }
 
 }
@@ -1220,11 +1221,6 @@ bool MarkovModel::RightTranspose(vector<float> &fromTo, vector<float> &noRecomPr
                             double reco,vector<int> &uniqueCardinality)
 {
     bool tempPrecisionJumpFlag=false;
-    if (reco == 0)
-    {
-        return false;
-    }
-
     double sum = 0.0;
     for (int i = 0; i <noReducedStatesCurrent; i++)
     {
@@ -1238,7 +1234,7 @@ bool MarkovModel::RightTranspose(vector<float> &fromTo, vector<float> &noRecomPr
     double complement = 1. - reco;
 
     // avoid underflows
-    if (sum < JumpThreshHold)
+    if(sum < JumpThreshHold)
     {
         tempPrecisionJumpFlag=true;
         sum*= JumpFix;
@@ -1274,12 +1270,6 @@ bool MarkovModel::LeftTranspose(vector<float> &from,
                             double reco,vector<int> &uniqueCardinality)
 {
     bool tempPrecisionJumpFlag=false;
-    if (reco == 0)
-    {
-        to=from;
-        return false;
-    }
-
     double sum = 0.0;
 
     for (int i = 0; i <noReducedStatesCurrent; i++)
@@ -1292,7 +1282,6 @@ bool MarkovModel::LeftTranspose(vector<float> &from,
     
     sum*=(reco/(double)refCount);
     double complement = 1. - reco;
-
     // avoid underflows
     if (sum < JumpThreshHold)
     {
@@ -1386,7 +1375,7 @@ void MarkovModel::CreatePosteriorProb( vector<float> &Leftprob,vector<float> &ri
 
     for(int i=0;i<noReducedStatesCurrent;i++)
     {
-        probHapMinimac3[i] = Constants[i]*(leftNoRecoProb[i]*rightNoRecoProb[i]/(leftEndProb[i]*rightEndProb[i]))
+        probHapMinimac3[i] = Constants[i]*(leftNoRecoProb[i]*rightNoRecoProb[i]/(leftEndProb[i]*rightEndProb[i] + 1e-30))
                              +(Leftprob[i]*rightProb[i]-leftNoRecoProb[i]*rightNoRecoProb[i])*(Info.InvuniqueCardinality[i]);
     }
 }

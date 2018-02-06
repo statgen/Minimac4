@@ -461,7 +461,7 @@ void Imputation::Minimac3ImputeThisChunk(int ChunkId, HaplotypeSet &FullrHap, Ha
 
 
     TimeToImpute = time(0) - time_prev;
-    cout <<endl<< " Imputation sssssssuccessful (" << TimeToImpute << " seconds) !!!"<<endl;
+    cout <<endl<< " Imputation successful (" << TimeToImpute << " seconds) !!!"<<endl;
     TimeToImpute-=(TimeToWrite);
 
 }
@@ -733,7 +733,7 @@ void Imputation::ImputeTraverse(HaplotypeSet &rHap,
     else
         MM.ImputeSites(hapID, group-1);
 
-  
+
     splitFoldedProb(recomProb,MM.ThisBlockRightProb[0],MM.ThisBlockRightNoRecoProb[0]);
 
 

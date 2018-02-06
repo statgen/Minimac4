@@ -73,7 +73,7 @@ bool Analysis::CreateRecombinationMap()
     }
     while(SecondIndex<referencePanel.numMarkers)
     {
-        referencePanel.Recom[SecondIndex-1]=0.0;
+        referencePanel.Recom[SecondIndex-1]=RECOM_MIN;
         SecondIndex++;
     }
     int h=0;
@@ -906,7 +906,7 @@ bool Analysis::OpenStreamOutputFiles()
         if(MyAllVariables->myOutFormat.DS)
             ifprintf(vcfdosepartial,"##FORMAT=<ID=DS,Number=1,Type=Float,Description=\"Estimated Alternate Allele Dosage : [P(0/1)+2*P(1/1)]\">\n");
         if(MyAllVariables->myOutFormat.HDS)
-            ifprintf(vcfdosepartial,"##FORMAT=<ID=HDS,Number=1,Type=String,Description=\"Estimated Haploid Alternate Allele Dosage \">\n");
+            ifprintf(vcfdosepartial,"##FORMAT=<ID=HDS,Number=2,Type=Float,Description=\"Estimated Haploid Alternate Allele Dosage \">\n");
         if(MyAllVariables->myOutFormat.GP)
             ifprintf(vcfdosepartial,"##FORMAT=<ID=GP,Number=3,Type=Float,Description=\"Estimated Posterior Probabilities for Genotypes 0/0, 0/1 and 1/1 \">\n");
         if(MyAllVariables->myOutFormat.SD)
