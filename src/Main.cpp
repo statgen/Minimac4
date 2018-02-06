@@ -227,7 +227,7 @@ printf("\n\n -------------------------------------------------------------------
     printf("                            no imputation would be performed.\n");
     printf("              --nobgzip   : If ON, output files will NOT be gzipped.\n");
     printf("               --format   : Specifies which fields to output for the FORMAT field in output \n");
-    printf("                            VCF file. Available handles: GT,DS,GP [Default: GT,DS].\n");
+    printf("                            VCF file. Available handles: GT,DS,HDS,GP [Default: GT,DS].\n");
     printf("        --allTypedSites   : If ON, sites available ONLY in GWAS panel will also be output [Default: OFF]. \n");
 
 
