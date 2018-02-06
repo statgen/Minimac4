@@ -75,7 +75,7 @@ public:
             else
             {
                 cout << " ERROR !!! \n Cannot identify handle for \"--format\" parameter : "<<formatPiece<<endl;
-                cout << " Available handles GT, DS, HDS and GP (for genotype, dosage, haplotype dosage and posterior probability). \n\n";
+                cout << " Available handles GT, DS and GP (for genotype, dosage and posterior probability). \n\n";
                 cout<<" Program Exiting ..."<<endl<<endl;
                 return false;
             }
