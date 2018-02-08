@@ -235,6 +235,7 @@ void Analysis::PrintInfoFile(int ChunkNo)
     InfoPrintStringLength=0;
     int RefStartPos =  MyRefVariantNumber[ChunkNo][0];
 
+    info = ifopen(MyAllVariables->myOutFormat.OutPrefix + ".info", "a");
     int i=0;
     for (int index = 0; index < CurrentRefPanel.RefTypedTotalCount; index++)
     {
@@ -306,6 +307,8 @@ void Analysis::PrintInfoFile(int ChunkNo)
         InfoPrintStringLength=0;
     }
 
+    ifclose(info);
+
 }
 
 
@@ -319,6 +322,8 @@ void Analysis::AppendtoMainLooVcfFaster(int ChunkNo, int MaxIndex)
     int RefStartPos =  MyRefVariantNumber[ChunkNo][0];
 
     vector<IFILE> vcfLoodosepartialList(MaxIndex);
+    vcfLoodosepartial = ifopen(MyAllVariables->myOutFormat.OutPrefix + ".empiricalDose.vcf" + (MyAllVariables->myOutFormat.gzip ? ".gz" : ""), "a", MyAllVariables->myOutFormat.gzip ?InputFile::BGZF:InputFile::UNCOMPRESSED);
+
 
     for(int i=1;i<=MaxIndex;i++)
     {
@@ -395,6 +400,7 @@ void Analysis::AppendtoMainLooVcfFaster(int ChunkNo, int MaxIndex)
     }
 
     TimeToWrite+=( time(0) - time_prev);
+    ifclose(vcfLoodosepartial);
 
 }
 
@@ -412,6 +418,8 @@ void Analysis::AppendtoMainVcfFaster(int ChunkNo, int MaxIndex)
     cout<<endl;
 
     vector<IFILE> vcfdosepartialList(MaxIndex);
+    vcfdosepartial = ifopen(MyAllVariables->myOutFormat.OutPrefix + ".dose.vcf" + (MyAllVariables->myOutFormat.gzip ? ".gz" : ""), "a", MyAllVariables->myOutFormat.gzip ?InputFile::BGZF:InputFile::UNCOMPRESSED);
+
 
     for(int i=1;i<=MaxIndex;i++)
     {
@@ -535,6 +543,7 @@ void Analysis::AppendtoMainVcfFaster(int ChunkNo, int MaxIndex)
     TimeToWrite+=( time(0) - time_prev);
     cout << " Appending successful (" << time(0) - time_prev << " seconds) !!!"<<endl;
 
+    ifclose(vcfdosepartial);
 }
 
 
@@ -921,6 +930,7 @@ bool Analysis::OpenStreamOutputFiles()
             ifprintf(vcfdosepartial,"\t%s",targetPanel.individualName[Id].c_str());
         }
         ifprintf(vcfdosepartial,"\n");
+        ifclose(vcfdosepartial);
 
     }
 
@@ -952,6 +962,7 @@ bool Analysis::OpenStreamOutputFiles()
             ifprintf(vcfLoodosepartial,"\t%s",targetPanel.individualName[Id].c_str());
         }
         ifprintf(vcfLoodosepartial,"\n");
+        ifclose(vcfLoodosepartial);
 
     }
 
@@ -973,6 +984,7 @@ bool Analysis::OpenStreamOutputFiles()
         return false;
     }
     ifprintf(info, "SNP\tREF(0)\tALT(1)\tALT_Frq\tMAF\tAvgCall\tRsq\tGenotyped\tLooRsq\tEmpR\tEmpRsq\tDose0\tDose1\n");
+    ifclose(info);
 
     return true;
 }
