@@ -17,6 +17,7 @@ sudo apt-get install cmake python-pip python-dev
 pip install cget```
 
 
+
 ## Installation
 The easiest way to install Minimac4 and its dependencies is to use the install.sh file provided.
 
