@@ -12,7 +12,8 @@ Users should follow the following steps to compile Minimac4
 
 Installation of Minimac4 requires cget and cmake to be installed which can be done as follows:
 
-```MacOS
+```
+MacOS
 sudo apt-get install cmake python-pip python-dev
 pip install cget
 ```
