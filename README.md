@@ -27,13 +27,11 @@ pip install --user cget --ignore-installed six
 ## Installation
 The easiest way to install Minimac4 and its dependencies is to use the install.sh file provided.
 
-```
-cd Minimac4
+```cd Minimac4
 bash install.sh```
 
 Alternatively, you can use [cget](http://cget.readthedocs.io/en/latest/src/intro.html#installing-cget) as follows:
-```
-cd Minimac4
+```cd Minimac4
 bash
 cget install --prefix <install_prefix> statgen/Minimac4
 ```
