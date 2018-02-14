@@ -9,7 +9,11 @@ minimac/mininac2/minimac3.
 Users should follow the following steps to compile Minimac4 
 
 ## Installation
-The easiest way to install Minimac4 and its dependencies is to use [cget](http://cget.readthedocs.io/en/latest/src/intro.html#installing-cget).
+The easiest way to install Minimac4 and its dependencies is to use the install.sh file provided.
+
+```bash install.sh```
+
+Another alternative would be to use [cget](http://cget.readthedocs.io/en/latest/src/intro.html#installing-cget) as follows:
 ```bash
 cget install --prefix <install_prefix> statgen/Minimac4
 ```
