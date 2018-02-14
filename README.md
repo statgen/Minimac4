@@ -8,6 +8,15 @@ minimac/mininac2/minimac3.
 
 Users should follow the following steps to compile Minimac4 
 
+## Pre-Requisites
+
+Installation of Minimac4 requires cget and cmake to be installed. This can be done as follows:
+
+``` MacOS
+sudo apt-get install cmake python-pip python-dev
+pip install cget```
+
+
 ## Installation
 The easiest way to install Minimac4 and its dependencies is to use the install.sh file provided.
 
@@ -26,6 +35,8 @@ mkdir build && cd build                                 # Create out of source b
 cmake -DCMAKE_TOOLCHAIN_FILE=../cget/cget/cget.cmake .. # Configure project with dependency paths.
 make                                                    # Build.
 ```
+
+
 
 ## Usage
 A typical Minimac4 command line for imputation is as follows
