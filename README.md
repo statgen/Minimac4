@@ -22,8 +22,7 @@ pip install cget
 ## Installation
 The easiest way to install Minimac4 and its dependencies is to use the install.sh file provided.
 
-```bash install.sh
-```
+```bash install.sh```
 
 Alternatively, you can use [cget](http://cget.readthedocs.io/en/latest/src/intro.html#installing-cget) as follows:
 ```bash
