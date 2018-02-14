@@ -8,19 +8,27 @@ minimac/mininac2/minimac3.
 
 Users should follow the following steps to compile Minimac4 
 
-## Pre-Requisites
+## Prerequisites
 
-Installation of Minimac4 requires cget and cmake to be installed which can be done as follows:
+Automatic installation of Minimac4 requires [cget](http://cget.readthedocs.io/en/latest/src/intro.html#installing-cget) and cmake v3.2. These prerequisites can be installed as follows:
 
-Unix
+Ubuntu 16.04
 ```
+sudo apt-get install cmake python-pip python-dev
+pip install cget
+```
+Ubuntu 14.04
+```
+sudo apt-get install software-properties-common
+sudo add-apt-repository ppa:george-edison55/cmake-3.x
+sudo apt-get update
 sudo apt-get install cmake python-pip python-dev
 pip install cget
 ```
 MacOS
 ```
 brew install cmake
-sudo eas-install pip
+sudo easy-install pip
 pip install --user cget --ignore-installed six
 ```
 
@@ -32,9 +40,8 @@ cd Minimac4
 bash install.sh
 ```
 
-Alternatively, you can use [cget](http://cget.readthedocs.io/en/latest/src/intro.html#installing-cget) as follows:
-```cd Minimac4
-bash
+Alternatively, you can use cget as follows:
+```bash
 cget install --prefix <install_prefix> statgen/Minimac4
 ```
 
