@@ -13,7 +13,7 @@ The easiest way to install Minimac4 and its dependencies is to use the install.s
 
 ```bash install.sh```
 
-Another alternative would be to use [cget](http://cget.readthedocs.io/en/latest/src/intro.html#installing-cget) as follows:
+Alternatively, you can use [cget](http://cget.readthedocs.io/en/latest/src/intro.html#installing-cget) as follows:
 ```bash
 cget install --prefix <install_prefix> statgen/Minimac4
 ```
@@ -34,6 +34,6 @@ minimac4 --refHaps refPanel.m3vcf \
          --haps targetStudy.vcf \
          --prefix testRun
 ```
-Here refPanel.vcf is the reference panel used in M3VCF format (e.g. 1000 Genomes), 
+Here refPanel.m3vcf is the reference panel used in M3VCF format (e.g. 1000 Genomes), 
 targetStudy.vcf is the phased GWAS data in VCF format, 
 and testRun is the prefix for the output files.
