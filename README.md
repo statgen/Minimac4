@@ -1,8 +1,5 @@
 # Minimac4
 
-
-THIS IS FOR TESTING PURPOSES ONLY !!!
-
 Minimac4 is a lower memory and more computationally efficient
 implementation of the genotype imputation algorithms in 
 minimac/mininac2/minimac3.
@@ -10,8 +7,6 @@ minimac/mininac2/minimac3.
 <<< SEE http://genome.sph.umich.edu/wiki/Minimac4 FOR DOCUMENTATION >>>
 
 Users should follow the following steps to compile Minimac4 
-(if they downloaded the source files) or should skip them
-(if they downloaded the binary executable).
 
 ## Installation
 The easiest way to install Minimac4 and its dependencies is to use [cget](http://cget.readthedocs.io/en/latest/src/intro.html#installing-cget).
