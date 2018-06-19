@@ -894,7 +894,7 @@ void MarkovModel::initializeMatrices()
     FoldedProbValue.resize(rHapFull->maxRepSize);
     probHapFullAverage.resize(rHapFull->numHaplotypes);
     FirstFoldedValue.resize(rHap->maxRepSize);
-    UnfoldTheseSites.resize(rHapFull->maxBlockSize);
+    UnfoldTheseSites.resize(rHap->maxBlockSize);
 
     LeftAdj_Rec.resize(rHap->maxRepSize);
     LeftAdj_NoRrec.resize(rHap->maxRepSize);
