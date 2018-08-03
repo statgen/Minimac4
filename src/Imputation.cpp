@@ -597,7 +597,8 @@ void Imputation::ImputeThisChunk(int ChunkId, HaplotypeSet &FullrHap, HaplotypeS
 
         #pragma omp parallel for
         for(int SampleId=StartSamId;SampleId<EndSamId;SampleId ++)
-        {
+        //for(int SampleId=10;SampleId<11;SampleId ++)
+            {
 
             int MMIndexId=0;
 

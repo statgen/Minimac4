@@ -111,6 +111,7 @@ int main(int argc, char ** argv)
 		LONG_INTPARAMETER("cisFactor", &MyModelVariables.cisFactor)
 		LONG_PARAMETER("allowRefDuplicates", &MyHapDataVariables.allowRefDuplicates)
 		LONG_PARAMETER("unphasedOutput", &MyOutFormat.unphasedOutput)
+		LONG_PARAMETER("longZero", &MyOutFormat.longZero)
 		END_LONG_PARAMETERS();
 
 	//MyHapDataVariables.GetMapFileLocation(argc,argv);

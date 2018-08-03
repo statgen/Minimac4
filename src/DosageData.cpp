@@ -99,7 +99,7 @@ void DosageData::PrintDiploidDosage(float &x, float &y)
     bool colonIndex=false;
     PrintStringLength+=sprintf(PrintStringPointer+PrintStringLength,"\t");
 
-    if(x<0.0005 && y<0.0005)
+    if(!MyAllVariables->myOutFormat.longZero && x<0.0005 && y<0.0005)
     {
         if(MyAllVariables->myOutFormat.GT)
         {
@@ -209,7 +209,7 @@ void DosageData::PrintHaploidDosage(float &x)
     bool colonIndex=false;
     PrintStringLength+=sprintf(PrintStringPointer+PrintStringLength,"\t");
 
-    if(x<0.0005)
+    if(!MyAllVariables->myOutFormat.longZero && x<0.0005)
     {
         if(MyAllVariables->myOutFormat.GT)
         {

@@ -33,6 +33,7 @@ public:
     String formatStringForVCF;
     bool verbose;
     int PrintBuffer;
+    bool longZero;
 
     bool memUsage;
 
@@ -163,7 +164,7 @@ public:
         GP=false;
         HDS=false;
         SD=false;
-
+        longZero=false;
 
         hapOutput=false;
         doseOutput=false;
