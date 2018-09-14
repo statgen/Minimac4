@@ -348,6 +348,7 @@ void Imputation::Minimac3ImputeThisChunk(int ChunkId, HaplotypeSet &FullrHap, Ha
         printf("  Imputing Samples %d-%d [%0.0f%%] out of %d samples ...", StartSamId + 1, EndSamId, 100*(float)EndSamId/TotalNumSamples, TotalNumSamples);
         cout<<endl;
 
+        int counter_sample_imputation_finished = 0;
 
         #pragma omp parallel for
         for(int SampleId=StartSamId;SampleId<EndSamId;SampleId ++)
@@ -413,23 +414,28 @@ void Imputation::Minimac3ImputeThisChunk(int ChunkId, HaplotypeSet &FullrHap, Ha
                     }
             }while(hapId == hapIdIndiv++);
 
-
-
-            if (MyAllVariables->myOutFormat.hapOutput && !MyAllVariables->myOutFormat.unphasedOutput)
+            #pragma omp critical (addCounter)
             {
-                #pragma omp critical (PrintHapData)
-                PrintHaplotypeData( hapIdIndiv, SampleId, MM.DosageHap);
+                counter_sample_imputation_finished++;
             }
 
-            if(MyAllVariables->myOutFormat.doseOutput)
-            {
-                #pragma omp critical  (PrintDoseData)
-                PrintDosageData(SampleId, ThisSamplePartialDosageData->hapDosage[(2*SwapDosageData.second)], ThisSamplePartialDosageData->hapDosage[(2*SwapDosageData.second)+1] );
-            }
+
+            // if (MyAllVariables->myOutFormat.hapOutput && !MyAllVariables->myOutFormat.unphasedOutput)
+            // {
+            //     #pragma omp critical (PrintHapData)
+            //     PrintHaplotypeData( hapIdIndiv, SampleId, MM.DosageHap);
+            // }
+
+            // if(MyAllVariables->myOutFormat.doseOutput)
+            // {
+            //     #pragma omp critical  (PrintDoseData)
+            //     PrintDosageData(SampleId, ThisSamplePartialDosageData->hapDosage[(2*SwapDosageData.second)], ThisSamplePartialDosageData->hapDosage[(2*SwapDosageData.second)+1] );
+            // }
 
             if(MyAllVariables->myOutFormat.vcfOutput)
             {
-                if(SwapDosageData.first==1)
+                if(counter_sample_imputation_finished == EndSamId-StartSamId)
+                //if(SwapDosageData.first==1)
                 {
                     #pragma omp critical (printVCF)
                     {
@@ -594,6 +600,7 @@ void Imputation::ImputeThisChunk(int ChunkId, HaplotypeSet &FullrHap, HaplotypeS
         printf("  Imputing Samples %d-%d [%0.0f%%] out of %d samples ...", StartSamId + 1, EndSamId, 100*(float)EndSamId/TotalNumSamples, TotalNumSamples);
         cout<<endl;
 
+        int counter_sample_imputation_finished = 0;
 
         #pragma omp parallel for
         for(int SampleId=StartSamId;SampleId<EndSamId;SampleId ++)
@@ -657,23 +664,29 @@ void Imputation::ImputeThisChunk(int ChunkId, HaplotypeSet &FullrHap, HaplotypeS
                     }
             }while(hapId == hapIdIndiv++);
 
-
-
-            if (MyAllVariables->myOutFormat.hapOutput && !MyAllVariables->myOutFormat.unphasedOutput)
+            #pragma omp critical (addCounter)
             {
-                #pragma omp critical (PrintHapData)
-                PrintHaplotypeData( hapIdIndiv, SampleId, MM.DosageHap);
+                counter_sample_imputation_finished++;
             }
 
-            if(MyAllVariables->myOutFormat.doseOutput)
-            {
-                #pragma omp critical  (PrintDoseData)
-                PrintDosageData(SampleId, ThisSamplePartialDosageData->hapDosage[(2*SwapDosageData.second)], ThisSamplePartialDosageData->hapDosage[(2*SwapDosageData.second)+1] );
-            }
+
+
+            // if (MyAllVariables->myOutFormat.hapOutput && !MyAllVariables->myOutFormat.unphasedOutput)
+            // {
+            //     #pragma omp critical (PrintHapData)
+            //     PrintHaplotypeData( hapIdIndiv, SampleId, MM.DosageHap);
+            // }
+
+            // if(MyAllVariables->myOutFormat.doseOutput)
+            // {
+            //     #pragma omp critical  (PrintDoseData)
+            //     PrintDosageData(SampleId, ThisSamplePartialDosageData->hapDosage[(2*SwapDosageData.second)], ThisSamplePartialDosageData->hapDosage[(2*SwapDosageData.second)+1] );
+            // }
 
             if(MyAllVariables->myOutFormat.vcfOutput)
             {
-                if(SwapDosageData.first==1)
+                if(counter_sample_imputation_finished == EndSamId-StartSamId)
+                // if(SwapDosageData.first==1)
                 {
                     #pragma omp critical (printVCF)
                     {
