@@ -604,8 +604,7 @@ void Imputation::ImputeThisChunk(int ChunkId, HaplotypeSet &FullrHap, HaplotypeS
 
         #pragma omp parallel for
         for(int SampleId=StartSamId;SampleId<EndSamId;SampleId ++)
-        //for(int SampleId=10;SampleId<11;SampleId ++)
-            {
+        {
 
             int MMIndexId=0;
 
@@ -664,47 +663,21 @@ void Imputation::ImputeThisChunk(int ChunkId, HaplotypeSet &FullrHap, HaplotypeS
                     }
             }while(hapId == hapIdIndiv++);
 
-            #pragma omp critical (addCounter)
-            {
-                counter_sample_imputation_finished++;
-            }
 
 
+        }
 
-            // if (MyAllVariables->myOutFormat.hapOutput && !MyAllVariables->myOutFormat.unphasedOutput)
-            // {
-            //     #pragma omp critical (PrintHapData)
-            //     PrintHaplotypeData( hapIdIndiv, SampleId, MM.DosageHap);
-            // }
+        if(MyAllVariables->myOutFormat.vcfOutput)
+        {
+            TotalNovcfParts++;
+            printf("       Saving Samples in temporary VCF file ... ");
+            cout<<endl;
+            CurrentPartialDosageData->FlushPartialVcf(TotalNovcfParts);
 
-            // if(MyAllVariables->myOutFormat.doseOutput)
-            // {
-            //     #pragma omp critical  (PrintDoseData)
-            //     PrintDosageData(SampleId, ThisSamplePartialDosageData->hapDosage[(2*SwapDosageData.second)], ThisSamplePartialDosageData->hapDosage[(2*SwapDosageData.second)+1] );
-            // }
-
-            if(MyAllVariables->myOutFormat.vcfOutput)
-            {
-                if(counter_sample_imputation_finished == EndSamId-StartSamId)
-                // if(SwapDosageData.first==1)
-                {
-                    #pragma omp critical (printVCF)
-                    {
-                        TotalNovcfParts++;
-                        printf("       Saving Samples in temporary VCF file ... ");
-                        cout<<endl;
-                        ThisSamplePartialDosageData->FlushPartialVcf(TotalNovcfParts);
-
-                        TimeToWrite+=ThisSamplePartialDosageData->TimeToWrite;
-                        NumVcfToBeWritten = NumVcfWritten + maxVcfSample;
-                        ThisSamplePartialDosageData->UpdatePartialDosageData(maxVcfSample < TotalNumSamples-NumVcfToBeWritten ? maxVcfSample : TotalNumSamples-NumVcfToBeWritten, NumVcfToBeWritten);
-                        NumVcfWritten+=maxVcfSample;
-                    }
-                }
-            }
-
-
-
+            TimeToWrite+=CurrentPartialDosageData->TimeToWrite;
+            NumVcfToBeWritten = NumVcfWritten + maxVcfSample;
+            CurrentPartialDosageData->UpdatePartialDosageData(maxVcfSample < TotalNumSamples-NumVcfToBeWritten ? maxVcfSample : TotalNumSamples-NumVcfToBeWritten, NumVcfToBeWritten);
+            NumVcfWritten+=maxVcfSample;
         }
 
         StartSamId=EndSamId ;
