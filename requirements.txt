@@ -1,1 +1,1 @@
-statgen/libStatGen --cmake dep/libstatgen.cmake
+daheise/libStatGen@parallel-bgzip --cmake dep/libstatgen.cmake
