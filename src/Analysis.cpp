@@ -36,7 +36,7 @@ void MyTokenize(vector<string> &result, const char *input, const char *delimiter
 
 }
 
- 
+
 
 bool Analysis::CreateRecombinationMap()
 {
@@ -77,9 +77,9 @@ bool Analysis::CreateRecombinationMap()
         SecondIndex++;
     }
     int h=0;
-    
+
     return true;
-    
+
 }
 
 
@@ -102,7 +102,7 @@ String Analysis::RunAnalysis(String &Reffilename, String &Tarfilename, String &R
             cout << "\n Program Exiting ... \n\n";
             return "Genetic.Map.Load.Error";
     }
-    
+
     if (!targetPanel.ScaffoldGWAStoReference(referencePanel,*MyAllVariables))
     {
             cout << "\n Program Exiting ... \n\n";
@@ -408,6 +408,8 @@ void Analysis::AppendtoMainLooVcfFaster(int ChunkNo, int MaxIndex)
 
 void Analysis::AppendtoMainVcfFaster(int ChunkNo, int MaxIndex)
 {
+    char bgzf_mode[16];
+    snprintf(bgzf_mode, 16-2, "r@%d", MyAllVariables->myModelVariables.cpus);
 
     VcfPrintStringLength=0;
 
@@ -429,7 +431,7 @@ void Analysis::AppendtoMainVcfFaster(int ChunkNo, int MaxIndex)
         strs1<<(ChunkNo+1);
         tempFileIndex+=(".chunk."+(string)(strs1.str())+".dose.part." +
                          (string)(strs.str())+".vcf.gz");
-        vcfdosepartialList[i-1] = ifopen(tempFileIndex.c_str(), "r");
+        vcfdosepartialList[i-1] = ifopen(tempFileIndex.c_str(), bgzf_mode);
     }
     string line;
     int i=0;
@@ -1287,7 +1289,7 @@ void Analysis::GetCurrentPanelReady(int ChunkNo, HaplotypeSet &ThisRefPanel,
             if(i==(ThisRefPanel.NoBlocks-1))
                  Mapper[j]=i;
         }
-        
+
     }
 
 
@@ -1398,7 +1400,7 @@ void Analysis::GetCurrentPanelReady(int ChunkNo, HaplotypeSet &ThisRefPanel,
 
     ThisRefPanel.CalculateAlleleFreq();
     ThisTarPanel.CalculateGWASOnlyAlleleFreq();
-        
+
     if(!MyAllVariables->myModelVariables.minimac3)
     {
         int time_prev = time(0);
@@ -1426,20 +1428,20 @@ void Analysis::GetCurrentPanelReady(int ChunkNo, HaplotypeSet &ThisRefPanel,
             thisDataFast.MainMarkovModel[i].AssignPanels(ThisRefPanel,ThisRefChipOnlyPanel,ThisTarPanel,ThisTarPanel,MyAllVariables);
             thisDataFast.MainMarkovModel[i].initializeMatrices();
 
-        }     
+        }
     }
     else
     {
         int time_prev = time(0);
 
-      
-       
+
+
         for(int i=0;i<MyAllVariables->myModelVariables.cpus;i++)
         {
             thisDataFast.MainMarkovModel[i].AssignPanels(ThisRefPanel,ThisTarPanel,MyAllVariables);
             thisDataFast.MainMarkovModel[i].initializeMatricesMinimac3();
 
-        }     
+        }
     }
 
 
@@ -1669,8 +1671,8 @@ void Analysis::GetCurrentPanelReady(int ChunkNo, HaplotypeSet &ThisRefPanel,
 
 }
 
- 
- 
+
+
 bool Analysis::CheckGeneticMapFile()
 {
     std::cout << "\n Checking genetic map file : "<<MyAllVariables->myHapDataVariables.mapFile << endl<<endl;
@@ -1681,9 +1683,9 @@ bool Analysis::CheckGeneticMapFile()
     vector<string> Pieces(4);
     vector<double> AppendPiece(2);
     double PrevSumVal=0.0;
-    
+
     if(fileStream)
-    {  
+    {
         while(fileStream->readLine(line)!=-1)
         {
             MyTokenize(Pieces, line.c_str(), tabSep,4);
@@ -1707,21 +1709,21 @@ bool Analysis::CheckGeneticMapFile()
         cout << "\n Program Exiting ... \n\n";
         return false;
     }
-    
-    
+
+
     if(GeneticMapData.size()<2)
     {
         cout << "\n ERROR !!! Chromosome "<<targetPanel.finChromosome <<" not found in genetic map file : " << MyAllVariables->myHapDataVariables.mapFile << endl;
         cout << "\n Program Exiting ... \n\n";
         return false;
     }
-        
+
     ifclose(fileStream);
-    
+
     cout<<" Successful !!! "<<endl;
-    return true; 
+    return true;
  }
- 
+
  String Analysis::CheckValidity(String &Reffilename, String &Tarfilename, String &Recomfilename, String &Errorfilename)
 {
     cout<<endl<<endl;
