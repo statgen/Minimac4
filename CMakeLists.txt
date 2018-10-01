@@ -10,7 +10,7 @@ if (DEFINED ENV{SOURCE_DATE_EPOCH})
   set(USER "Reproducible")
 else ()
   execute_process(
-    COMMAND "date" "+%Y-%m-%d"
+    COMMAND "date"
     OUTPUT_VARIABLE DATE
     OUTPUT_STRIP_TRAILING_WHITESPACE)
   execute_process(
