@@ -408,8 +408,24 @@ void Analysis::AppendtoMainLooVcfFaster(int ChunkNo, int MaxIndex)
 
 void Analysis::AppendtoMainVcfFaster(int ChunkNo, int MaxIndex)
 {
-    char bgzf_mode[16];
-    snprintf(bgzf_mode, 16-2, "r@%d", MyAllVariables->myModelVariables.cpus);
+    char bgzf_partial_mode[16];
+    char bgzf_final_mode[16];
+    // To avoid forkbombing on reads, only use more than one CPU on reads
+    // if there is more than one CPU per files to read.
+    int readingCpus = (MyAllVariables->myModelVariables.cpus-1)/MaxIndex;
+    if(MyAllVariables->myModelVariables.cpus > 1 && readingCpus > 1){
+        snprintf(bgzf_partial_mode, 16-2, "r@%d", readingCpus);
+    } else {
+        snprintf(bgzf_partial_mode, 16-2, "r@%d", 1);
+    }
+
+    // Use all available CPUs for writing
+    if(MyAllVariables->myModelVariables.cpus > 1){
+        snprintf(bgzf_final_mode, 16-2, "a@%d", MyAllVariables->myModelVariables.cpus-1);
+    } else {
+        // Otherwise, do a single threaded read.
+        snprintf(bgzf_final_mode, 16-2, "a@%d", 1);
+    }
 
     VcfPrintStringLength=0;
 
@@ -420,7 +436,7 @@ void Analysis::AppendtoMainVcfFaster(int ChunkNo, int MaxIndex)
     cout<<endl;
 
     vector<IFILE> vcfdosepartialList(MaxIndex);
-    vcfdosepartial = ifopen(MyAllVariables->myOutFormat.OutPrefix + ".dose.vcf" + (MyAllVariables->myOutFormat.gzip ? ".gz" : ""), "a", MyAllVariables->myOutFormat.gzip ?InputFile::BGZF:InputFile::UNCOMPRESSED);
+    vcfdosepartial = ifopen(MyAllVariables->myOutFormat.OutPrefix + ".dose.vcf" + (MyAllVariables->myOutFormat.gzip ? ".gz" : ""), bgzf_final_mode, MyAllVariables->myOutFormat.gzip ?InputFile::BGZF:InputFile::UNCOMPRESSED);
 
 
     for(int i=1;i<=MaxIndex;i++)
@@ -431,7 +447,7 @@ void Analysis::AppendtoMainVcfFaster(int ChunkNo, int MaxIndex)
         strs1<<(ChunkNo+1);
         tempFileIndex+=(".chunk."+(string)(strs1.str())+".dose.part." +
                          (string)(strs.str())+".vcf.gz");
-        vcfdosepartialList[i-1] = ifopen(tempFileIndex.c_str(), bgzf_mode);
+        vcfdosepartialList[i-1] = ifopen(tempFileIndex.c_str(), bgzf_partial_mode);
     }
     string line;
     int i=0;
