@@ -18,7 +18,7 @@ endif()
 find_package(ZLIB REQUIRED)
 find_library(STATGEN_LIBRARY StatGen)
 find_library(HTS_LIBRARY hts)
-#find_library(BAM_LIBRARY bam)
+
 add_executable(minimac4
         src/Analysis.cpp
         src/Analysis.h
@@ -42,6 +42,6 @@ add_executable(minimac4
         src/Estimation.cpp
         src/Estimation.h)
 
-target_link_libraries(minimac4 ${STATGEN_LIBRARY} ${HTS_LIBRARY} ${BAM_LIBRARY} ${ZLIB_LIBRARIES})
+target_link_libraries(minimac4 ${STATGEN_LIBRARY} ${HTS_LIBRARY} ${ZLIB_LIBRARIES})
 
 install(TARGETS minimac4 RUNTIME DESTINATION bin)
