@@ -357,13 +357,17 @@ void Analysis::AppendtoMainLooVcfFaster(int ChunkNo, int MaxIndex)
                          tempVariant.altAlleleString.c_str());
                     VcfPrintStringLength+=sprintf(VcfPrintStringPointer + VcfPrintStringLength,"\tTYPED\tGT:LDS");
 
+                    vector<string> lines(MaxIndex);
+                    #pragma omp parallel for
                     for(int j=1;j<=MaxIndex;j++)
                     {
-                        line.clear();
-                        vcfLoodosepartialList[j-1]->readLine(line);
-                        VcfPrintStringLength+=sprintf(VcfPrintStringPointer + VcfPrintStringLength,"%s",line.c_str());
-
+                        lines[j-1].clear();
+                        vcfLoodosepartialList[j-1]->readLine(lines[j-1]);
                     }
+                    for(int j=1;j<=MaxIndex;j++){
+                        VcfPrintStringLength+=sprintf(VcfPrintStringPointer + VcfPrintStringLength,"%s",lines[j-1].c_str());
+                    }
+
                     VcfPrintStringLength+=sprintf(VcfPrintStringPointer + VcfPrintStringLength,"\n");
 
                 }
@@ -410,10 +414,10 @@ void Analysis::AppendtoMainVcfFaster(int ChunkNo, int MaxIndex)
 {
     char bgzf_partial_mode[16];
     char bgzf_final_mode[16];
-    // To avoid forkbombing on reads, only use more than one CPU on reads
-    // if there is more than one CPU per files to read.
+    // To avoid threadbombing on reads, only use more than one CPU on reads
+    // if there is more than one CPU per file to read.
     int readingCpus = (MyAllVariables->myModelVariables.cpus-1)/MaxIndex;
-    if(MyAllVariables->myModelVariables.cpus > 1 && readingCpus > 1){
+    if(readingCpus > 1){
         snprintf(bgzf_partial_mode, 16-2, "r@%d", readingCpus);
     } else {
         snprintf(bgzf_partial_mode, 16-2, "r@%d", 1);
@@ -421,7 +425,7 @@ void Analysis::AppendtoMainVcfFaster(int ChunkNo, int MaxIndex)
 
     // Use all available CPUs for writing
     if(MyAllVariables->myModelVariables.cpus > 1){
-        snprintf(bgzf_final_mode, 16-2, "a@%d", MyAllVariables->myModelVariables.cpus-1);
+        snprintf(bgzf_final_mode, 16-2, "a@%d", MyAllVariables->myModelVariables.cpus);
     } else {
         // Otherwise, do a single threaded read.
         snprintf(bgzf_final_mode, 16-2, "a@%d", 1);
@@ -482,14 +486,17 @@ void Analysis::AppendtoMainVcfFaster(int ChunkNo, int MaxIndex)
 
 
                 VcfPrintStringLength+=sprintf(VcfPrintStringPointer + VcfPrintStringLength,"\t%s",MyAllVariables->myOutFormat.formatStringForVCF.c_str());
+                vector<string> lines(MaxIndex);
+                #pragma omp parallel for
                 for(int j=1;j<=MaxIndex;j++)
                 {
-                    line.clear();
-                    vcfdosepartialList[j-1]->readLine(line);
-                    VcfPrintStringLength+=sprintf(VcfPrintStringPointer + VcfPrintStringLength,"%s",line.c_str());
-
+                    lines[j-1].clear();
+                    vcfdosepartialList[j-1]->readLine(lines[j-1]);
                 }
-                 VcfPrintStringLength+=sprintf(VcfPrintStringPointer + VcfPrintStringLength,"\n");
+                for(int j=1;j<=MaxIndex;j++){
+                    VcfPrintStringLength+=sprintf(VcfPrintStringPointer + VcfPrintStringLength,"%s",lines[j-1].c_str());
+                }
+                VcfPrintStringLength+=sprintf(VcfPrintStringPointer + VcfPrintStringLength,"\n");
 
             }
 
@@ -516,12 +523,15 @@ void Analysis::AppendtoMainVcfFaster(int ChunkNo, int MaxIndex)
                             freq, freq > 0.5 ? 1.0 - freq : freq);
 
                 VcfPrintStringLength+=sprintf(VcfPrintStringPointer + VcfPrintStringLength,"\t%s",MyAllVariables->myOutFormat.formatStringForVCF.c_str());
+                vector<string> lines(MaxIndex);
+                #pragma omp parallel for
                 for(int j=1;j<=MaxIndex;j++)
                 {
-                    line.clear();
-                    vcfdosepartialList[j-1]->readLine(line);
-                    VcfPrintStringLength+=sprintf(VcfPrintStringPointer + VcfPrintStringLength,"%s",line.c_str());
-
+                    lines[j-1].clear();
+                    vcfdosepartialList[j-1]->readLine(lines[j-1]);
+                }
+                for(int j=1;j<=MaxIndex;j++){
+                    VcfPrintStringLength+=sprintf(VcfPrintStringPointer + VcfPrintStringLength,"%s",lines[j-1].c_str());
                 }
                 VcfPrintStringLength+=sprintf(VcfPrintStringPointer + VcfPrintStringLength,"\n");
             }

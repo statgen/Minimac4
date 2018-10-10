@@ -15,6 +15,8 @@ void DosageData::FlushPartialVcf(int NovcfParts)
 
     int time_Start = time(0);
     char bgzf_mode[16];
+    // Use all available CPUs for writing. Parallel writes work best with large
+    // print buffers.
     snprintf(bgzf_mode, 16-3, "wb@%d", MyAllVariables->myModelVariables.cpus);
 
     string PartialVcfFileName(MyAllVariables->myOutFormat.OutPrefix);
