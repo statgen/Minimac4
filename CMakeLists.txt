@@ -18,7 +18,7 @@ endif()
 find_package(ZLIB REQUIRED)
 find_library(STATGEN_LIBRARY StatGen)
 find_library(HTS_LIBRARY hts)
-find_library(BAM_LIBRARY bam)
+#find_library(BAM_LIBRARY bam)
 add_executable(minimac4
         src/Analysis.cpp
         src/Analysis.h
