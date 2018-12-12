@@ -95,9 +95,9 @@ void PrintHaploidLooDosage(float &x, AlleleType a);
         void FlushPartialVcf(int NovcfParts);
         void PrintDiploidDosage(float &x, float &y);
         void PrintHaploidDosage(float &x);
-        void PrintDosageForVcfOutputForID(int MarkerIndex);
+        void PrintDosageForVcfOutputForID(int MarkerIndex, std::vector<float>& variant_dose_buf);
         void PrintDosageForVcfOutputForIDFast(int MarkerIndex);
-        void PrintGWASOnlyForVcfOutputForID(int MarkerIndex);
+        void PrintGWASOnlyForVcfOutputForID(int MarkerIndex, std::vector<float>& variant_dose_buf);
 
         DosageData () {};
 

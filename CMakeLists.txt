@@ -13,10 +13,11 @@ if (OPENMP_FOUND)
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
 endif()
 
+#set(CMAKE_FIND_LIBRARY_SUFFIXES ".a;${CMAKE_FIND_LIBRARY_SUFFIXES}")
 
-
-find_package(ZLIB REQUIRED)
+find_package(savvy REQUIRED)
 find_library(STATGEN_LIBRARY StatGen)
+
 add_executable(minimac4
         src/Analysis.cpp
         src/Analysis.h
@@ -40,6 +41,6 @@ add_executable(minimac4
         src/Estimation.cpp
         src/Estimation.h)
 
-target_link_libraries(minimac4 ${STATGEN_LIBRARY} ${ZLIB_LIBRARIES})
+target_link_libraries(minimac4 ${STATGEN_LIBRARY} savvy ${ZLIB_LIBRARIES})
 
 install(TARGETS minimac4 RUNTIME DESTINATION bin)

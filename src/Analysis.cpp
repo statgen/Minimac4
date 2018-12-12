@@ -2,6 +2,7 @@
 #include "Estimation.h"
 #include <iomanip>
 #include "assert.h"
+
 # define RECOM_MIN 1e-05
 
 
@@ -417,8 +418,9 @@ void Analysis::AppendtoMainVcfFaster(int ChunkNo, int MaxIndex)
     printf("\n Appending chunk to final output VCF File :  %s ",(MyAllVariables->myOutFormat.OutPrefix + ".dose.vcf" + (MyAllVariables->myOutFormat.gzip ? ".gz" : "")).c_str() );
     cout<<endl;
 
-    vector<IFILE> vcfdosepartialList(MaxIndex);
-    vcfdosepartial = ifopen(MyAllVariables->myOutFormat.OutPrefix + ".dose.vcf" + (MyAllVariables->myOutFormat.gzip ? ".gz" : ""), "a", MyAllVariables->myOutFormat.gzip ?InputFile::BGZF:InputFile::UNCOMPRESSED);
+    std::list<savvy::sav::reader> temp_files;
+    //vector<IFILE> vcfdosepartialList(MaxIndex);
+    //vcfdosepartial = ifopen(MyAllVariables->myOutFormat.OutPrefix + ".dose.vcf" + (MyAllVariables->myOutFormat.gzip ? ".gz" : ""), "a", MyAllVariables->myOutFormat.gzip ?InputFile::BGZF:InputFile::UNCOMPRESSED);
 
 
     for(int i=1;i<=MaxIndex;i++)
@@ -429,12 +431,18 @@ void Analysis::AppendtoMainVcfFaster(int ChunkNo, int MaxIndex)
         strs1<<(ChunkNo+1);
         tempFileIndex+=(".chunk."+(string)(strs1.str())+".dose.part." +
                          (string)(strs.str())+".vcf.gz");
-        vcfdosepartialList[i-1] = ifopen(tempFileIndex.c_str(), "r");
+        //vcfdosepartialList[i-1] = ifopen(tempFileIndex.c_str(), "r");
+        temp_files.emplace_back(tempFileIndex, savvy::fmt::hds);
     }
+
+    std::vector<float> output_dosage_buf;
     string line;
     int i=0;
     for (int index = 0; index < CurrentRefPanel.RefTypedTotalCount; index++)
     {
+        output_dosage_buf.clear();
+        output_dosage_buf.resize(targetPanel.numSamples * 2);
+
         if(CurrentRefPanel.RefTypedIndex[index]==-1)
         {
 
@@ -442,36 +450,57 @@ void Analysis::AppendtoMainVcfFaster(int ChunkNo, int MaxIndex)
             {
                 variant &tempVariant = referencePanel.VariantList[i+RefStartPos];
 
-                VcfPrintStringLength+=sprintf(VcfPrintStringPointer + VcfPrintStringLength,"%s\t%d\t%s\t%s\t%s\t.\tPASS",
+                /*VcfPrintStringLength+=sprintf(VcfPrintStringPointer + VcfPrintStringLength,"%s\t%d\t%s\t%s\t%s\t.\tPASS",
                          tempVariant.chr.c_str(),
                          tempVariant.bp,
                          MyAllVariables->myOutFormat.RsId?tempVariant.rsid.c_str():tempVariant.name.c_str(),
                          tempVariant.refAlleleString.c_str(),
-                         tempVariant.altAlleleString.c_str());
-
-
+                         tempVariant.altAlleleString.c_str());*/
 
                 double freq = stats.AlleleFrequency(i);
 
-                VcfPrintStringLength+=sprintf(VcfPrintStringPointer + VcfPrintStringLength,"\tAF=%.5f;MAF=%.5f;R2=%.5f",
-                        freq, freq > 0.5 ? 1.0 - freq : freq, stats.Rsq(i));
+                savvy::site_info sav_variant(std::string(tempVariant.chr), tempVariant.bp, std::string(tempVariant.refAlleleString), std::string(tempVariant.altAlleleString), {
+                  {"ID", MyAllVariables->myOutFormat.RsId ? tempVariant.rsid : tempVariant.name },
+                  {"FILTER","PASS"},
+                  {"AF", std::to_string(freq)},
+                  {"MAF", std::to_string(freq > 0.5 ? 1.0 - freq : freq)},
+                  {"R2", std::to_string(stats.Rsq(i))}});
+
+//                VcfPrintStringLength+=sprintf(VcfPrintStringPointer + VcfPrintStringLength,"\tAF=%.5f;MAF=%.5f;R2=%.5f",
+//                        freq, freq > 0.5 ? 1.0 - freq : freq, stats.Rsq(i));
 
 
                 if(!CurrentRefPanel.Targetmissing[i])
-                    VcfPrintStringLength+=sprintf(VcfPrintStringPointer + VcfPrintStringLength,";ER2=%.5f;TYPED",stats.EmpiricalRsq(i));
-                else
-                    VcfPrintStringLength+=sprintf(VcfPrintStringPointer + VcfPrintStringLength,";IMPUTED");
-
-
-                VcfPrintStringLength+=sprintf(VcfPrintStringPointer + VcfPrintStringLength,"\t%s",MyAllVariables->myOutFormat.formatStringForVCF.c_str());
-                for(int j=1;j<=MaxIndex;j++)
                 {
-                    line.clear();
-                    vcfdosepartialList[j-1]->readLine(line);
-                    VcfPrintStringLength+=sprintf(VcfPrintStringPointer + VcfPrintStringLength,"%s",line.c_str());
+                    //VcfPrintStringLength += sprintf(VcfPrintStringPointer + VcfPrintStringLength, ";ER2=%.5f;TYPED", stats.EmpiricalRsq(i));
+                    sav_variant.prop("ER2", std::to_string(stats.EmpiricalRsq(i)));
+                    sav_variant.prop("TYPED", "1");
+                }
+                else
+                {
+                    //VcfPrintStringLength += sprintf(VcfPrintStringPointer + VcfPrintStringLength, ";IMPUTED");
+                    sav_variant.prop("IMPUTED", "1");
+                }
+
+
+                //VcfPrintStringLength+=sprintf(VcfPrintStringPointer + VcfPrintStringLength,"\t%s",MyAllVariables->myOutFormat.formatStringForVCF.c_str());
+                std::size_t last_hap_off = 0;
+                savvy::site_info temp_anno;
+                savvy::compressed_vector<float> temp_buf;
+                for(auto t = temp_files.begin(); t != temp_files.end(); ++t)
+                {
+                    t->read(temp_anno, temp_buf);
+                    for (auto h = temp_buf.begin(); h != temp_buf.end(); ++h)
+                        output_dosage_buf[last_hap_off + h.offset()] = *h;
+                    last_hap_off += temp_buf.size();
+                    //line.clear();
+                    //vcfdosepartialList[j-1]->readLine(line);
+                    //VcfPrintStringLength+=sprintf(VcfPrintStringPointer + VcfPrintStringLength,"%s",line.c_str());
 
                 }
-                 VcfPrintStringLength+=sprintf(VcfPrintStringPointer + VcfPrintStringLength,"\n");
+
+                //VcfPrintStringLength+=sprintf(VcfPrintStringPointer + VcfPrintStringLength,"\n");
+                savOut->write(sav_variant, output_dosage_buf);
 
             }
 
@@ -485,52 +514,68 @@ void Analysis::AppendtoMainVcfFaster(int ChunkNo, int MaxIndex)
             if(MappingIndex>=CurrentTarPanelChipOnly.PrintTypedOnlyStartIndex && MappingIndex<=CurrentTarPanelChipOnly.PrintTypedOnlyEndIndex)
             {
                 variant &ThisTypedVariant = (CurrentTarPanelChipOnly.TypedOnlyVariantList[CurrentRefPanel.RefTypedIndex[index]]);
-                VcfPrintStringLength+=sprintf(VcfPrintStringPointer + VcfPrintStringLength,"%s\t%d\t%s\t%s\t%s\t.\tPASS",
-                         ThisTypedVariant.chr.c_str(),
-                         ThisTypedVariant.bp,
-                         MyAllVariables->myOutFormat.RsId? ThisTypedVariant.rsid.c_str():ThisTypedVariant.name.c_str(),
-                         ThisTypedVariant.refAlleleString.c_str(),
-                         ThisTypedVariant.altAlleleString.c_str());
+//                VcfPrintStringLength+=sprintf(VcfPrintStringPointer + VcfPrintStringLength,"%s\t%d\t%s\t%s\t%s\t.\tPASS",
+//                         ThisTypedVariant.chr.c_str(),
+//                         ThisTypedVariant.bp,
+//                         MyAllVariables->myOutFormat.RsId? ThisTypedVariant.rsid.c_str():ThisTypedVariant.name.c_str(),
+//                         ThisTypedVariant.refAlleleString.c_str(),
+//                         ThisTypedVariant.altAlleleString.c_str());
 
-                double &freq = (CurrentTarPanelChipOnly.GWASOnlyAlleleFreq[CurrentRefPanel.RefTypedIndex[index]]);
+                double freq = (CurrentTarPanelChipOnly.GWASOnlyAlleleFreq[CurrentRefPanel.RefTypedIndex[index]]);
 
-                VcfPrintStringLength+=sprintf(VcfPrintStringPointer + VcfPrintStringLength,"\tAF=%.5f;MAF=%.5f;TYPED_ONLY",
-                            freq, freq > 0.5 ? 1.0 - freq : freq);
+                savvy::site_info sav_variant(std::string(ThisTypedVariant.chr), ThisTypedVariant.bp, std::string(ThisTypedVariant.refAlleleString), std::string(ThisTypedVariant.altAlleleString), {
+                  {"ID", MyAllVariables->myOutFormat.RsId ? ThisTypedVariant.rsid : ThisTypedVariant.name },
+                  {"FILTER","PASS"},
+                  {"AF", std::to_string(freq)},
+                  {"MAF", std::to_string(freq > 0.5 ? 1.0 - freq : freq)},
+                  {"TYPED_ONLY", "1"}});
 
-                VcfPrintStringLength+=sprintf(VcfPrintStringPointer + VcfPrintStringLength,"\t%s",MyAllVariables->myOutFormat.formatStringForVCF.c_str());
-                for(int j=1;j<=MaxIndex;j++)
+//                VcfPrintStringLength+=sprintf(VcfPrintStringPointer + VcfPrintStringLength,"\tAF=%.5f;MAF=%.5f;TYPED_ONLY",
+//                            freq, freq > 0.5 ? 1.0 - freq : freq);
+
+                //VcfPrintStringLength+=sprintf(VcfPrintStringPointer + VcfPrintStringLength,"\t%s",MyAllVariables->myOutFormat.formatStringForVCF.c_str());
+                std::size_t last_hap_off = 0;
+                savvy::site_info temp_anno;
+                savvy::compressed_vector<float> temp_buf;
+                for(auto t = temp_files.begin(); t != temp_files.end(); ++t)
                 {
-                    line.clear();
-                    vcfdosepartialList[j-1]->readLine(line);
-                    VcfPrintStringLength+=sprintf(VcfPrintStringPointer + VcfPrintStringLength,"%s",line.c_str());
+                    t->read(temp_anno, temp_buf);
+                    for (auto h = temp_buf.begin(); h != temp_buf.end(); ++h)
+                        output_dosage_buf[last_hap_off + h.offset()] = *h;
+                    last_hap_off += temp_buf.size();
+//                    line.clear();
+//                    vcfdosepartialList[j-1]->readLine(line);
+//                    VcfPrintStringLength+=sprintf(VcfPrintStringPointer + VcfPrintStringLength,"%s",line.c_str());
 
                 }
-                VcfPrintStringLength+=sprintf(VcfPrintStringPointer + VcfPrintStringLength,"\n");
+
+                //VcfPrintStringLength+=sprintf(VcfPrintStringPointer + VcfPrintStringLength,"\n");
+                savOut->write(sav_variant, output_dosage_buf);
             }
         }
 
 
-      if(VcfPrintStringLength > 0.9 * (float)(MyAllVariables->myOutFormat.PrintBuffer))
-      {
-
-            ifprintf(vcfdosepartial,"%s",VcfPrintStringPointer);
-            VcfPrintStringLength=0;
-      }
+//      if(VcfPrintStringLength > 0.9 * (float)(MyAllVariables->myOutFormat.PrintBuffer))
+//      {
+//
+//            ifprintf(vcfdosepartial,"%s",VcfPrintStringPointer);
+//            VcfPrintStringLength=0;
+//      }
 
 
 
     }
 
-    if(VcfPrintStringLength > 0)
-    {
-        ifprintf(vcfdosepartial,"%s",VcfPrintStringPointer);
-        VcfPrintStringLength=0;
-    }
+//    if(VcfPrintStringLength > 0)
+//    {
+//        ifprintf(vcfdosepartial,"%s",VcfPrintStringPointer);
+//        VcfPrintStringLength=0;
+//    }
 
 
     for(int i=1;i<=MaxIndex;i++)
     {
-        ifclose(vcfdosepartialList[i-1]);
+        //ifclose(vcfdosepartialList[i-1]);
         string tempFileIndex(MyAllVariables->myOutFormat.OutPrefix);
         stringstream strs,strs1;
         strs<<(i);
@@ -543,7 +588,7 @@ void Analysis::AppendtoMainVcfFaster(int ChunkNo, int MaxIndex)
     TimeToWrite+=( time(0) - time_prev);
     cout << " Appending successful (" << time(0) - time_prev << " seconds) !!!"<<endl;
 
-    ifclose(vcfdosepartial);
+//    ifclose(vcfdosepartial);
 }
 
 
@@ -887,50 +932,66 @@ bool Analysis::OpenStreamOutputFiles()
 
     if(MyAllVariables->myOutFormat.vcfOutput)
     {
-        VcfPrintStringPointer = (char*)malloc(sizeof(char) * (MyAllVariables->myOutFormat.PrintBuffer));
+        VcfPrintStringPointer = (char*)malloc(sizeof(char) * (MyAllVariables->myOutFormat.PrintBuffer)); // TODO: make sure this is not needed.
 
-        vcfdosepartial = ifopen(MyAllVariables->myOutFormat.OutPrefix + ".dose.vcf" + (gzip ? ".gz" : ""), "wb", gzip ?InputFile::BGZF:InputFile::UNCOMPRESSED);
-        if(vcfdosepartial==NULL)
+        std::vector<std::pair<std::string, std::string>> headers{
+            {"source", "Minimac4.v" + std::string(VERSION)},
+            {"contig", "<ID=" + referencePanel.finChromosome + ">"},
+            {"INFO", "<ID=AF,Number=1,Type=Float,Description=\"Estimated Alternate Allele Frequency\">"},
+            {"INFO", "<ID=MAF,Number=1,Type=Float,Description=\"Estimated Minor Allele Frequency\">"},
+            {"INFO", "<ID=R2,Number=1,Type=Float,Description=\"Estimated Imputation Accuracy (R-square)\">"},
+            {"INFO", "<ID=ER2,Number=1,Type=Float,Description=\"Empirical (Leave-One-Out) R-square (available only for genotyped variants)\">"},
+            {"INFO", "<ID=IMPUTED,Number=0,Type=Flag,Description=\"Marker was imputed but NOT genotyped\">"},
+            {"INFO", "<ID=TYPED,Number=0,Type=Flag,Description=\"Marker was genotyped AND imputed\">"},
+            {"INFO", "<ID=TYPED_ONLY,Number=0,Type=Flag,Description=\"Marker was genotyped but NOT imputed\">"},
+            {"minimac4_Command", MyAllVariables->myOutFormat.CommandLine.c_str()}};
+
+        savOut = savvy::detail::make_unique<savvy::sav::writer>(std::string(MyAllVariables->myOutFormat.OutPrefix) + ".dose.vcf" + (gzip ? ".gz" : ""),
+            targetPanel.individualName.begin(), targetPanel.individualName.end(),
+            headers.begin(), headers.end(),
+            savvy::fmt::hds);
+        //vcfdosepartial = ifopen(MyAllVariables->myOutFormat.OutPrefix + ".dose.vcf" + (gzip ? ".gz" : ""), "wb", gzip ?InputFile::BGZF:InputFile::UNCOMPRESSED);
+        if(savOut || !savOut->good())
         {
             cout <<"\n\n ERROR !!! \n Could NOT create the following file : "<< MyAllVariables->myOutFormat.OutPrefix + ".dose.vcf" + (gzip ? ".gz" : "") <<endl;
             return false;
         }
 
-        ifprintf(vcfdosepartial,"##fileformat=VCFv4.1\n");
+//        ifprintf(vcfdosepartial,"##fileformat=VCFv4.1\n");
         time_t t = time(0);
         struct tm * now = localtime( & t );
-        ifprintf(vcfdosepartial,"##filedate=%d.%d.%d\n",(now->tm_year + 1900),(now->tm_mon + 1) ,now->tm_mday);
-        ifprintf(vcfdosepartial,"##source=Minimac4.v%s\n",VERSION);
-        ifprintf(vcfdosepartial,"##contig=<ID=%s>\n",referencePanel.finChromosome.c_str());
-        ifprintf(vcfdosepartial,"##INFO=<ID=AF,Number=1,Type=Float,Description=\"Estimated Alternate Allele Frequency\">\n");
-        ifprintf(vcfdosepartial,"##INFO=<ID=MAF,Number=1,Type=Float,Description=\"Estimated Minor Allele Frequency\">\n");
-        ifprintf(vcfdosepartial,"##INFO=<ID=R2,Number=1,Type=Float,Description=\"Estimated Imputation Accuracy (R-square)\">\n");
-        ifprintf(vcfdosepartial,"##INFO=<ID=ER2,Number=1,Type=Float,Description=\"Empirical (Leave-One-Out) R-square (available only for genotyped variants)\">\n");
-        ifprintf(vcfdosepartial,"##INFO=<ID=IMPUTED,Number=0,Type=Flag,Description=\"Marker was imputed but NOT genotyped\">\n");
-        ifprintf(vcfdosepartial,"##INFO=<ID=TYPED,Number=0,Type=Flag,Description=\"Marker was genotyped AND imputed\">\n");
-        ifprintf(vcfdosepartial,"##INFO=<ID=TYPED_ONLY,Number=0,Type=Flag,Description=\"Marker was genotyped but NOT imputed\">\n");
+//        ifprintf(vcfdosepartial,"##filedate=%d.%d.%d\n",(now->tm_year + 1900),(now->tm_mon + 1) ,now->tm_mday);
+//        ifprintf(vcfdosepartial,"##source=Minimac4.v%s\n",VERSION);
+//        ifprintf(vcfdosepartial,"##contig=<ID=%s>\n",referencePanel.finChromosome.c_str());
+//        ifprintf(vcfdosepartial,"##INFO=<ID=AF,Number=1,Type=Float,Description=\"Estimated Alternate Allele Frequency\">\n");
+//        ifprintf(vcfdosepartial,"##INFO=<ID=MAF,Number=1,Type=Float,Description=\"Estimated Minor Allele Frequency\">\n");
+//        ifprintf(vcfdosepartial,"##INFO=<ID=R2,Number=1,Type=Float,Description=\"Estimated Imputation Accuracy (R-square)\">\n");
+//        ifprintf(vcfdosepartial,"##INFO=<ID=ER2,Number=1,Type=Float,Description=\"Empirical (Leave-One-Out) R-square (available only for genotyped variants)\">\n");
+//        ifprintf(vcfdosepartial,"##INFO=<ID=IMPUTED,Number=0,Type=Flag,Description=\"Marker was imputed but NOT genotyped\">\n");
+//        ifprintf(vcfdosepartial,"##INFO=<ID=TYPED,Number=0,Type=Flag,Description=\"Marker was genotyped AND imputed\">\n");
+//        ifprintf(vcfdosepartial,"##INFO=<ID=TYPED_ONLY,Number=0,Type=Flag,Description=\"Marker was genotyped but NOT imputed\">\n");
 
-        if(MyAllVariables->myOutFormat.GT)
-            ifprintf(vcfdosepartial,"##FORMAT=<ID=GT,Number=1,Type=String,Description=\"Genotype\">\n");
-        if(MyAllVariables->myOutFormat.DS)
-            ifprintf(vcfdosepartial,"##FORMAT=<ID=DS,Number=1,Type=Float,Description=\"Estimated Alternate Allele Dosage : [P(0/1)+2*P(1/1)]\">\n");
-        if(MyAllVariables->myOutFormat.HDS)
-            ifprintf(vcfdosepartial,"##FORMAT=<ID=HDS,Number=2,Type=Float,Description=\"Estimated Haploid Alternate Allele Dosage \">\n");
-        if(MyAllVariables->myOutFormat.GP)
-            ifprintf(vcfdosepartial,"##FORMAT=<ID=GP,Number=3,Type=Float,Description=\"Estimated Posterior Probabilities for Genotypes 0/0, 0/1 and 1/1 \">\n");
-        if(MyAllVariables->myOutFormat.SD)
-            ifprintf(vcfdosepartial,"##FORMAT=<ID=SD,Number=1,Type=Float,Description=\"Variance of Posterior Genotype Probabilities\">\n");
-
-        ifprintf(vcfdosepartial,"##minimac4_Command=%s\n",MyAllVariables->myOutFormat.CommandLine.c_str());
-
-        ifprintf(vcfdosepartial,"#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT");
-
-        for(int Id=0;Id<targetPanel.numSamples;Id++)
-        {
-            ifprintf(vcfdosepartial,"\t%s",targetPanel.individualName[Id].c_str());
-        }
-        ifprintf(vcfdosepartial,"\n");
-        ifclose(vcfdosepartial);
+//        if(MyAllVariables->myOutFormat.GT)
+//            ifprintf(vcfdosepartial,"##FORMAT=<ID=GT,Number=1,Type=String,Description=\"Genotype\">\n");
+//        if(MyAllVariables->myOutFormat.DS)
+//            ifprintf(vcfdosepartial,"##FORMAT=<ID=DS,Number=1,Type=Float,Description=\"Estimated Alternate Allele Dosage : [P(0/1)+2*P(1/1)]\">\n");
+//        if(MyAllVariables->myOutFormat.HDS)
+//            ifprintf(vcfdosepartial,"##FORMAT=<ID=HDS,Number=2,Type=Float,Description=\"Estimated Haploid Alternate Allele Dosage \">\n");
+//        if(MyAllVariables->myOutFormat.GP)
+//            ifprintf(vcfdosepartial,"##FORMAT=<ID=GP,Number=3,Type=Float,Description=\"Estimated Posterior Probabilities for Genotypes 0/0, 0/1 and 1/1 \">\n");
+//        if(MyAllVariables->myOutFormat.SD)
+//            ifprintf(vcfdosepartial,"##FORMAT=<ID=SD,Number=1,Type=Float,Description=\"Variance of Posterior Genotype Probabilities\">\n");
+//
+//        ifprintf(vcfdosepartial,"##minimac4_Command=%s\n",MyAllVariables->myOutFormat.CommandLine.c_str());
+//
+//        ifprintf(vcfdosepartial,"#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT");
+//
+//        for(int Id=0;Id<targetPanel.numSamples;Id++)
+//        {
+//            ifprintf(vcfdosepartial,"\t%s",targetPanel.individualName[Id].c_str());
+//        }
+//        ifprintf(vcfdosepartial,"\n");
+//        ifclose(vcfdosepartial);
 
     }
 

@@ -3,6 +3,7 @@
 
 #include "assert.h"
 
+#include <savvy/reader.hpp>
 
 
 
@@ -23,7 +24,13 @@ void DosageData::FlushPartialVcf(int NovcfParts)
     PartialVcfFileName+=(".chunk."+(string)(strs1.str())+ ".dose.part."+ (string)(strs.str())+".vcf.gz");
     PartialMetaVcfFileName+=(".chunk."+(string)(strs1.str())+ ".empiricalDose.part."+ (string)(strs.str())+".vcf.gz");
 
-    IFILE vcfdosepartial = ifopen(PartialVcfFileName.c_str(), "wb", InputFile::BGZF);
+    //IFILE vcfdosepartial = ifopen(PartialVcfFileName.c_str(), "wb", InputFile::BGZF);
+
+    std::vector<std::pair<std::string,std::string>> empty_vec;
+    savvy::sav::writer temp_sav_file(PartialVcfFileName, individualName.begin(), individualName.end(), empty_vec.begin(), empty_vec.end(), savvy::fmt::hds);
+    savvy::site_info variant_anno;
+    std::vector<float> variant_dose_buf(2 * individualName.size()); // TODO: hardcoded ploidy
+
     IFILE vcfLoodosepartial = NULL;
 
     if(MyAllVariables->myOutFormat.meta)
@@ -46,7 +53,8 @@ void DosageData::FlushPartialVcf(int NovcfParts)
 
             if(i>=rHapFull->PrintStartIndex && i <= rHapFull->PrintEndIndex)
             {
-                PrintDosageForVcfOutputForID(i);
+                PrintDosageForVcfOutputForID(i, variant_dose_buf);
+                temp_sav_file.write(variant_anno, variant_dose_buf);
             }
             i++;
         }
@@ -56,15 +64,16 @@ void DosageData::FlushPartialVcf(int NovcfParts)
 
             if(MappingIndex>=tHapFull->PrintTypedOnlyStartIndex && MappingIndex<=tHapFull->PrintTypedOnlyEndIndex)
             {
-                PrintGWASOnlyForVcfOutputForID(MappingIndex);
+                PrintGWASOnlyForVcfOutputForID(MappingIndex, variant_dose_buf);
+                temp_sav_file.write(variant_anno, variant_dose_buf);
             }
         }
 
-        if(PrintStringLength > 0.9 * (float)(MyAllVariables->myOutFormat.PrintBuffer))
-        {
-            ifprintf(vcfdosepartial,"%s",PrintStringPointer);
-            PrintStringLength=0;
-        }
+//        if(PrintStringLength > 0.9 * (float)(MyAllVariables->myOutFormat.PrintBuffer))
+//        {
+//            ifprintf(vcfdosepartial,"%s",PrintStringPointer);
+//            PrintStringLength=0;
+//        }
         if(PrintEmpStringLength > 0.9 * (float)(MyAllVariables->myOutFormat.PrintBuffer))
         {
             ifprintf(vcfLoodosepartial,"%s",PrintEmpStringPointer);
@@ -72,18 +81,18 @@ void DosageData::FlushPartialVcf(int NovcfParts)
         }
 
     }
-    if(PrintStringLength>0)
-    {
-        ifprintf(vcfdosepartial,"%s",PrintStringPointer);
-        PrintStringLength=0;
-    }
+//    if(PrintStringLength>0)
+//    {
+//        ifprintf(vcfdosepartial,"%s",PrintStringPointer);
+//        PrintStringLength=0;
+//    }
     if(PrintEmpStringLength >0)
     {
         ifprintf(vcfLoodosepartial,"%s",PrintEmpStringPointer);
         PrintEmpStringLength=0;
     }
 
-    ifclose(vcfdosepartial);
+    //ifclose(vcfdosepartial);
 
     if(MyAllVariables->myOutFormat.meta)
         ifclose(vcfLoodosepartial);
@@ -311,7 +320,7 @@ void DosageData::PrintHaploidLooDosage(float &x, AlleleType a)
 
 
 
-void DosageData::PrintDosageForVcfOutputForID(int MarkerIndex)
+void DosageData::PrintDosageForVcfOutputForID(int MarkerIndex, std::vector<float>& variant_dose_buf)
 {
     for(int Id=0;Id<BuffernumSamples;Id++)
     {
@@ -320,9 +329,17 @@ void DosageData::PrintDosageForVcfOutputForID(int MarkerIndex)
 //        assert(SampleIndex[IndexId]==(Id+FirstHapId));
 
         if(NoHaps==2)
-            PrintDiploidDosage((hapDosage[2*IndexId])[MarkerIndex] , (hapDosage[2*IndexId+1])[MarkerIndex] );
+        {
+            //PrintDiploidDosage((hapDosage[2 * IndexId])[MarkerIndex], (hapDosage[2 * IndexId + 1])[MarkerIndex]);
+            variant_dose_buf[2 * IndexId] = hapDosage[2 * IndexId][MarkerIndex];
+            variant_dose_buf[2 * IndexId + 1] = hapDosage[2 * IndexId + 1][MarkerIndex];
+        }
         else if(NoHaps==1)
-            PrintHaploidDosage((hapDosage[2*IndexId])[MarkerIndex] );
+        {
+            //PrintHaploidDosage((hapDosage[2 * IndexId])[MarkerIndex]);
+            variant_dose_buf[2 * IndexId] = hapDosage[2 * IndexId][MarkerIndex];
+            // TODO: potentially make these missing -- variant_dose_buf[2 * IndexId + 1] = std::numeric_limits<float>::quiet_NaN();
+        }
         else
             abort();
 
@@ -376,7 +393,7 @@ void DosageData::PrintDosageForVcfOutputForID(int MarkerIndex)
 
 }
 
-void DosageData::PrintGWASOnlyForVcfOutputForID(int MarkerIndex)
+void DosageData::PrintGWASOnlyForVcfOutputForID(int MarkerIndex, std::vector<float>& variant_dose_buf)
 {
     float freq=(float)tHapFull->GWASOnlyAlleleFreq[MarkerIndex];
     float x,y;
@@ -395,12 +412,18 @@ void DosageData::PrintGWASOnlyForVcfOutputForID(int MarkerIndex)
             AlleleType a2=tHapFull->GWASOnlyMissingSampleUnscaffolded[gwasHapIndex+1][MarkerIndex];
 
             if(a1=='1' || a2=='1')
-                PrintDiploidDosage(freq,freq);
+            {
+                //PrintDiploidDosage(freq, freq);
+                variant_dose_buf[2 * IndexId] = freq;
+                variant_dose_buf[2 * IndexId + 1] = freq;
+            }
             else
              {
                  x=(float)(tHapFull->GWASOnlyhaplotypesUnscaffolded[gwasHapIndex][MarkerIndex]-'0');
                  y=(float)(tHapFull->GWASOnlyhaplotypesUnscaffolded[gwasHapIndex+1][MarkerIndex]-'0');
-                 PrintDiploidDosage(x, y);
+                 //PrintDiploidDosage(x, y);
+                 variant_dose_buf[2 * IndexId] = x;
+                 variant_dose_buf[2 * IndexId + 1] = y;
             }
         }
 
@@ -408,11 +431,17 @@ void DosageData::PrintGWASOnlyForVcfOutputForID(int MarkerIndex)
         {
             AlleleType a1=tHapFull->GWASOnlyMissingSampleUnscaffolded[gwasHapIndex][MarkerIndex];
             if(a1=='1')
+            {
                 PrintHaploidDosage(freq);
+                variant_dose_buf[2 * IndexId] = freq;
+                //TODO: variant_dose_buf[2 * IndexId + 1] = freq;
+            }
             else
              {
                  x=(float)(tHapFull->GWASOnlyhaplotypesUnscaffolded[gwasHapIndex][MarkerIndex]-'0');
                  PrintHaploidDosage(x);
+                 variant_dose_buf[2 * IndexId] = x;
+                 //TODO: variant_dose_buf[2 * IndexId + 1] = std::numeric_limits<float>::quiet_NaN();
              }
 
         }
