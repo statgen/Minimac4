@@ -64,7 +64,7 @@ class Analysis
 
 
         // Output File Handle Streams
-        IFILE dosages, hapdose, haps, vcfdosepartial, vcfLoodosepartial, info;
+        IFILE dosages = nullptr, hapdose = nullptr, haps = nullptr, vcfdosepartial = nullptr, vcfLoodosepartial = nullptr, info = nullptr;
 
         std::unique_ptr<savvy::sav::writer> savOut;
 

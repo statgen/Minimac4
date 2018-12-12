@@ -951,7 +951,7 @@ bool Analysis::OpenStreamOutputFiles()
             headers.begin(), headers.end(),
             savvy::fmt::hds);
         //vcfdosepartial = ifopen(MyAllVariables->myOutFormat.OutPrefix + ".dose.vcf" + (gzip ? ".gz" : ""), "wb", gzip ?InputFile::BGZF:InputFile::UNCOMPRESSED);
-        if(savOut || !savOut->good())
+        if(!savOut || !savOut->good())
         {
             cout <<"\n\n ERROR !!! \n Could NOT create the following file : "<< MyAllVariables->myOutFormat.OutPrefix + ".dose.vcf" + (gzip ? ".gz" : "") <<endl;
             return false;
@@ -1145,7 +1145,8 @@ void Analysis::CloseStreamOutputFiles()
 
     if(MyAllVariables->myOutFormat.vcfOutput)
     {
-        ifclose(vcfdosepartial);
+        if (vcfdosepartial)
+          ifclose(vcfdosepartial);
         free(VcfPrintStringPointer);
         cout<<" Imputed VCF information written to      : "<< MyAllVariables->myOutFormat.OutPrefix + ".dose.vcf" + (gzip ? ".gz" : "")<<endl;
     }
