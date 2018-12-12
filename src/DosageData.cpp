@@ -27,9 +27,13 @@ void DosageData::FlushPartialVcf(int NovcfParts)
     //IFILE vcfdosepartial = ifopen(PartialVcfFileName.c_str(), "wb", InputFile::BGZF);
 
     std::vector<std::pair<std::string,std::string>> empty_vec;
-    savvy::sav::writer temp_sav_file(PartialVcfFileName, individualName.begin(), individualName.end(), empty_vec.begin(), empty_vec.end(), savvy::fmt::hds);
+
+    savvy::sav::writer temp_sav_file(PartialVcfFileName,
+        individualName.begin() + ((NovcfParts - 1) * BuffernumSamples), individualName.begin() + std::min(individualName.size(), std::size_t(NovcfParts * BuffernumSamples)),
+        empty_vec.begin(), empty_vec.end(),
+        savvy::fmt::hds);
     savvy::site_info variant_anno;
-    std::vector<float> variant_dose_buf(2 * individualName.size()); // TODO: hardcoded ploidy
+    std::vector<float> variant_dose_buf(2 * BuffernumSamples); // TODO: hardcoded ploidy
 
     IFILE vcfLoodosepartial = NULL;
 
