@@ -944,6 +944,9 @@ bool Analysis::OpenStreamOutputFiles()
             {"INFO", "<ID=IMPUTED,Number=0,Type=Flag,Description=\"Marker was imputed but NOT genotyped\">"},
             {"INFO", "<ID=TYPED,Number=0,Type=Flag,Description=\"Marker was genotyped AND imputed\">"},
             {"INFO", "<ID=TYPED_ONLY,Number=0,Type=Flag,Description=\"Marker was genotyped but NOT imputed\">"},
+            {"INFO", "<ID=FILTER,Description=\"Variant filter\">"},
+            {"INFO", "<ID=QUAL,Description=\"Variant quality\">"},
+            {"INFO", "<ID=ID,Description=\"Variant ID\">"},
             {"minimac4_Command", MyAllVariables->myOutFormat.CommandLine.c_str()}};
 
         savOut = savvy::detail::make_unique<savvy::sav::writer>(std::string(MyAllVariables->myOutFormat.OutPrefix) + ".dose.sav",
