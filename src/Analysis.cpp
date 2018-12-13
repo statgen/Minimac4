@@ -415,7 +415,7 @@ void Analysis::AppendtoMainVcfFaster(int ChunkNo, int MaxIndex)
     int time_prev = time(0);
 
     int RefStartPos =  MyRefVariantNumber[ChunkNo][0];
-    printf("\n Appending chunk to final output VCF File :  %s ",(MyAllVariables->myOutFormat.OutPrefix + ".dose.vcf" + (MyAllVariables->myOutFormat.gzip ? ".gz" : "")).c_str() );
+    printf("\n Appending chunk to final output VCF File :  %s ",(MyAllVariables->myOutFormat.OutPrefix + ".dose.sav").c_str() );
     cout<<endl;
 
     std::list<savvy::sav::reader> temp_files;
@@ -430,7 +430,7 @@ void Analysis::AppendtoMainVcfFaster(int ChunkNo, int MaxIndex)
         strs<<(i);
         strs1<<(ChunkNo+1);
         tempFileIndex+=(".chunk."+(string)(strs1.str())+".dose.part." +
-                         (string)(strs.str())+".vcf.gz");
+                         (string)(strs.str())+".sav");
         //vcfdosepartialList[i-1] = ifopen(tempFileIndex.c_str(), "r");
         temp_files.emplace_back(tempFileIndex, savvy::fmt::hds);
     }
@@ -581,7 +581,7 @@ void Analysis::AppendtoMainVcfFaster(int ChunkNo, int MaxIndex)
         strs<<(i);
         strs1<<(ChunkNo+1);
         tempFileIndex+=(".chunk."+(string)(strs1.str())+".dose.part." +
-                         (string)(strs.str())+".vcf.gz");
+                         (string)(strs.str())+".sav");
         remove(tempFileIndex.c_str());
     }
 
@@ -946,14 +946,14 @@ bool Analysis::OpenStreamOutputFiles()
             {"INFO", "<ID=TYPED_ONLY,Number=0,Type=Flag,Description=\"Marker was genotyped but NOT imputed\">"},
             {"minimac4_Command", MyAllVariables->myOutFormat.CommandLine.c_str()}};
 
-        savOut = savvy::detail::make_unique<savvy::sav::writer>(std::string(MyAllVariables->myOutFormat.OutPrefix) + ".dose.vcf" + (gzip ? ".gz" : ""),
+        savOut = savvy::detail::make_unique<savvy::sav::writer>(std::string(MyAllVariables->myOutFormat.OutPrefix) + ".dose.sav",
             targetPanel.individualName.begin(), targetPanel.individualName.end(),
             headers.begin(), headers.end(),
             savvy::fmt::hds);
         //vcfdosepartial = ifopen(MyAllVariables->myOutFormat.OutPrefix + ".dose.vcf" + (gzip ? ".gz" : ""), "wb", gzip ?InputFile::BGZF:InputFile::UNCOMPRESSED);
         if(!savOut || !savOut->good())
         {
-            cout <<"\n\n ERROR !!! \n Could NOT create the following file : "<< MyAllVariables->myOutFormat.OutPrefix + ".dose.vcf" + (gzip ? ".gz" : "") <<endl;
+            cout <<"\n\n ERROR !!! \n Could NOT create the following file : "<< (MyAllVariables->myOutFormat.OutPrefix + ".dose.sav") <<endl;
             return false;
         }
 

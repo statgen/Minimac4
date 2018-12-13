@@ -21,8 +21,8 @@ void DosageData::FlushPartialVcf(int NovcfParts)
     stringstream strs,strs1;
     strs<<(NovcfParts);
     strs1<<(ChunkNo+1);
-    PartialVcfFileName+=(".chunk."+(string)(strs1.str())+ ".dose.part."+ (string)(strs.str())+".vcf.gz");
-    PartialMetaVcfFileName+=(".chunk."+(string)(strs1.str())+ ".empiricalDose.part."+ (string)(strs.str())+".vcf.gz");
+    PartialVcfFileName+=(".chunk."+(string)(strs1.str())+ ".dose.part."+ (string)(strs.str())+".sav");
+    PartialMetaVcfFileName+=(".chunk."+(string)(strs1.str())+ ".empiricalDose.part."+ (string)(strs.str())+".sav");
 
     //IFILE vcfdosepartial = ifopen(PartialVcfFileName.c_str(), "wb", InputFile::BGZF);
 
