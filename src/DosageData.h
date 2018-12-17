@@ -58,6 +58,8 @@ class DosageData
         int PrintStringLength;
         int PrintEmpStringLength;
 
+        std::vector<float> savDoseBuf;
+
 
         double size()
         {

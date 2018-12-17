@@ -440,7 +440,7 @@ void Imputation::Minimac3ImputeThisChunk(int ChunkId, HaplotypeSet &FullrHap, Ha
                     #pragma omp critical (printVCF)
                     {
                         TotalNovcfParts++;
-                        printf("       Saving Samples in temporary VCF file ... ");
+                        printf("       Saving samples to temporary file ... ");
                         cout<<endl;
                         ThisSamplePartialDosageData->FlushPartialVcf(TotalNovcfParts);
 
@@ -670,7 +670,7 @@ void Imputation::ImputeThisChunk(int ChunkId, HaplotypeSet &FullrHap, HaplotypeS
         if(MyAllVariables->myOutFormat.vcfOutput)
         {
             TotalNovcfParts++;
-            printf("       Saving Samples in temporary VCF file ... ");
+            printf("       Saving samples to temporary file ... ");
             cout<<endl;
             CurrentPartialDosageData->FlushPartialVcf(TotalNovcfParts);
 

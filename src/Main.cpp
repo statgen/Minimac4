@@ -57,6 +57,7 @@ int main(int argc, char ** argv)
 		LONG_STRINGPARAMETER("format", &MyOutFormat.formatString)
 		LONG_PARAMETER("allTypedSites", &MyOutFormat.TypedOnly)
 		LONG_PARAMETER("meta", &MyOutFormat.meta)
+		LONG_PARAMETER("sav", &MyOutFormat.savOutput)
 		LONG_PARAMETER("memUsage", &MyOutFormat.memUsage)
 
 

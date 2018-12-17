@@ -1,7 +1,10 @@
 #include "DosageData.h"
 #include "HaplotypeSet.h"
 
-#include "assert.h"
+#include <savvy/reader.hpp>
+
+#include <memory>
+#include <assert.h>
 
 
 
@@ -16,15 +19,34 @@ void DosageData::FlushPartialVcf(int NovcfParts)
 
 
     string PartialVcfFileName(MyAllVariables->myOutFormat.OutPrefix);
-    string PartialMetaVcfFileName(MyAllVariables->myOutFormat.OutPrefix);
+    string PartialMetaVcfFileName = PartialVcfFileName;
     stringstream strs,strs1;
     strs<<(NovcfParts);
     strs1<<(ChunkNo+1);
-    PartialVcfFileName+=(".chunk."+(string)(strs1.str())+ ".dose.part."+ (string)(strs.str())+".vcf.gz");
+    PartialVcfFileName += (".chunk."+(string)(strs1.str())+ ".dose.part."+ (string)(strs.str()));
+    PartialVcfFileName += MyAllVariables->myOutFormat.savOutput ? ".sav" : ".vcf.gz";
     PartialMetaVcfFileName+=(".chunk."+(string)(strs1.str())+ ".empiricalDose.part."+ (string)(strs.str())+".vcf.gz");
 
-    IFILE vcfdosepartial = ifopen(PartialVcfFileName.c_str(), "wb", InputFile::BGZF);
-    IFILE vcfLoodosepartial = NULL;
+    IFILE vcfdosepartial = nullptr;
+    IFILE vcfLoodosepartial = nullptr;
+    std::unique_ptr<savvy::sav::writer> temp_sav_file = nullptr;
+
+
+    savvy::site_info sav_variant_anno;
+    if (MyAllVariables->myOutFormat.savOutput)
+    {
+        std::vector<std::pair<std::string,std::string>> empty_vec;
+        savDoseBuf.resize(2 * BuffernumSamples);
+        temp_sav_file = savvy::detail::make_unique<savvy::sav::writer>(PartialVcfFileName,
+          individualName.begin() + ((NovcfParts - 1) * BuffernumSamples), individualName.begin() + std::min(individualName.size(), std::size_t(NovcfParts * BuffernumSamples)),
+          empty_vec.begin(), empty_vec.end(),
+          savvy::fmt::hds);
+    }
+    else
+    {
+        vcfdosepartial = ifopen(PartialVcfFileName.c_str(), "wb", InputFile::BGZF);
+    }
+
 
     if(MyAllVariables->myOutFormat.meta)
         vcfLoodosepartial=ifopen(PartialMetaVcfFileName.c_str(), "wb", InputFile::UNCOMPRESSED);
@@ -47,6 +69,8 @@ void DosageData::FlushPartialVcf(int NovcfParts)
             if(i>=rHapFull->PrintStartIndex && i <= rHapFull->PrintEndIndex)
             {
                 PrintDosageForVcfOutputForID(i);
+                if (temp_sav_file)
+                    temp_sav_file->write(sav_variant_anno, savDoseBuf);
             }
             i++;
         }
@@ -57,6 +81,8 @@ void DosageData::FlushPartialVcf(int NovcfParts)
             if(MappingIndex>=tHapFull->PrintTypedOnlyStartIndex && MappingIndex<=tHapFull->PrintTypedOnlyEndIndex)
             {
                 PrintGWASOnlyForVcfOutputForID(MappingIndex);
+                if (temp_sav_file)
+                    temp_sav_file->write(sav_variant_anno, savDoseBuf);
             }
         }
 
@@ -83,9 +109,10 @@ void DosageData::FlushPartialVcf(int NovcfParts)
         PrintEmpStringLength=0;
     }
 
-    ifclose(vcfdosepartial);
+    if (vcfdosepartial)
+        ifclose(vcfdosepartial);
 
-    if(MyAllVariables->myOutFormat.meta)
+    if(vcfLoodosepartial)
         ifclose(vcfLoodosepartial);
 
     TimeToWrite=time(0) - time_Start;
@@ -319,12 +346,35 @@ void DosageData::PrintDosageForVcfOutputForID(int MarkerIndex)
         int NoHaps = BufferSampleNoHaplotypes[IndexId];
 //        assert(SampleIndex[IndexId]==(Id+FirstHapId));
 
+
         if(NoHaps==2)
-            PrintDiploidDosage((hapDosage[2*IndexId])[MarkerIndex] , (hapDosage[2*IndexId+1])[MarkerIndex] );
+        {
+            if (MyAllVariables->myOutFormat.savOutput)
+            {
+                savDoseBuf[2 * IndexId] = hapDosage[2 * IndexId][MarkerIndex];
+                savDoseBuf[2 * IndexId + 1] = hapDosage[2 * IndexId + 1][MarkerIndex];
+            }
+            else
+            {
+                PrintDiploidDosage((hapDosage[2 * IndexId])[MarkerIndex], (hapDosage[2 * IndexId + 1])[MarkerIndex]);
+            }
+        }
         else if(NoHaps==1)
-            PrintHaploidDosage((hapDosage[2*IndexId])[MarkerIndex] );
+        {
+            if (MyAllVariables->myOutFormat.savOutput)
+            {
+                savDoseBuf[2 * IndexId] = hapDosage[2 * IndexId][MarkerIndex];
+                savDoseBuf[2 * IndexId + 1] = savDoseBuf[2 * IndexId];
+            }
+            else
+            {
+                PrintHaploidDosage((hapDosage[2 * IndexId])[MarkerIndex]);
+            }
+        }
         else
+        {
             abort();
+        }
 
         if(MyAllVariables->myOutFormat.meta && !rHapFull->Targetmissing[MarkerIndex] )
         {
@@ -370,7 +420,8 @@ void DosageData::PrintDosageForVcfOutputForID(int MarkerIndex)
 
     }
 
-    PrintStringLength+=sprintf(PrintStringPointer+PrintStringLength,"\n");
+    if (!MyAllVariables->myOutFormat.savOutput)
+        PrintStringLength+=sprintf(PrintStringPointer+PrintStringLength,"\n");
     if(MyAllVariables->myOutFormat.meta && !rHapFull->Targetmissing[MarkerIndex] )
         PrintEmpStringLength+=sprintf(PrintEmpStringPointer+PrintEmpStringLength,"\n");
 
@@ -395,12 +446,30 @@ void DosageData::PrintGWASOnlyForVcfOutputForID(int MarkerIndex)
             AlleleType a2=tHapFull->GWASOnlyMissingSampleUnscaffolded[gwasHapIndex+1][MarkerIndex];
 
             if(a1=='1' || a2=='1')
-                PrintDiploidDosage(freq,freq);
+            {
+                if (MyAllVariables->myOutFormat.savOutput)
+                {
+                    savDoseBuf[2 * IndexId] = freq;
+                    savDoseBuf[2 * IndexId + 1] = freq;
+                }
+                else
+                {
+                    PrintDiploidDosage(freq, freq);
+                }
+            }
             else
              {
                  x=(float)(tHapFull->GWASOnlyhaplotypesUnscaffolded[gwasHapIndex][MarkerIndex]-'0');
                  y=(float)(tHapFull->GWASOnlyhaplotypesUnscaffolded[gwasHapIndex+1][MarkerIndex]-'0');
-                 PrintDiploidDosage(x, y);
+                 if (MyAllVariables->myOutFormat.savOutput)
+                 {
+                     savDoseBuf[2 * IndexId] = x;
+                     savDoseBuf[2 * IndexId + 1] = y;
+                 }
+                 else
+                 {
+                     PrintDiploidDosage(x, y);
+                 }
             }
         }
 
@@ -408,11 +477,29 @@ void DosageData::PrintGWASOnlyForVcfOutputForID(int MarkerIndex)
         {
             AlleleType a1=tHapFull->GWASOnlyMissingSampleUnscaffolded[gwasHapIndex][MarkerIndex];
             if(a1=='1')
-                PrintHaploidDosage(freq);
+            {
+                if (MyAllVariables->myOutFormat.savOutput)
+                {
+                    savDoseBuf[2 * IndexId] = freq;
+                    savDoseBuf[2 * IndexId + 1] = freq;
+                }
+                else
+                {
+                    PrintHaploidDosage(freq);
+                }
+            }
             else
              {
                  x=(float)(tHapFull->GWASOnlyhaplotypesUnscaffolded[gwasHapIndex][MarkerIndex]-'0');
-                 PrintHaploidDosage(x);
+                 if (MyAllVariables->myOutFormat.savOutput)
+                 {
+                     savDoseBuf[2 * IndexId] = x;
+                     savDoseBuf[2 * IndexId + 1] = x;
+                 }
+                 else
+                 {
+                     PrintHaploidDosage(x);
+                 }
              }
 
         }
@@ -420,7 +507,8 @@ void DosageData::PrintGWASOnlyForVcfOutputForID(int MarkerIndex)
             abort();
     }
 
-    PrintStringLength+=sprintf(PrintStringPointer+PrintStringLength,"\n");
+    if (!MyAllVariables->myOutFormat.savOutput)
+        PrintStringLength+=sprintf(PrintStringPointer+PrintStringLength,"\n");
 }
 
 

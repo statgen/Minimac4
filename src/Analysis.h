@@ -11,10 +11,14 @@
 #include "HaplotypeSet.h"
 //#include "StringBasics.h"
 //#include "VcfFileReader.h"
+
+#include <savvy/reader.hpp>
+
 //#include <fstream>
 //#include <string>
 //#include <sstream>
 //#include <algorithm>
+#include <memory>
 #include <unordered_map>
 
 using namespace std;
@@ -61,6 +65,9 @@ class Analysis
 
         // Output File Handle Streams
         IFILE dosages, hapdose, haps, vcfdosepartial, vcfLoodosepartial, info;
+
+        std::unique_ptr<savvy::sav::writer> savOut;
+
         ImputationStatistics stats;
 
 
@@ -136,6 +143,8 @@ void AppendtoMainVcf(int ChunkNo, int MaxIndex);
 void AppendtoMainLooVcfFaster(int ChunkNo, int MaxIndex);
 
 void AppendtoMainVcfFaster(int ChunkNo, int MaxIndex);
+
+void AppendtoMainSAVFaster(int ChunkNo, int MaxIndex);
 
 
 void MemDisplay();

@@ -37,10 +37,13 @@ public:
 
     bool memUsage;
 
-    bool vcfOutput,doseOutput,hapOutput,TypedOnly;
+    bool vcfOutput,doseOutput,hapOutput,TypedOnly,savOutput;
 
     bool CheckValidity()
     {
+        if (formatString.IsEmpty())
+            formatString = savOutput ? "HDS" : "GT:DS";
+
         string formatPiece,formatTemp=formatString.c_str();
         char *end_str1;
 
@@ -80,10 +83,18 @@ public:
                 cout<<" Program Exiting ..."<<endl<<endl;
                 return false;
             }
+
+            if (savOutput && formatPiece != "HDS")
+            {
+                cout << " ERROR !!! \n SAV files do not support \"--format\" parameter : "<<formatPiece<<endl;
+                cout << " Available handles HDS (haplotype dosage). \n\n";
+                cout<<" Program Exiting ..."<<endl<<endl;
+                return false;
+            }
         }
 
 
-        if(meta)
+        if(meta || savOutput)
         {
             vcfOutput=true;
             HDS=true;
@@ -158,7 +169,7 @@ public:
         meta=false;
         PrintBuffer = 100000000;
 
-        formatString = "GT,DS";
+        formatString = "";
         GT=false;
         DS=false;
         GP=false;
@@ -169,6 +180,7 @@ public:
         hapOutput=false;
         doseOutput=false;
         vcfOutput=true;
+        savOutput=false;
         gzip=true;
         RsId=false;
         TypedOnly=false;

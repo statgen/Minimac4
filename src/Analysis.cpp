@@ -200,9 +200,12 @@ String Analysis::RunAnalysis(String &Reffilename, String &Tarfilename, String &R
         TimeToCompress+=(thisDataFast.TimeToCompress);
 
 
-        AppendtoMainVcfFaster(i,thisDataFast.TotalNovcfParts);
+        if (MyAllVariables->myOutFormat.savOutput)
+            AppendtoMainSAVFaster(i, thisDataFast.TotalNovcfParts);
+        else
+            AppendtoMainVcfFaster(i, thisDataFast.TotalNovcfParts);
         if(MyAllVariables->myOutFormat.meta)
-            AppendtoMainLooVcfFaster(i,thisDataFast.TotalNovcfParts);
+            AppendtoMainLooVcfFaster(i, thisDataFast.TotalNovcfParts);
         PrintInfoFile(i);
 
         time_load = time(0) - time_prev;
@@ -546,7 +549,132 @@ void Analysis::AppendtoMainVcfFaster(int ChunkNo, int MaxIndex)
     ifclose(vcfdosepartial);
 }
 
+void Analysis::AppendtoMainSAVFaster(int ChunkNo, int MaxIndex)
+{
 
+    VcfPrintStringLength=0;
+
+    int time_prev = time(0);
+
+    int RefStartPos =  MyRefVariantNumber[ChunkNo][0];
+    printf("\n Appending chunk to final output SAV File :  %s ",(MyAllVariables->myOutFormat.OutPrefix + ".dose.sav").c_str() );
+    cout<<endl;
+
+    std::list<savvy::sav::reader> temp_files;
+    for(int i=1;i<=MaxIndex;i++)
+    {
+        string tempFileIndex(MyAllVariables->myOutFormat.OutPrefix);
+        stringstream strs,strs1;
+        strs<<(i);
+        strs1<<(ChunkNo+1);
+        tempFileIndex+=(".chunk."+(string)(strs1.str())+".dose.part." +
+          (string)(strs.str())+".sav");
+        temp_files.emplace_back(tempFileIndex, savvy::fmt::hds);
+    }
+
+    std::vector<float> output_dosage_buf;
+    string line;
+    int i=0;
+    for (int index = 0; index < CurrentRefPanel.RefTypedTotalCount; index++)
+    {
+        output_dosage_buf.clear();
+        output_dosage_buf.resize(targetPanel.numSamples * 2);
+
+        if(CurrentRefPanel.RefTypedIndex[index]==-1)
+        {
+
+            if(i>=CurrentRefPanel.PrintStartIndex && i <= CurrentRefPanel.PrintEndIndex)
+            {
+                variant &tempVariant = referencePanel.VariantList[i+RefStartPos];
+
+                double freq = stats.AlleleFrequency(i);
+
+                savvy::site_info sav_variant(std::string(tempVariant.chr), tempVariant.bp, std::string(tempVariant.refAlleleString), std::string(tempVariant.altAlleleString), {
+                  {"ID", MyAllVariables->myOutFormat.RsId ? tempVariant.rsid : tempVariant.name },
+                  {"FILTER","PASS"},
+                  {"AF", std::to_string(freq)},
+                  {"MAF", std::to_string(freq > 0.5 ? 1.0 - freq : freq)},
+                  {"R2", std::to_string(stats.Rsq(i))}});
+
+
+                if(!CurrentRefPanel.Targetmissing[i])
+                {
+                    sav_variant.prop("ER2", std::to_string(stats.EmpiricalRsq(i)));
+                    sav_variant.prop("TYPED", "1");
+                }
+                else
+                {
+                    sav_variant.prop("IMPUTED", "1");
+                }
+
+                std::size_t last_hap_off = 0;
+                savvy::site_info temp_anno;
+                savvy::compressed_vector<float> temp_buf;
+                for(auto t = temp_files.begin(); t != temp_files.end(); ++t)
+                {
+                    t->read(temp_anno, temp_buf);
+                    for (auto h = temp_buf.begin(); h != temp_buf.end(); ++h)
+                        output_dosage_buf[last_hap_off + h.offset()] = *h;
+                    last_hap_off += temp_buf.size();
+
+                }
+
+                savOut->write(sav_variant, output_dosage_buf);
+
+            }
+
+            i++;
+        }
+        else
+        {
+
+            int MappingIndex = CurrentRefPanel.RefTypedIndex[index];
+
+            if(MappingIndex>=CurrentTarPanelChipOnly.PrintTypedOnlyStartIndex && MappingIndex<=CurrentTarPanelChipOnly.PrintTypedOnlyEndIndex)
+            {
+                variant &ThisTypedVariant = (CurrentTarPanelChipOnly.TypedOnlyVariantList[CurrentRefPanel.RefTypedIndex[index]]);
+
+                double freq = (CurrentTarPanelChipOnly.GWASOnlyAlleleFreq[CurrentRefPanel.RefTypedIndex[index]]);
+
+                savvy::site_info sav_variant(std::string(ThisTypedVariant.chr), ThisTypedVariant.bp, std::string(ThisTypedVariant.refAlleleString), std::string(ThisTypedVariant.altAlleleString), {
+                  {"ID", MyAllVariables->myOutFormat.RsId ? ThisTypedVariant.rsid : ThisTypedVariant.name },
+                  {"FILTER","PASS"},
+                  {"AF", std::to_string(freq)},
+                  {"MAF", std::to_string(freq > 0.5 ? 1.0 - freq : freq)},
+                  {"TYPED_ONLY", "1"}});
+
+                std::size_t last_hap_off = 0;
+                savvy::site_info temp_anno;
+                savvy::compressed_vector<float> temp_buf;
+                for(auto t = temp_files.begin(); t != temp_files.end(); ++t)
+                {
+                    t->read(temp_anno, temp_buf);
+                    for (auto h = temp_buf.begin(); h != temp_buf.end(); ++h)
+                        output_dosage_buf[last_hap_off + h.offset()] = *h;
+                    last_hap_off += temp_buf.size();
+
+                }
+
+                //VcfPrintStringLength+=sprintf(VcfPrintStringPointer + VcfPrintStringLength,"\n");
+                savOut->write(sav_variant, output_dosage_buf);
+            }
+        }
+    }
+
+    for(int i=1;i<=MaxIndex;i++)
+    {
+        string tempFileIndex(MyAllVariables->myOutFormat.OutPrefix);
+        stringstream strs,strs1;
+        strs<<(i);
+        strs1<<(ChunkNo+1);
+        tempFileIndex+=(".chunk."+(string)(strs1.str())+".dose.part." +
+          (string)(strs.str())+".sav");
+        remove(tempFileIndex.c_str());
+    }
+
+    TimeToWrite+=( time(0) - time_prev);
+    cout << " Appending successful (" << time(0) - time_prev << " seconds) !!!"<<endl;
+}
 
 
 void Analysis::readm3vcfFileChunk(int ChunkNo, HaplotypeSet &ThisRefPanel)
@@ -884,8 +1012,35 @@ bool Analysis::OpenStreamOutputFiles()
 
     bool gzip=MyAllVariables->myOutFormat.gzip;
 
+    if (MyAllVariables->myOutFormat.savOutput)
+    {
+        std::vector<std::pair<std::string, std::string>> headers{
+          {"source", "Minimac4.v" + std::string(VERSION)},
+          {"contig", "<ID=" + referencePanel.finChromosome + ">"},
+          {"INFO", "<ID=AF,Number=1,Type=Float,Description=\"Estimated Alternate Allele Frequency\">"},
+          {"INFO", "<ID=MAF,Number=1,Type=Float,Description=\"Estimated Minor Allele Frequency\">"},
+          {"INFO", "<ID=R2,Number=1,Type=Float,Description=\"Estimated Imputation Accuracy (R-square)\">"},
+          {"INFO", "<ID=ER2,Number=1,Type=Float,Description=\"Empirical (Leave-One-Out) R-square (available only for genotyped variants)\">"},
+          {"INFO", "<ID=IMPUTED,Number=0,Type=Flag,Description=\"Marker was imputed but NOT genotyped\">"},
+          {"INFO", "<ID=TYPED,Number=0,Type=Flag,Description=\"Marker was genotyped AND imputed\">"},
+          {"INFO", "<ID=TYPED_ONLY,Number=0,Type=Flag,Description=\"Marker was genotyped but NOT imputed\">"},
+          {"INFO", "<ID=FILTER,Description=\"Variant filter\">"},
+          {"INFO", "<ID=QUAL,Description=\"Variant quality\">"},
+          {"INFO", "<ID=ID,Description=\"Variant ID\">"},
+          {"minimac4_Command", MyAllVariables->myOutFormat.CommandLine.c_str()}};
 
-    if(MyAllVariables->myOutFormat.vcfOutput)
+        savOut = savvy::detail::make_unique<savvy::sav::writer>(std::string(MyAllVariables->myOutFormat.OutPrefix) + ".dose.sav",
+          targetPanel.individualName.begin(), targetPanel.individualName.end(),
+          headers.begin(), headers.end(),
+          savvy::fmt::hds);
+
+        if(!savOut || !savOut->good())
+        {
+            cout <<"\n\n ERROR !!! \n Could NOT create the following file : "<< (MyAllVariables->myOutFormat.OutPrefix + ".dose.sav") <<endl;
+            return false;
+        }
+    }
+    else if(MyAllVariables->myOutFormat.vcfOutput)
     {
         VcfPrintStringPointer = (char*)malloc(sizeof(char) * (MyAllVariables->myOutFormat.PrintBuffer));
 
@@ -1082,7 +1237,11 @@ void Analysis::CloseStreamOutputFiles()
         cout<<" Haplotype Dosage information written to : "<<MyAllVariables->myOutFormat.OutPrefix + ".hapDose" + (gzip ? ".gz" : "")<<endl;
     }
 
-    if(MyAllVariables->myOutFormat.vcfOutput)
+    if (MyAllVariables->myOutFormat.savOutput)
+    {
+        cout<<" Imputed SAV information written to      : "<< MyAllVariables->myOutFormat.OutPrefix + ".dose.sav"<<endl;
+    }
+    else if(MyAllVariables->myOutFormat.vcfOutput)
     {
         ifclose(vcfdosepartial);
         free(VcfPrintStringPointer);
