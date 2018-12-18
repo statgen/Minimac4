@@ -231,6 +231,7 @@ printf("\n\n -------------------------------------------------------------------
     printf("               --format   : Specifies which fields to output for the FORMAT field in output \n");
     printf("                            VCF file. Available handles: GT,DS,HDS,GP [Default: GT,DS].\n");
     printf("        --allTypedSites   : If ON, sites available ONLY in GWAS panel will also be output [Default: OFF]. \n");
+	  printf("                  --sav   : Enables SAV output instead of VCF. \n");
 
 
 
