@@ -1,2 +1,2 @@
-statgen/libStatGen@cram-support --cmake dep/libstatgen.cmake
 statgen/savvy@develop
+statgen/libStatGen@cram-support --cmake dep/libstatgen.cmake
