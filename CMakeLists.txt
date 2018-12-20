@@ -48,7 +48,7 @@ add_custom_target(manuals
                   COMMAND help2man --output "${CMAKE_BINARY_DIR}/minimac4.1" "${CMAKE_BINARY_DIR}/minimac4")
 
 install(TARGETS minimac4 RUNTIME DESTINATION bin)
-install(FILES ${CMAKE_CURRENT_BINARY_DIR}/sav.1
+install(FILES ${CMAKE_CURRENT_BINARY_DIR}/minimac4.1
         DESTINATION share/man/man1
         OPTIONAL)
 
