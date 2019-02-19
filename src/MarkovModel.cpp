@@ -701,7 +701,7 @@ void MarkovModel::FoldBackProbabilitiesWithThreshold(ReducedHaplotypeInfo &Info)
     noNewReducedStates = 0;
     int UnMappedIndex, MappedIndex;
 
-    for (int index=0; index<NoBestMatchFullRefHaps; index++)
+    for (int index=0; MyAllVariables->myModelVariables.probThreshold>0.0 && index<NoBestMatchFullRefHaps; index++)
     {
         UnMappedIndex=BestMatchFullRefHaps[index];
         MappedIndex=Info.uniqueIndexMap[UnMappedIndex];
