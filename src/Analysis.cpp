@@ -1296,7 +1296,10 @@ void Analysis::GetCurrentPanelReady(int ChunkNo, HaplotypeSet &ThisRefPanel,
     {
         ThisRefPanel.RefTypedIndex.clear();
         int ThisIndex=0,ThisMappedIndex=0;
-        while(  ThisIndex<(int) targetPanel.TargetMissingTypedOnly.size() && targetPanel.TargetMissingTypedOnly[ThisIndex] < (RefStartPos))
+        while(  ThisIndex<(int) targetPanel.TargetMissingTypedOnly.size()
+                && RefStartPos>0
+                //  && targetPanel.TargetMissingTypedOnly[ThisIndex]!=-1
+                && targetPanel.TargetMissingTypedOnly[ThisIndex] < (RefStartPos))
         {
             ThisIndex++;
         }
