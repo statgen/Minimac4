@@ -384,14 +384,11 @@ void MarkovModel::ImputeChunk(int group, int &hapID, int &position,
 
         MidPoint = (UnfoldTheseSites[StartPoint] + UnfoldTheseSites[EndPoint])/2 - startIndex ;
 
-        if(MyAllVariables->myModelVariables.probThreshold>0.0)
-        {
-            unfoldProbabilitiesWithThreshold(group, ThisBlockLeftNoRecoProb[MidPoint],
-                                             ThisLeftprob[MidPoint],
-                                             ThisBlockRightNoRecoProb[MidPoint],
-                                             ThisBlockRightProb[MidPoint],
-                                             leftEndProb, rightEndProb);
-        }
+        unfoldProbabilitiesWithThreshold(group, ThisBlockLeftNoRecoProb[MidPoint],
+                                         ThisLeftprob[MidPoint],
+                                         ThisBlockRightNoRecoProb[MidPoint],
+                                         ThisBlockRightProb[MidPoint],
+                                         leftEndProb, rightEndProb);
 
         for(int i=EndPoint;i>=StartPoint;i--)
         {
@@ -605,7 +602,7 @@ void MarkovModel::unfoldProbabilitiesWithThreshold(int bridgeIndex,
     double tempInvSum = SumOfProb[MidPoint];
     double maxVal = 0.0, sum = 0.0;
 
-    if(!MyAllVariables->myOutFormat.verbose && MyAllVariables->myModelVariables.probThreshold>0.0)
+    if(!MyAllVariables->myOutFormat.verbose)
     {
         int Index=0;
         NoBestMatchHaps=0;
@@ -627,7 +624,7 @@ void MarkovModel::unfoldProbabilitiesWithThreshold(int bridgeIndex,
         }
     }
 
-    if(MyAllVariables->myOutFormat.verbose && MyAllVariables->myModelVariables.probThreshold>0.0)
+    if(MyAllVariables->myOutFormat.verbose)
     {
         int Index=0;
         NoBestMatchHaps=0;
@@ -905,22 +902,8 @@ void MarkovModel::initializeMatrices()
 
     FinalBestMatchfHaps.resize(rHapFull->maxRepSize);
     FinalBestMatchfHapsIndicator.resize(rHapFull->maxRepSize);
-    if(MyAllVariables->myModelVariables.probThreshold>0.0)
-    {
-        BestMatchHaps.resize(rHap->maxRepSize);
-        BestMatchFullRefHaps.resize(refCount);
-    }
-    else
-    {
-        for(int i=0;i<rHapFull->maxRepSize ;i++)
-        {
-            FinalBestMatchfHaps[i]=i;
-        }
-    }
-
-
-
-
+    BestMatchHaps.resize(rHap->maxRepSize);
+    BestMatchFullRefHaps.resize(refCount);
 }
 
 
