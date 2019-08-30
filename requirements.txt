@@ -1,1 +1,2 @@
+zlib,http://zlib.net/zlib-1.2.11.tar.gz
 statgen/libStatGen --cmake dep/libstatgen.cmake
