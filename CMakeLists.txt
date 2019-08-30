@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.2)
-project(minimac4 VERSION 1.0.1)
+project(minimac4 VERSION 1.0.2)
 
 set(CMAKE_CXX_STANDARD 11)
 execute_process(COMMAND date OUTPUT_VARIABLE DATE OUTPUT_STRIP_TRAILING_WHITESPACE)
