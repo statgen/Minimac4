@@ -430,6 +430,11 @@ void Analysis::AppendtoMainVcfFaster(int ChunkNo, int MaxIndex)
         tempFileIndex+=(".chunk."+(string)(strs1.str())+".dose.part." +
                          (string)(strs.str())+".vcf.gz");
         vcfdosepartialList[i-1] = ifopen(tempFileIndex.c_str(), "r");
+        if (!vcfdosepartialList[i-1])
+        {
+            std::cout << "Error: Could not open temporary file. Ensure that `ulimit -n` is at least greater than " << (MaxIndex + 5) << "." << std::endl;
+            exit(-1);
+        }
     }
     string line;
     int i=0;
