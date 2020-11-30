@@ -57,11 +57,11 @@ bool Analysis::CreateRecombinationMap()
             denom += GeneticMapData[i][0] - GeneticMapData[i-1][0];
             num = referencePanel.VariantList[SecondIndex].bp - referencePanel.VariantList[SecondIndex-1].bp;
             Val += GeneticMapData[i][1];
-            referencePanel.Recom[SecondIndex-1]=(1-exp(-Val*num/denom/50))/2;
+//            referencePanel.Recom[SecondIndex-1]=(1-exp(-Val*num/denom/50))/2;
             if(num==0  || Val==0)
                 referencePanel.Recom[SecondIndex-1]=RECOM_MIN;
             else
-                referencePanel.Recom[SecondIndex-1]=max(RECOM_MIN,Val*num/denom);
+                referencePanel.Recom[SecondIndex-1]=max(RECOM_MIN, 0.01*Val*num/denom);
 
 //            cout<<" RECOM = "<<SecondIndex-1<<"\t"<<referencePanel.Recom[SecondIndex-1]<<"\t"<<num/denom<<"\t"<<Val*num/denom<<endl;
             SecondIndex++;
@@ -452,6 +452,11 @@ void Analysis::AppendtoMainVcfFaster(int ChunkNo, int MaxIndex)
         tempFileIndex+=(".chunk."+(string)(strs1.str())+".dose.part." +
                          (string)(strs.str())+".vcf.gz");
         vcfdosepartialList[i-1] = ifopen(tempFileIndex.c_str(), bgzf_partial_mode);
+        if (!vcfdosepartialList[i-1])
+        {
+            std::cout << "Error: Could not open temporary file. Ensure that `ulimit -n` is at least greater than " << (MaxIndex + 5) << "." << std::endl;
+            exit(-1);
+        }
     }
     string line;
     int i=0;
@@ -1324,7 +1329,10 @@ void Analysis::GetCurrentPanelReady(int ChunkNo, HaplotypeSet &ThisRefPanel,
     {
         ThisRefPanel.RefTypedIndex.clear();
         int ThisIndex=0,ThisMappedIndex=0;
-        while(  ThisIndex<(int) targetPanel.TargetMissingTypedOnly.size() && targetPanel.TargetMissingTypedOnly[ThisIndex] < (RefStartPos))
+        while(  ThisIndex<(int) targetPanel.TargetMissingTypedOnly.size()
+                && RefStartPos>0
+                //  && targetPanel.TargetMissingTypedOnly[ThisIndex]!=-1
+                && targetPanel.TargetMissingTypedOnly[ThisIndex] < (RefStartPos))
         {
             ThisIndex++;
         }
