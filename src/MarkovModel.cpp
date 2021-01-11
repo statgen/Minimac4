@@ -661,11 +661,11 @@ void MarkovModel::unfoldProbabilitiesWithThreshold(int bridgeIndex,
         tempInvCardinality=thisInfo.InvuniqueCardinality[i];
 
         temp=LeftNoRecomProb[i];
-        LeftAdj_Rec[i] = (LeftTotalProb[i] - temp ) * tempInvCardinality;
+        LeftAdj_Rec[i] = std::max(LeftTotalProb[i] - temp, 0.) * tempInvCardinality;
         LeftAdj_NoRrec[i] = temp / (PrevLeftFoldedProb[i]+1e-30);
 
         temp=RightNoRecomProb[i];
-        RightAdj_Rec[i] = (RightTotalProb[i] - temp )  * tempInvCardinality;
+        RightAdj_Rec[i] = std::max(RightTotalProb[i] - temp, 0.)  * tempInvCardinality;
         RightAdj_NoRec[i] = RightNoRecomProb[i] / (PrevRightFoldedProb[i]+1e-30);
     }
 
@@ -682,6 +682,7 @@ void MarkovModel::unfoldProbabilitiesWithThreshold(int bridgeIndex,
             UnMappedIndex=thisInfo.uniqueIndexReverseMaps[i][K];
             probHapFullAverage[UnMappedIndex]=(LeftAdj_Rec[i] + LeftAdj_NoRrec[i]*LeftPrev[UnMappedIndex])
                                                * (RightAdj_Rec[i] + RightAdj_NoRec[i]*RightPrev[UnMappedIndex]);
+            assert(probHapFullAverage[UnMappedIndex] >= 0.);
             BestMatchFullRefHaps[NoBestMatchFullRefHaps++]=UnMappedIndex;
         }
     }
@@ -704,6 +705,7 @@ void MarkovModel::FoldBackProbabilitiesWithThreshold(ReducedHaplotypeInfo &Info)
         MappedIndex=Info.uniqueIndexMap[UnMappedIndex];
         FinalBestMatchfHapsIndicator[MappedIndex]=1;
         FoldedProbValue[MappedIndex]+=probHapFullAverage[UnMappedIndex];
+        assert(FoldedProbValue[MappedIndex] >= 0.);
     }
 
     for (int i=0; i<rHapFull->maxRepSize; i++)
