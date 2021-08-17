@@ -958,7 +958,7 @@ bool Analysis::OpenStreamOutputFiles()
         ifprintf(vcfLoodosepartial,"##contig=<ID=%s>\n",referencePanel.finChromosome.c_str());
         ifprintf(vcfLoodosepartial,"##INFO=<ID=TYPED,Number=0,Type=Flag,Description=\"Marker was genotyped AND imputed\">\n");
         ifprintf(vcfLoodosepartial,"##FORMAT=<ID=GT,Number=1,Type=String,Description=\"Genotyped alleles from Array\">\n");
-        ifprintf(vcfLoodosepartial,"##FORMAT=<ID=LDS,Number=1,Type=String,Description=\"Leave-one-out Imputed Dosage : Estimated Haploid Alternate Allele Dosage assuming site was NOT genotyped \">\n");
+        ifprintf(vcfLoodosepartial,"##FORMAT=<ID=LDS,Number=2,Type=Float,Description=\"Leave-one-out Imputed Dosage : Estimated Haploid Alternate Allele Dosage assuming site was NOT genotyped \">\n");
         ifprintf(vcfLoodosepartial,"##minimac4_Command=%s\n",MyAllVariables->myOutFormat.CommandLine.c_str());
         ifprintf(vcfLoodosepartial,"#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT");
 
