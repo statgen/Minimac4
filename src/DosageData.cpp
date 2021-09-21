@@ -301,7 +301,7 @@ void DosageData::PrintDiploidLooDosage(float &x, float &y, AlleleType a, AlleleT
     PrintEmpStringLength+=sprintf(PrintEmpStringPointer+PrintEmpStringLength,"\t");
     PrintEmpStringLength+=sprintf(PrintEmpStringPointer+PrintEmpStringLength,"%c|%c",a,b);
     PrintEmpStringLength+=sprintf(PrintEmpStringPointer+PrintEmpStringLength,":");
-    PrintEmpStringLength+=sprintf(PrintEmpStringPointer+PrintEmpStringLength,"%.3f|%.3f",x , y);
+    PrintEmpStringLength+=sprintf(PrintEmpStringPointer+PrintEmpStringLength,"%.3f,%.3f",x , y);
 }
 
 
@@ -346,7 +346,7 @@ void DosageData::PrintDosageForVcfOutputForID(int MarkerIndex)
                  if( tHapFull->MissingSampleUnscaffolded[gwasHapIndex][TypedMarkerIndex] =='1'
                      || tHapFull->MissingSampleUnscaffolded[gwasHapIndex+1][TypedMarkerIndex]=='1')
                  {
-                     PrintEmpStringLength+=sprintf(PrintEmpStringPointer+PrintEmpStringLength,"\t.|.:.|.");
+                     PrintEmpStringLength+=sprintf(PrintEmpStringPointer+PrintEmpStringLength,"\t.|.:.,.");
                  }
                  else
                  {
