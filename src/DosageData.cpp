@@ -1,3 +1,4 @@
+#include <stdio.h>
 #include "DosageData.h"
 #include "HaplotypeSet.h"
 
@@ -13,7 +14,10 @@ void DosageData::FlushPartialVcf(int NovcfParts)
     PrintEmpStringLength=0;
 
     int time_Start = time(0);
-
+    char bgzf_mode[16];
+    // Use all available CPUs for writing. Parallel writes work best with large
+    // print buffers.
+    snprintf(bgzf_mode, 16-3, "wb@%d", MyAllVariables->myModelVariables.cpus);
 
     string PartialVcfFileName(MyAllVariables->myOutFormat.OutPrefix);
     string PartialMetaVcfFileName(MyAllVariables->myOutFormat.OutPrefix);
@@ -23,7 +27,7 @@ void DosageData::FlushPartialVcf(int NovcfParts)
     PartialVcfFileName+=(".chunk."+(string)(strs1.str())+ ".dose.part."+ (string)(strs.str())+".vcf.gz");
     PartialMetaVcfFileName+=(".chunk."+(string)(strs1.str())+ ".empiricalDose.part."+ (string)(strs.str())+".vcf.gz");
 
-    IFILE vcfdosepartial = ifopen(PartialVcfFileName.c_str(), "wb", InputFile::BGZF);
+    IFILE vcfdosepartial = ifopen(PartialVcfFileName.c_str(), bgzf_mode, InputFile::BGZF);
     IFILE vcfLoodosepartial = NULL;
 
     if(MyAllVariables->myOutFormat.meta)

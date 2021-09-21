@@ -36,7 +36,7 @@ void MyTokenize(vector<string> &result, const char *input, const char *delimiter
 
 }
 
- 
+
 
 bool Analysis::CreateRecombinationMap()
 {
@@ -77,9 +77,9 @@ bool Analysis::CreateRecombinationMap()
         SecondIndex++;
     }
     int h=0;
-    
+
     return true;
-    
+
 }
 
 
@@ -102,7 +102,7 @@ String Analysis::RunAnalysis(String &Reffilename, String &Tarfilename, String &R
             cout << "\n Program Exiting ... \n\n";
             return "Genetic.Map.Load.Error";
     }
-    
+
     if (!targetPanel.ScaffoldGWAStoReference(referencePanel,*MyAllVariables))
     {
             cout << "\n Program Exiting ... \n\n";
@@ -357,13 +357,17 @@ void Analysis::AppendtoMainLooVcfFaster(int ChunkNo, int MaxIndex)
                          tempVariant.altAlleleString.c_str());
                     VcfPrintStringLength+=sprintf(VcfPrintStringPointer + VcfPrintStringLength,"\tTYPED\tGT:LDS");
 
+                    vector<string> lines(MaxIndex);
+                    #pragma omp parallel for
                     for(int j=1;j<=MaxIndex;j++)
                     {
-                        line.clear();
-                        vcfLoodosepartialList[j-1]->readLine(line);
-                        VcfPrintStringLength+=sprintf(VcfPrintStringPointer + VcfPrintStringLength,"%s",line.c_str());
-
+                        lines[j-1].clear();
+                        vcfLoodosepartialList[j-1]->readLine(lines[j-1]);
                     }
+                    for(int j=1;j<=MaxIndex;j++){
+                        VcfPrintStringLength+=sprintf(VcfPrintStringPointer + VcfPrintStringLength,"%s",lines[j-1].c_str());
+                    }
+
                     VcfPrintStringLength+=sprintf(VcfPrintStringPointer + VcfPrintStringLength,"\n");
 
                 }
@@ -408,6 +412,24 @@ void Analysis::AppendtoMainLooVcfFaster(int ChunkNo, int MaxIndex)
 
 void Analysis::AppendtoMainVcfFaster(int ChunkNo, int MaxIndex)
 {
+    char bgzf_partial_mode[16];
+    char bgzf_final_mode[16];
+    // To avoid threadbombing on reads, only use more than one CPU on reads
+    // if there is more than one CPU per file to read.
+    int readingCpus = (MyAllVariables->myModelVariables.cpus-1)/MaxIndex;
+    if(readingCpus > 1){
+        snprintf(bgzf_partial_mode, 16-2, "r@%d", readingCpus);
+    } else {
+        snprintf(bgzf_partial_mode, 16-2, "r@%d", 1);
+    }
+
+    // Use all available CPUs for writing
+    if(MyAllVariables->myModelVariables.cpus > 1){
+        snprintf(bgzf_final_mode, 16-2, "a@%d", MyAllVariables->myModelVariables.cpus);
+    } else {
+        // Otherwise, do a single threaded read.
+        snprintf(bgzf_final_mode, 16-2, "a@%d", 1);
+    }
 
     VcfPrintStringLength=0;
 
@@ -418,7 +440,7 @@ void Analysis::AppendtoMainVcfFaster(int ChunkNo, int MaxIndex)
     cout<<endl;
 
     vector<IFILE> vcfdosepartialList(MaxIndex);
-    vcfdosepartial = ifopen(MyAllVariables->myOutFormat.OutPrefix + ".dose.vcf" + (MyAllVariables->myOutFormat.gzip ? ".gz" : ""), "a", MyAllVariables->myOutFormat.gzip ?InputFile::BGZF:InputFile::UNCOMPRESSED);
+    vcfdosepartial = ifopen(MyAllVariables->myOutFormat.OutPrefix + ".dose.vcf" + (MyAllVariables->myOutFormat.gzip ? ".gz" : ""), bgzf_final_mode, MyAllVariables->myOutFormat.gzip ?InputFile::BGZF:InputFile::UNCOMPRESSED);
 
 
     for(int i=1;i<=MaxIndex;i++)
@@ -429,7 +451,7 @@ void Analysis::AppendtoMainVcfFaster(int ChunkNo, int MaxIndex)
         strs1<<(ChunkNo+1);
         tempFileIndex+=(".chunk."+(string)(strs1.str())+".dose.part." +
                          (string)(strs.str())+".vcf.gz");
-        vcfdosepartialList[i-1] = ifopen(tempFileIndex.c_str(), "r");
+        vcfdosepartialList[i-1] = ifopen(tempFileIndex.c_str(), bgzf_partial_mode);
         if (!vcfdosepartialList[i-1])
         {
             std::cout << "Error: Could not open temporary file. Ensure that `ulimit -n` is at least greater than " << (MaxIndex + 5) << "." << std::endl;
@@ -469,14 +491,17 @@ void Analysis::AppendtoMainVcfFaster(int ChunkNo, int MaxIndex)
 
 
                 VcfPrintStringLength+=sprintf(VcfPrintStringPointer + VcfPrintStringLength,"\t%s",MyAllVariables->myOutFormat.formatStringForVCF.c_str());
+                vector<string> lines(MaxIndex);
+                #pragma omp parallel for
                 for(int j=1;j<=MaxIndex;j++)
                 {
-                    line.clear();
-                    vcfdosepartialList[j-1]->readLine(line);
-                    VcfPrintStringLength+=sprintf(VcfPrintStringPointer + VcfPrintStringLength,"%s",line.c_str());
-
+                    lines[j-1].clear();
+                    vcfdosepartialList[j-1]->readLine(lines[j-1]);
                 }
-                 VcfPrintStringLength+=sprintf(VcfPrintStringPointer + VcfPrintStringLength,"\n");
+                for(int j=1;j<=MaxIndex;j++){
+                    VcfPrintStringLength+=sprintf(VcfPrintStringPointer + VcfPrintStringLength,"%s",lines[j-1].c_str());
+                }
+                VcfPrintStringLength+=sprintf(VcfPrintStringPointer + VcfPrintStringLength,"\n");
 
             }
 
@@ -503,12 +528,15 @@ void Analysis::AppendtoMainVcfFaster(int ChunkNo, int MaxIndex)
                             freq, freq > 0.5 ? 1.0 - freq : freq);
 
                 VcfPrintStringLength+=sprintf(VcfPrintStringPointer + VcfPrintStringLength,"\t%s",MyAllVariables->myOutFormat.formatStringForVCF.c_str());
+                vector<string> lines(MaxIndex);
+                #pragma omp parallel for
                 for(int j=1;j<=MaxIndex;j++)
                 {
-                    line.clear();
-                    vcfdosepartialList[j-1]->readLine(line);
-                    VcfPrintStringLength+=sprintf(VcfPrintStringPointer + VcfPrintStringLength,"%s",line.c_str());
-
+                    lines[j-1].clear();
+                    vcfdosepartialList[j-1]->readLine(lines[j-1]);
+                }
+                for(int j=1;j<=MaxIndex;j++){
+                    VcfPrintStringLength+=sprintf(VcfPrintStringPointer + VcfPrintStringLength,"%s",lines[j-1].c_str());
                 }
                 VcfPrintStringLength+=sprintf(VcfPrintStringPointer + VcfPrintStringLength,"\n");
             }
@@ -1292,7 +1320,7 @@ void Analysis::GetCurrentPanelReady(int ChunkNo, HaplotypeSet &ThisRefPanel,
             if(i==(ThisRefPanel.NoBlocks-1))
                  Mapper[j]=i;
         }
-        
+
     }
 
 
@@ -1406,7 +1434,7 @@ void Analysis::GetCurrentPanelReady(int ChunkNo, HaplotypeSet &ThisRefPanel,
 
     ThisRefPanel.CalculateAlleleFreq();
     ThisTarPanel.CalculateGWASOnlyAlleleFreq();
-        
+
     if(!MyAllVariables->myModelVariables.minimac3)
     {
         int time_prev = time(0);
@@ -1434,20 +1462,20 @@ void Analysis::GetCurrentPanelReady(int ChunkNo, HaplotypeSet &ThisRefPanel,
             thisDataFast.MainMarkovModel[i].AssignPanels(ThisRefPanel,ThisRefChipOnlyPanel,ThisTarPanel,ThisTarPanel,MyAllVariables);
             thisDataFast.MainMarkovModel[i].initializeMatrices();
 
-        }     
+        }
     }
     else
     {
         int time_prev = time(0);
 
-      
-       
+
+
         for(int i=0;i<MyAllVariables->myModelVariables.cpus;i++)
         {
             thisDataFast.MainMarkovModel[i].AssignPanels(ThisRefPanel,ThisTarPanel,MyAllVariables);
             thisDataFast.MainMarkovModel[i].initializeMatricesMinimac3();
 
-        }     
+        }
     }
 
 
@@ -1677,8 +1705,8 @@ void Analysis::GetCurrentPanelReady(int ChunkNo, HaplotypeSet &ThisRefPanel,
 
 }
 
- 
- 
+
+
 bool Analysis::CheckGeneticMapFile()
 {
     std::cout << "\n Checking genetic map file : "<<MyAllVariables->myHapDataVariables.mapFile << endl<<endl;
@@ -1689,9 +1717,9 @@ bool Analysis::CheckGeneticMapFile()
     vector<string> Pieces(4);
     vector<double> AppendPiece(2);
     double PrevSumVal=0.0;
-    
+
     if(fileStream)
-    {  
+    {
         while(fileStream->readLine(line)!=-1)
         {
             MyTokenize(Pieces, line.c_str(), tabSep,4);
@@ -1715,21 +1743,21 @@ bool Analysis::CheckGeneticMapFile()
         cout << "\n Program Exiting ... \n\n";
         return false;
     }
-    
-    
+
+
     if(GeneticMapData.size()<2)
     {
         cout << "\n ERROR !!! Chromosome "<<targetPanel.finChromosome <<" not found in genetic map file : " << MyAllVariables->myHapDataVariables.mapFile << endl;
         cout << "\n Program Exiting ... \n\n";
         return false;
     }
-        
+
     ifclose(fileStream);
-    
+
     cout<<" Successful !!! "<<endl;
-    return true; 
+    return true;
  }
- 
+
  String Analysis::CheckValidity(String &Reffilename, String &Tarfilename, String &Recomfilename, String &Errorfilename)
 {
     cout<<endl<<endl;

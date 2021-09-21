@@ -216,8 +216,8 @@ public:
     int minimac3;
     bool referenceEstimates;
     String intermediate;
-    
-    
+
+
     ModelVariable()
     {
         intermediate="";
@@ -560,8 +560,8 @@ class HaplotypeDataVariables
                 }
             }
 
-                    
-                    
+
+
             CHR=chr;
             START=start;
             END=end;

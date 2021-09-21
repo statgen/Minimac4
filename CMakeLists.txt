@@ -11,7 +11,7 @@ execute_process(COMMAND whoami OUTPUT_VARIABLE USER OUTPUT_STRIP_TRAILING_WHITES
 
 add_definitions(-DVERSION="${PROJECT_VERSION}" -DUSER="${USER}" -DDATE="${DATE}")
 
-set(CMAKE_FIND_LIBRARY_SUFFIXES ".a;${CMAKE_FIND_LIBRARY_SUFFIXES}") # Prefer libz.a when both are available
+#set(CMAKE_FIND_LIBRARY_SUFFIXES ".a;${CMAKE_FIND_LIBRARY_SUFFIXES}") # Prefer libz.a when both are available
 
 find_package(OpenMP)
 if (OPENMP_FOUND)
@@ -19,10 +19,15 @@ if (OPENMP_FOUND)
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
 endif()
 
-
+find_package(OpenSSL REQUIRED)
+find_package(CURL REQUIRED)
+find_package(LibLZMA REQUIRED)
+find_package(BZip2 REQUIRED)
 
 find_package(ZLIB REQUIRED)
 find_library(STATGEN_LIBRARY StatGen)
+find_library(HTS_LIBRARY hts)
+
 add_executable(minimac4
         src/Analysis.cpp
         src/Analysis.h
@@ -46,7 +51,8 @@ add_executable(minimac4
         src/Estimation.cpp
         src/Estimation.h)
 
-target_link_libraries(minimac4 ${STATGEN_LIBRARY} ${ZLIB_LIBRARIES})
+#target_link_libraries(minimac4 ${STATGEN_LIBRARY} ${HTS_LIBRARY} ${ZLIB_LIBRARIES} CURL::libcurl OpenSSL::SSL OpenSSL::Crypto ZLIB::ZLIB LibLZMA::LibLZMA BZip2::BZip2)
+target_link_libraries(minimac4 ${STATGEN_LIBRARY} ${HTS_LIBRARY} ${ZLIB_LIBRARIES})
 
 install(TARGETS minimac4 RUNTIME DESTINATION bin)
 
