@@ -1,0 +1,14 @@
+BasedOnStyle: Mozilla
+BreakBeforeBraces: Allman
+AlwaysBreakAfterReturnType: None
+AlwaysBreakAfterDefinitionReturnType: None
+ColumnLimit: 0
+NamespaceIndentation: All
+IndentCaseLabels: false
+IndentCaseBlocks: true
+BreakConstructorInitializers: AfterColon
+AllowShortCaseLabelsOnASingleLine: true
+AllowShortFunctionsOnASingleLine: All
+AllowShortLoopsOnASingleLine: true
+Cpp11BracedListStyle: true
+AlignAfterOpenBracket: DontAlign

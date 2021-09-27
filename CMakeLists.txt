@@ -23,7 +23,12 @@ endif()
 
 find_package(ZLIB REQUIRED)
 find_library(STATGEN_LIBRARY StatGen)
+find_library(OMPP_LIBRARY omp)
+find_package(savvy REQUIRED)
 add_executable(minimac4
+        src/hidden_markov_model.cpp src/hidden_markov_model.hpp
+        src/recombination.cpp src/recombination.hpp
+        src/unique_haplotype.cpp src/unique_haplotype.hpp
         src/Analysis.cpp
         src/Analysis.h
         src/AnalysisChunks.cpp
@@ -46,7 +51,7 @@ add_executable(minimac4
         src/Estimation.cpp
         src/Estimation.h)
 
-target_link_libraries(minimac4 ${STATGEN_LIBRARY} ${ZLIB_LIBRARIES})
+target_link_libraries(minimac4 savvy ${OMPP_LIBRARY} ${STATGEN_LIBRARY} ${ZLIB_LIBRARIES})
 
 install(TARGETS minimac4 RUNTIME DESTINATION bin)
 
