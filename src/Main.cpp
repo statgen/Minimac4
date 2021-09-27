@@ -600,42 +600,6 @@ public:
     savvy::compressed_vector<std::int8_t> genos;
     std::vector<std::size_t> allele_counts;
     std::vector<std::int8_t> dense_genos;
-    //  for (std::size_t i = 1; i < dims[0]; ++i)
-    //  {
-    //    // TODO: allele_counts.resize(uniq_hap_size);
-    //    std::size_t mid_pos = (typed_variants[i].pos - typed_variants[i - 1].pos) / 2 + typed_variants[i - 1].pos;
-    //    while (ref_file >> ref_var && ref_var.position() < mid_pos)
-    //    {
-    //      ref_var.get_format("GT", genos);
-    //      std::fill(allele_counts.begin(), allele_counts.end(), 0);
-    //      for (auto it = genos.begin();  it != genos.end(); ++it)
-    //        ++allele_counts[uniq_map[it.offset()]]; // TODO: multi-allelic
-    //
-    //      for (std::size_t j = 0; j < dims[1]; ++j)
-    //      {
-    //        float p = 0.f;
-    //        std::size_t ac = 0;
-    //        std::size_t an = 0;
-    //        float prob_sum = 0.f;
-    //        const auto& best_templates = hmm_results.best_templates(i, j);
-    //        const auto& best_probs = hmm_results.best_probs(i, j);
-    //        assert(best_templates.size() == best_probs.size());
-    //        for (std::size_t k = 0; k < best_templates.size(); ++k)
-    //        {
-    //          std::size_t uniq_idx = best_templates[k];
-    //          ac += allele_counts[k];
-    //          prob_sum += best_probs[k];
-    //          an += cardinalities[uniq_idx];
-    //          p += (best_probs[k] * allele_counts[k]) / cardinalities[uniq_idx];
-    //        }
-    //
-    //        p += (1.f - prob_sum) * float(genos.non_zero_size() - ac) / float(genos.size() - an);
-    //        dosages[j] = p; // TODO: this may not correct
-    //        assert(dosages[j] <= 1.f);
-    //        assert(dosages[j] >= 0.f);
-    //      }
-    //    }
-    //  }
 
     ref_file >> ref_var;
 
@@ -643,23 +607,8 @@ public:
     while (global_idx < typed_variants.size() && ref_file)
     {
       bool ref_matches_typed = sites_match(typed_variants[global_idx], ref_var);
-      if (typed_variants[global_idx].pos == 10002652)
-      {
-        auto a = 0;
-      }
+
       const auto& ref_block = reduced_reference.blocks()[block_idx];
-#ifndef NDEBUG
-//      for (std::size_t u = 0; u < ref_block.unique_haplotype_size(); ++u)
-//      {
-//        std::size_t cnt = 0;
-//        for (std::size_t f = 0; f < ref_block.unique_map().size(); ++f)
-//        {
-//          if (ref_block.unique_map()[f] == u)
-//            ++cnt;
-//        }
-//        assert(cnt == ref_block.cardinalities()[u]);
-//      }
-#endif
 
       std::size_t next_global_idx = global_idx + 1, next_block_idx = block_idx, next_local_idx = local_idx + 1;
       if (next_local_idx >= ref_block.variant_size())
@@ -745,15 +694,6 @@ public:
           }
           else
           {
-#ifndef NDEBUG
-//            std::vector<std::int8_t> dense_genos(genos.size());
-//            for (auto gt = genos.begin(); gt != genos.end(); ++gt)
-//              dense_genos[gt.offset()] = *gt;
-//            for (std::size_t j = 0; j < dense_genos.size(); ++j)
-//            {
-//              assert(dense_genos[j] == ref_block.compressed_matrix()[local_idx][ref_block.unique_map()[j]]);
-//            }
-#endif
             for (std::size_t j = 0; j < dims[1]; ++j)
             {
               dosages[j] = float(std::int16_t(hmm_results.dosage(global_idx, j) * bin_scalar_ + 0.5f)) / bin_scalar_;
@@ -794,14 +734,6 @@ private:
     float s_x = std::accumulate(sparse_dosages.begin(), sparse_dosages.end(), 0.f);
     float s_xx = std::inner_product(sparse_dosages.begin(), sparse_dosages.end(), sparse_dosages.begin(), 0.f);
     float af = s_x / n;
-//    double f = sum[marker] / (count[marker] + 1e-30);
-//    double evar = f * (1.0 - f);
-//    double ovar = 0.0;
-//
-//    if((sumSq[marker] - sum[marker] * sum[marker] / (count[marker] + 1e-30))>0)
-//      ovar=(sumSq[marker] - sum[marker] * sum[marker] / (count[marker] + 1e-30)) / (count[marker] + 1e-30);
-//
-//    return ovar / (evar + 1e-30);
 
     float r2 = savvy::typed_value::missing_value<float>();
     if (af > 0.f && af < 1.f)
@@ -855,9 +787,9 @@ private:
       for (auto it = sparse_gt.begin(); it != sparse_gt.end(); ++it)
         s_xy += *it * loo_dosages[it.offset()];
 
-      //                    n * Sum xy - Sum x * Sum y
-      // -------------------------------------------------------------------
-      // sqrt(n * Sum xx - Sum x * Sum x) * sqrt(n * Sum yy - Sum y * Sum y)
+      //                         n * Sum xy - Sum x * Sum y
+      //  r = -------------------------------------------------------------------
+      //      Sqrt(n * Sum xx - Sum x * Sum x) * Sqrt(n * Sum yy - Sum y * Sum y)
       float emp_r = (n * s_xy - s_x * s_y) / (std::sqrt(n * s_xx - s_x * s_x) * std::sqrt(n * s_yy - s_y * s_y));
       out_var.set_info("ER2", std::isnan(emp_r) ? savvy::typed_value::missing_value<float>() :emp_r * emp_r);
     }
