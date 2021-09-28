@@ -782,7 +782,8 @@ private:
       s_x = std::accumulate(sparse_dosages.begin(), sparse_dosages.end(), 0.f);
       s_xx = std::inner_product(sparse_dosages.begin(), sparse_dosages.end(), sparse_dosages.begin(), 0.f);
       float s_y = std::accumulate(sparse_gt.begin(), sparse_gt.end(), 0.f);
-      float s_yy = std::inner_product(sparse_gt.begin(), sparse_gt.end(), sparse_gt.begin(), 0.f);
+      // since observed can only be 0 or 1, s_yy is the same as s_y
+      float s_yy = s_y; //std::inner_product(sparse_gt.begin(), sparse_gt.end(), sparse_gt.begin(), 0.f); // TODO: allow for missing oberserved genotypes.
       float s_xy = 0.f;
       for (auto it = sparse_gt.begin(); it != sparse_gt.end(); ++it)
         s_xy += *it * loo_dosages[it.offset()];
@@ -791,7 +792,7 @@ private:
       //  r = -------------------------------------------------------------------
       //      Sqrt(n * Sum xx - Sum x * Sum x) * Sqrt(n * Sum yy - Sum y * Sum y)
       float emp_r = (n * s_xy - s_x * s_y) / (std::sqrt(n * s_xx - s_x * s_x) * std::sqrt(n * s_yy - s_y * s_y));
-      out_var.set_info("ER2", std::isnan(emp_r) ? savvy::typed_value::missing_value<float>() :emp_r * emp_r);
+      out_var.set_info("ER2", std::isnan(emp_r) ? savvy::typed_value::missing_value<float>() : emp_r * emp_r);
     }
 
     out_var.set_info(observed.size() ? "TYPED" : "IMPUTED", std::vector<std::int8_t>());
