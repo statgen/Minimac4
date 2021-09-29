@@ -21,7 +21,7 @@ private:
    float map_value = 0.;
  };
 public:
- static bool parse_map_file(std::vector<float>& recom_probs, const std::string& map_file_path, const std::vector<target_variant>& sites);
+ static bool parse_map_file(const std::string& map_file_path, std::vector<target_variant>& sites);
 private:
  static bool read_entry(std::istream& ifs, map_file_line& entry, bool new_format);
 };

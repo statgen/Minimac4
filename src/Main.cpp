@@ -445,7 +445,7 @@ bool load_target_haplotypes(const std::string& file_path, const savvy::genomic_r
     for (std::size_t i = 0; i < var.alts().size(); ++i)
     {
       std::size_t allele_idx = i + 1;
-      target_sites.push_back({var.chromosome(), var.position(), var.ref(), var.alts()[i], true, false, {}});
+      target_sites.push_back({var.chromosome(), var.position(), var.ref(), var.alts()[i], true, false, std::numeric_limits<float>::quiet_NaN(), 0.01, recombination::recom_min, {}});
       if (var.alts().size() == 1)
         tmp_geno.swap(target_sites.back().gt);
       else
@@ -461,13 +461,12 @@ bool load_target_haplotypes(const std::string& file_path, const savvy::genomic_r
   return !input.bad();
 }
 
-bool load_reference_haplotypes(const std::string& file_path, const savvy::genomic_region& reg, std::vector<target_variant>& target_sites, reduced_haplotypes& reference_data, std::vector<float>& freq)
+bool load_reference_haplotypes(const std::string& file_path, const savvy::genomic_region& reg, std::vector<target_variant>& target_sites, reduced_haplotypes& reference_data)
 {
   savvy::reader input(file_path);
   input.reset_bounds(reg);
   savvy::variant var;
   std::vector<std::int8_t> tmp_geno;
-  freq.reserve(target_sites.size());
 
   auto tar_it = target_sites.begin();
   while (input >> var)
@@ -480,8 +479,10 @@ bool load_reference_haplotypes(const std::string& file_path, const savvy::genomi
       if (it->ref == var.ref() && it->alt == (var.alts().size() ? var.alts()[0] : ""))
       {
         var.get_format("GT", tmp_geno);
-        reference_data.append_variant({it->chrom, it->pos, it->ref, it->alt}, tmp_geno);
-        freq.push_back(std::accumulate(tmp_geno.begin(), tmp_geno.end(), 0.f) / tmp_geno.size());
+        reference_data.compress_variant({it->chrom, it->pos, it->ref, it->alt}, tmp_geno);
+        //freq.push_back(std::accumulate(tmp_geno.begin(), tmp_geno.end(), 0.f) / tmp_geno.size());
+        //it->af = std::accumulate(tmp_geno.begin(), tmp_geno.end(), 0.f) / tmp_geno.size(); // TODO; remove
+        it->af = float((--reference_data.end())->ac) / tmp_geno.size();
         it->in_ref = true;
         if (it != tar_it)
           std::swap(*it, *tar_it);
@@ -829,9 +830,9 @@ int main(int argc, char** argv)
   std::cerr << ("Loading target haplotypes took " + std::to_string(std::difftime(std::time(nullptr), start_time)) + " seconds") << std::endl;
 
   start_time = std::time(nullptr);
-  std::vector<float> freq;
+
   reduced_haplotypes reduced_reference_data(16, 512);
-  load_reference_haplotypes(args.ref_path(), extended_region, target_sites, reduced_reference_data, freq);
+  load_reference_haplotypes(args.ref_path(), extended_region, target_sites, reduced_reference_data);
   std::cerr << ("Loading reference haplotypes took " + std::to_string(std::difftime(std::time(nullptr), start_time)) + " seconds") << std::endl;
 
   start_time = std::time(nullptr);
@@ -841,13 +842,11 @@ int main(int argc, char** argv)
   if (target_sites.empty())
     return std::cerr << "Error: no target variants\n", EXIT_FAILURE;
 
-  std::vector<float> err(target_sites.size(), 0.01f);
-  std::vector<float> recom_probs(target_sites.size(), recombination::recom_min);
-
+  target_sites.back().recom = 0.f; // Last recom prob must be zero so that the first step of backward traversal will have no recombination.
   if (args.map_path().size())
   {
     start_time = std::time(nullptr);
-    if (!recombination::parse_map_file(recom_probs, args.map_path(), target_sites))
+    if (!recombination::parse_map_file(args.map_path(), target_sites))
       return std::cerr << "Error: parsing map file failed\n", EXIT_FAILURE;
     std::cerr << ("Loading switch probabilities took " + std::to_string(std::difftime(std::time(nullptr), start_time)) + " seconds") << std::endl;
   }
@@ -870,25 +869,46 @@ int main(int argc, char** argv)
     }
   }
 
-  best_templates_results hmm_results;
-  hmm_results.resize(target_sites.size(), target_sites[0].gt.size());
-
-
   std::cerr << "Running HMM with " << args.threads() << " threads ..." << std::endl;
   start_time = std::time(nullptr);
   omp::internal::thread_pool2 tpool(args.threads());
   std::vector<hidden_markov_model> hmms(args.threads());
-  omp::parallel_for_exp(omp::static_schedule(), omp::sequence_iterator(0), omp::sequence_iterator(target_sites[0].gt.size()), [&](int& i, const omp::iteration_context& ctx)
-    {
-      hmms[ctx.thread_index].traverse_forward(reduced_reference_data.blocks(), target_sites, i, recom_probs, err, freq);
-      hmms[ctx.thread_index].traverse_backward(reduced_reference_data.blocks(), target_sites, i, recom_probs, err, freq, reverse_maps, hmm_results);
-    }, tpool);
-  std::cerr << ("Running HMM took " + std::to_string(std::difftime(std::time(nullptr), start_time)) + " seconds") << std::endl;
 
-  start_time = std::time(nullptr);
-  haplotype_interpolator interpolator(args.out_path(), args.out_format(), args.out_compression(), sample_ids, args.fmt_fields(), target_sites.front().chrom);
-  interpolator.piecewise_constant(target_sites, reduced_reference_data, hmm_results, args.ref_path(), args.region(), args.out_path());
-  std::cerr << ("Interpolating and writing output took " + std::to_string(std::difftime(std::time(nullptr), start_time)) + " seconds") << std::endl;
+  bool deferred_interoplation = true;
+  if (deferred_interoplation)
+  {
+    best_templates_results hmm_results;
+    hmm_results.resize(target_sites.size(), target_sites[0].gt.size());
+
+    omp::parallel_for_exp(omp::static_schedule(), omp::sequence_iterator(0), omp::sequence_iterator(target_sites[0].gt.size()), [&](int& i, const omp::iteration_context& ctx)
+      {
+        hmms[ctx.thread_index].traverse_forward(reduced_reference_data.blocks(), target_sites, i);
+        hmms[ctx.thread_index].traverse_backward(reduced_reference_data.blocks(), target_sites, i, reverse_maps, hmm_results);
+      },
+      tpool);
+    std::cerr << ("Running HMM took " + std::to_string(std::difftime(std::time(nullptr), start_time)) + " seconds") << std::endl;
+    start_time = std::time(nullptr);
+    haplotype_interpolator interpolator(args.out_path(), args.out_format(), args.out_compression(), sample_ids, args.fmt_fields(), target_sites.front().chrom);
+    interpolator.piecewise_constant(target_sites, reduced_reference_data, hmm_results, args.ref_path(), args.region(), args.out_path());
+    std::cerr << ("Interpolating and writing output took " + std::to_string(std::difftime(std::time(nullptr), start_time)) + " seconds") << std::endl;
+  }
+  else
+  {
+    full_dosages_results hmm_results;
+    reduced_haplotypes full_reference_data(16, 512); // TODO: Load from m3vcf file
+    hmm_results.resize(full_reference_data.variant_size(), target_sites[0].gt.size());
+
+    omp::parallel_for_exp(omp::static_schedule(), omp::sequence_iterator(0), omp::sequence_iterator(target_sites[0].gt.size()), [&](int& i, const omp::iteration_context& ctx)
+      {
+        hmms[ctx.thread_index].traverse_forward(reduced_reference_data.blocks(), target_sites, i);
+        auto reverse_ref_itr = --full_reference_data.end();
+        hmms[ctx.thread_index].traverse_backward(reduced_reference_data.blocks(), target_sites, i, reverse_maps, hmm_results, reverse_ref_itr, --full_reference_data.begin());
+      },
+      tpool);
+    std::cerr << ("Running HMM took " + std::to_string(std::difftime(std::time(nullptr), start_time)) + " seconds") << std::endl;
+  }
+
+
 
   return EXIT_SUCCESS;
 }

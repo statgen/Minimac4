@@ -3,6 +3,7 @@
 
 #include <cassert>
 #include <numeric>
+#include <unordered_map>
 
 constexpr float hidden_markov_model::jump_fix;
 
@@ -11,19 +12,23 @@ hidden_markov_model::hidden_markov_model(float background_error) :
 {
 }
 
-void hidden_markov_model::initialize_likelihoods(std::vector<float>& start_row, const std::vector<std::size_t>& cardinalities)
+void hidden_markov_model::initialize_likelihoods(std::vector<float>& probs, std::vector<float>& probs_norecom, std::vector<float>& proportions, const unique_haplotype_block& ref_block)
 {
-  start_row.resize(cardinalities.size());
-  for (std::size_t i = 0; i < start_row.size(); ++i)
-    start_row[i] = 1.f * cardinalities[i];
+  probs.clear();
+  probs.resize(ref_block.cardinalities().size(), 0.f);
+  for (std::size_t i = 0; i < probs.size(); ++i)
+    probs[i] = 1.f * ref_block.cardinalities()[i];
+
+  probs_norecom = probs;
+
+  proportions.resize(ref_block.expanded_haplotype_size());
+  for (std::size_t i = 0; i < proportions.size(); ++i)
+    proportions[i] = 1.f / ref_block.cardinalities()[ref_block.unique_map()[i]];
 }
 
 void hidden_markov_model::traverse_forward(const std::deque<unique_haplotype_block>& ref_haps,
   const std::vector<target_variant>& tar_variants,
-  std::size_t hap_idx,
-  const std::vector<float>& recom,
-  const std::vector<float>& err,
-  const std::vector<float>& freq)
+  std::size_t hap_idx)
 {
   std::size_t n_expanded_haplotypes = ref_haps.front().expanded_haplotype_size();
 
@@ -54,10 +59,11 @@ void hidden_markov_model::traverse_forward(const std::deque<unique_haplotype_blo
     if (block_idx == 0)
     {
       // Initialize likelihoods at first position
-      initialize_likelihoods(forward_probs_[block_idx][0], ref_block.cardinalities());
-      forward_norecom_probs_[block_idx][0] = forward_probs_[block_idx][0];
-      for (std::size_t i = 0; i < ref_block.expanded_haplotype_size(); ++i)
-        junction_prob_proportions_[block_idx][i] =  1.f / ref_block.cardinalities()[ref_block.unique_map()[i]];
+      initialize_likelihoods(forward_probs_[block_idx][0], forward_norecom_probs_[block_idx][0], junction_prob_proportions_[block_idx], ref_block);
+//      initialize_likelihoods(forward_probs_[block_idx][0], ref_block.cardinalities());
+//      forward_norecom_probs_[block_idx][0] = forward_probs_[block_idx][0];
+//      for (std::size_t i = 0; i < ref_block.expanded_haplotype_size(); ++i)
+//        junction_prob_proportions_[block_idx][i] =  1.f / ref_block.cardinalities()[ref_block.unique_map()[i]];
     }
     else
     {
@@ -97,27 +103,27 @@ void hidden_markov_model::traverse_forward(const std::deque<unique_haplotype_blo
       float sdiff = s2 - s1;
 #endif
 
-      precision_jumps_[global_idx - 1] = transpose(temp_row, first_row, temp_row, first_row_norecom, ref_block.cardinalities(), recom[global_idx - 1], n_expanded_haplotypes);
+      precision_jumps_[global_idx - 1] = transpose(temp_row, first_row, temp_row, first_row_norecom, ref_block.cardinalities(), tar_variants[global_idx - 1].recom, n_expanded_haplotypes);
     }
 
 
-    const auto& template_haps = ref_block.compressed_matrix();
+    const auto& template_variants = ref_block.variants();
     std::size_t n_rows = forward_probs_[block_idx].size();
     std::size_t last_row_idx = n_rows - 1;
     for (std::size_t i = 0; i < last_row_idx; ++i,++global_idx)
     {
       std::int8_t observed = tar_variants[global_idx].gt[hap_idx];
       if (observed >= 0)
-        condition(forward_probs_[block_idx][i], forward_norecom_probs_[block_idx][i], template_haps[i], observed, err[global_idx], freq[global_idx]);
-      precision_jumps_[global_idx] = transpose(forward_probs_[block_idx][i], forward_probs_[block_idx][i + 1], forward_norecom_probs_[block_idx][i], forward_norecom_probs_[block_idx][i + 1], ref_block.cardinalities(), recom[global_idx], n_expanded_haplotypes);
+        condition(forward_probs_[block_idx][i], forward_norecom_probs_[block_idx][i], template_variants[i].gt, observed, tar_variants[global_idx].err, tar_variants[global_idx].af);
+      precision_jumps_[global_idx] = transpose(forward_probs_[block_idx][i], forward_probs_[block_idx][i + 1], forward_norecom_probs_[block_idx][i], forward_norecom_probs_[block_idx][i + 1], ref_block.cardinalities(), tar_variants[global_idx].recom, n_expanded_haplotypes);
     }
 
     std::int8_t observed = tar_variants[global_idx].gt[hap_idx];
     if (observed >= 0)
-      condition(forward_probs_[block_idx][last_row_idx], forward_norecom_probs_[block_idx][last_row_idx], template_haps[last_row_idx], observed, err[global_idx], freq[global_idx]);
+      condition(forward_probs_[block_idx][last_row_idx], forward_norecom_probs_[block_idx][last_row_idx], template_variants[last_row_idx].gt, observed, tar_variants[global_idx].err, tar_variants[global_idx].af);
   }
 }
-
+/*
 void hidden_markov_model::traverse_backward(const std::deque<unique_haplotype_block>& ref_haps,
   const std::vector<target_variant>& tar_variants,
   std::size_t hap_idx,
@@ -225,6 +231,70 @@ void hidden_markov_model::traverse_backward(const std::deque<unique_haplotype_bl
   }
   assert(global_idx == std::size_t(-1));
 }
+*/
+
+bool hidden_markov_model::transpose(const std::vector<float>& from, std::vector<float>& to, const std::vector<float>& from_norecom, std::vector<float>& to_norecom, const std::vector<std::size_t>& uniq_cardinalities, double recom, std::size_t n_templates)
+{
+  bool jumped = false;
+  assert(from.size() == to.size());
+
+  double sum = 0.;
+
+  for (std::size_t i = 0; i < from.size(); ++i)
+  {
+    sum += from[i];
+  }
+
+  //sum *= (recom / n_templates);
+  double complement = 1. - recom;
+
+  // avoid underflows
+  if (sum < 1e-10)
+  {
+    sum *= jump_fix; //1e15;
+    complement *= jump_fix; //1e15;
+    //    for(int i=0;i<noReducedStatesCurrent;i++)
+    //      noRecomProb[i]*=JumpFix;
+    jumped = true;
+  }
+
+  sum *= (recom / n_templates);
+
+
+  for (int i = 0; i < to.size(); i++)
+  {
+    to[i] = from[i] * complement + (uniq_cardinalities[i] * sum);
+    to_norecom[i] = from_norecom[i] * complement;
+    assert(to[i]>=0.0f);
+    //assert(noRecomProb[i]>=0.0f);
+    assert(to[i]<1e18);
+    //assert(noRecomProb[i]<1e18);
+  }
+
+  return jumped;
+}
+
+void hidden_markov_model::condition(std::vector<float>& probs, std::vector<float>& probs_norecom, const std::vector<std::int8_t>& template_haps, std::int8_t observed, float err, float af)
+{
+  float prandom = err * (observed ? af : 1.f - af) + background_error_;
+  float pmatch = (1.f - err) + prandom;
+
+  for (std::size_t i = 0; i < probs.size(); ++i)
+  {
+    if(observed == template_haps[i])
+    {
+      probs[i] *= pmatch;
+      probs_norecom[i] *= pmatch;
+    }
+    else
+    {
+      probs[i] *= prandom;
+      probs_norecom[i] *= prandom;
+    }
+
+    assert(probs[i]>=0.0f);
+  }
+}
 
 void hidden_markov_model::impute(double& prob_sum, std::size_t& prev_best_hap,
   const std::vector<float>& left_probs,
@@ -237,7 +307,7 @@ void hidden_markov_model::impute(double& prob_sum, std::size_t& prev_best_hap,
   const std::vector<std::vector<std::size_t>>& reverse_map,
   const std::vector<std::int8_t>& template_haps,
   std::int8_t observed, float err, float af,
-  best_templates_results& output, std::size_t row, std::size_t column)
+  std::vector<std::uint32_t>& best_unique_haps, std::vector<double>& best_unique_probs, float& dose, float& loo_dose)
 {
   assert(left_probs.size() == right_probs.size());
   const float threshold = 0.01;
@@ -267,8 +337,6 @@ void hidden_markov_model::impute(double& prob_sum, std::size_t& prev_best_hap,
   double sum = prob_sum;
 #endif
 
-  std::vector<std::uint32_t> best_unique_haps;
-  std::vector<double> best_unique_probs;
   double denorm_threshold = threshold * sum;
 
   if (prev_best_hap < constants.size())
@@ -311,26 +379,16 @@ void hidden_markov_model::impute(double& prob_sum, std::size_t& prev_best_hap,
         best_unique_haps.push_back(i);
         assert(fixed / sum > threshold); // TODO: remove since rounding error could make this assert fail.
       }
-
-      //      float normalized_prob = probs[i] / sum;
-      //      if (normalized_prob > threshold)
-      //      {
-      //        best_probs.push_back(normalized_prob);
-      //        best_haps.push_back(i);
-      //      }
-      //
-      //      if (template_haps[i])
-      //        p_alt += normalized_prob;
     }
     sum = prob_sum = p_alt + p_ref;
     p_alt = std::min(1., std::max(0., p_alt / sum));
   }
 
-  output.dosage(row, column) = p_alt;
+  dose = p_alt;
 
   if (observed < 0)
   {
-    output.loo_dosage(row, column) = std::numeric_limits<float>::quiet_NaN();
+    loo_dose = dose; // savvy::typed_value::missing_value<float>();
   }
   else
   {
@@ -352,10 +410,43 @@ void hidden_markov_model::impute(double& prob_sum, std::size_t& prev_best_hap,
       loo_p_alt /= fmismatch;
     }
 
-    output.loo_dosage(row, column) = loo_p_alt / (loo_p_alt + loo_p_ref);
+    loo_dose = loo_p_alt / (loo_p_alt + loo_p_ref);
   }
 
   prev_best_hap = best_unique_haps.size() == 1 ? best_unique_haps.front() : std::numeric_limits<std::size_t>::max();
+}
+
+void hidden_markov_model::impute(double& prob_sum, std::size_t& prev_best_hap,
+  const std::vector<float>& left_probs,
+  const std::vector<float>& right_probs,
+  const std::vector<float>& left_probs_norecom,
+  const std::vector<float>& right_probs_norecom,
+  const std::vector<float>& left_junction_proportions,
+  const std::vector<float>& right_junction_proportions,
+  const std::vector<float>& constants,
+  const std::vector<std::vector<std::size_t>>& reverse_map,
+  const std::vector<std::int8_t>& template_haps,
+  const std::vector<target_variant>& tar_variants,
+  std::size_t row, std::size_t column, best_templates_results& output)
+{
+  std::vector<std::uint32_t> best_unique_haps;
+  std::vector<double> best_unique_probs;
+  impute(prob_sum, prev_best_hap,
+    left_probs,
+    right_probs,
+    left_probs_norecom,
+    right_probs_norecom,
+    left_junction_proportions,
+    right_junction_proportions,
+    constants,
+    reverse_map,
+    template_haps,
+    tar_variants[row].gt[column], tar_variants[row].err, tar_variants[row].af,
+    best_unique_haps, best_unique_probs,
+    output.dosage(row, column), output.loo_dosage(row, column));
+
+  const float threshold = 0.01;
+  double denorm_threshold = threshold * prob_sum;
 
   double best_orig_prob = 0.f;
   std::vector<float>& best_probs = output.best_probs(row, column);
@@ -386,15 +477,15 @@ void hidden_markov_model::impute(double& prob_sum, std::size_t& prev_best_hap,
       if (orig_prob >= denorm_threshold)
       {
         best_haps.push_back(expanded_idx);
-        best_probs.push_back(orig_prob / sum);
+        best_probs.push_back(orig_prob / prob_sum);
         best_uniq_flags.push_back(false);
         found = true;
-        local_sum_used += orig_prob / sum;
+        local_sum_used += orig_prob / prob_sum;
       }
       if (orig_prob > best_orig_prob)
         best_orig_prob = orig_prob;
 
-      local_sum += orig_prob / sum;
+      local_sum += orig_prob / prob_sum;
     }
     //local_sum /= sum;
     auto diff = best_unique_probs[i] - local_sum;
@@ -456,65 +547,158 @@ void hidden_markov_model::impute(double& prob_sum, std::size_t& prev_best_hap,
 #endif
 }
 
-void hidden_markov_model::condition(std::vector<float>& probs, std::vector<float>& probs_norecom, const std::vector<std::int8_t>& template_haps, std::int8_t observed, float err, float af)
+inline bool sites_match(const target_variant& t, const reference_site_info& r)
 {
-  float prandom = err * (observed ? af : 1.f - af) + background_error_;
-  float pmatch = (1.f - err) + prandom;
+  return t.pos == r.pos && t.alt == r.alt && t.ref == r.ref;
+}
 
-  for (std::size_t i = 0; i < probs.size(); ++i)
+void hidden_markov_model::impute(double& prob_sum, std::size_t& prev_best_hap,
+  const std::vector<float>& left_probs,
+  const std::vector<float>& right_probs,
+  const std::vector<float>& left_probs_norecom,
+  const std::vector<float>& right_probs_norecom,
+  const std::vector<float>& left_junction_proportions,
+  const std::vector<float>& right_junction_proportions,
+  const std::vector<float>& constants,
+  const std::vector<std::vector<std::size_t>>& reverse_map,
+  const std::vector<std::int8_t>& template_haps,
+  const std::vector<target_variant>& tar_variants,
+  std::size_t row, std::size_t column, full_dosages_results& output, reduced_haplotypes::iterator& full_ref_ritr, const reduced_haplotypes::iterator& full_ref_rend)
+{
+  assert(row == 0 || tar_variants[row].pos >= tar_variants[row - 1].pos);
+  std::size_t mid_point = row == 0 ? 1 : std::min<std::int32_t>(1, std::int32_t(tar_variants[row].pos) - std::int32_t(tar_variants[row].pos - tar_variants[row - 1].pos) / 2);
+  if (full_ref_ritr == full_ref_rend || full_ref_ritr->pos <= mid_point) // TODO: stop traverse_backward at beginning of region.
+    return;
+
+  float typed_dose = std::numeric_limits<float>::quiet_NaN();
+  float typed_loo_dose = std::numeric_limits<float>::quiet_NaN();
+  std::vector<std::uint32_t> best_typed_haps;
+  std::vector<double> best_typed_probs;
+  impute(prob_sum, prev_best_hap,
+    left_probs,
+    right_probs,
+    left_probs_norecom,
+    right_probs_norecom,
+    left_junction_proportions,
+    right_junction_proportions,
+    constants,
+    reverse_map,
+    template_haps,
+    tar_variants[row].gt[column], tar_variants[row].err, tar_variants[row].af, best_typed_haps, best_typed_probs,
+    typed_dose, typed_loo_dose);
+
+  // vvvvvvvvvvvvvvvv TODO vvvvvvvvvvvvvvvv //
+  double best_sum = std::accumulate(best_typed_probs.begin(), best_typed_probs.end(), 0.);
+  std::size_t n_templates = left_junction_proportions.size();
+  std::size_t last_block_idx(-1);
+  std::vector<float> best_full_probs;
+  std::vector<std::uint32_t> best_full_haps;
+  for ( ; full_ref_ritr != full_ref_rend && full_ref_ritr->pos > mid_point; ++full_ref_ritr)
   {
-    if(observed == template_haps[i])
+    if (sites_match(tar_variants[row], *full_ref_ritr))
     {
-      probs[i] *= pmatch;
-      probs_norecom[i] *= pmatch;
+      output.dosage(full_ref_ritr.global_idx(), column) = typed_dose;
+      output.loo_dosage(full_ref_ritr.global_idx(), column) = typed_loo_dose;
     }
     else
     {
-      probs[i] *= prandom;
-      probs_norecom[i] *= prandom;
-    }
+      if (full_ref_ritr.block_idx() != last_block_idx)
+      {
+        typed_to_full_probs(
+          best_full_haps,
+          best_full_probs,
+          best_typed_haps,
+          left_probs,
+          right_probs,
+          left_probs_norecom,
+          right_probs_norecom,
+          left_junction_proportions,
+          right_junction_proportions,
+          reverse_map,
+          full_ref_ritr.unique_map(),
+          prob_sum,
+          full_ref_ritr.cardinalities().size());
 
-    assert(probs[i]>=0.0f);
+#ifndef NDEBUG
+        double s = std::accumulate(best_full_probs.begin(), best_full_probs.end(), 0.);
+#endif
+
+        last_block_idx = full_ref_ritr.block_idx();
+      }
+
+      float p_alt = 0;
+      std::size_t ac = 0;
+      std::size_t an = 0;
+      for (std::size_t i = 0; i < best_full_haps.size(); ++i)
+      {
+        std::size_t card = full_ref_ritr.cardinalities()[best_full_haps[i]];
+        ;
+        if (full_ref_ritr->gt[best_full_haps[i]])
+        {
+          p_alt += best_full_probs[i];
+          ac += card;
+        }
+        an += card;
+      }
+
+      assert(full_ref_ritr->ac >= ac);
+      assert(n_templates >= an);
+      if (n_templates - an > 0)
+        p_alt += (1. - best_sum) * (double(full_ref_ritr->ac - ac) / double(n_templates - an));
+
+      output.dosage(full_ref_ritr.global_idx(), column) = p_alt;
+    }
   }
 }
 
-bool hidden_markov_model::transpose(const std::vector<float>& from, std::vector<float>& to, const std::vector<float>& from_norecom, std::vector<float>& to_norecom, const std::vector<std::size_t>& uniq_cardinalities, double recom, std::size_t n_templates)
+void hidden_markov_model::typed_to_full_probs(
+  std::vector<std::uint32_t>& full_haps,
+  std::vector<float>& full_probs,
+  const std::vector<std::uint32_t>& typed_haps,
+  const std::vector<float>& left_probs, const std::vector<float>& right_probs,
+  const std::vector<float>& left_probs_norecom, const std::vector<float>& right_probs_norecom,
+  const std::vector<float>& left_junction_proportions, const std::vector<float>& right_junction_proportions,
+  const std::vector<std::vector<std::size_t>>& typed_reverse_map,
+  const std::vector<std::size_t>& full_map,
+  double prob_sum,
+  std::size_t full_uniq_hap_count)
 {
-  bool jumped = false;
-  assert(from.size() == to.size());
+  std::unordered_map<std::size_t, double> full_ref_prob_hash;
+  full_ref_prob_hash.reserve(full_uniq_hap_count);
 
-  double sum = 0.;
-
-  for (std::size_t i = 0; i < from.size(); ++i)
+  for (std::size_t i = 0; i < typed_haps.size(); ++i)
   {
-    sum += from[i];
+    std::size_t uniq_idx = typed_haps[i];
+    std::size_t cardinality = typed_reverse_map[uniq_idx].size();
+    double left_full_prob = left_probs[uniq_idx];
+    double left_norecom_prob = left_probs_norecom[uniq_idx];
+    double left_recom_prob = (left_full_prob - left_norecom_prob) / cardinality;
+
+    double right_full_prob = right_probs[uniq_idx];
+    double right_norecom_prob = right_probs_norecom[uniq_idx];
+    double right_recom_prob = (right_full_prob - right_norecom_prob) / cardinality;
+
+    double local_sum = 0.f;
+    for (std::size_t j = 0; j < cardinality; ++j)
+    {
+      assert(uniq_idx < typed_reverse_map.size());
+      assert(j < typed_reverse_map[uniq_idx].size());
+      std::size_t expanded_idx = typed_reverse_map[uniq_idx][j];
+      std::size_t full_ref_idx = full_map[expanded_idx];
+      double orig_prob = (left_norecom_prob * left_junction_proportions[expanded_idx] + left_recom_prob) * (right_norecom_prob * right_junction_proportions[expanded_idx] + right_recom_prob);
+      full_ref_prob_hash[full_ref_idx] += orig_prob / prob_sum;
+
+      local_sum += orig_prob / prob_sum;
+    }
   }
 
-  //sum *= (recom / n_templates);
-  double complement = 1. - recom;
+  full_probs.resize(full_ref_prob_hash.size());
+  full_haps.resize(full_ref_prob_hash.size());
 
-  // avoid underflows
-  if (sum < 1e-10)
+  std::size_t i = 0;
+  for (auto it = full_ref_prob_hash.begin(); it != full_ref_prob_hash.end(); ++it)
   {
-    sum *= jump_fix; //1e15;
-    complement *= jump_fix; //1e15;
-//    for(int i=0;i<noReducedStatesCurrent;i++)
-//      noRecomProb[i]*=JumpFix;
-    jumped = true;
+    full_haps[i] = it->first;
+    full_probs[i] = it->second;
   }
-
-  sum *= (recom / n_templates);
-
-
-  for (int i = 0; i < to.size(); i++)
-  {
-    to[i] = from[i] * complement + (uniq_cardinalities[i] * sum);
-    to_norecom[i] = from_norecom[i] * complement;
-    assert(to[i]>=0.0f);
-    //assert(noRecomProb[i]>=0.0f);
-    assert(to[i]<1e18);
-    //assert(noRecomProb[i]<1e18);
-  }
-
-  return jumped;
 }

@@ -6,13 +6,12 @@
 
 constexpr float recombination::recom_min;
 
-bool recombination::parse_map_file(std::vector<float>& recom_probs, const std::string& map_file_path, const std::vector<target_variant>& sites)
+bool recombination::parse_map_file(const std::string& map_file_path, std::vector<target_variant>& sites)
 {
   if (sites.empty())
     return false;
 
-  recom_probs.resize(sites.size());
-  std::cerr << "Num sites: " << recom_probs.size() << std::endl;
+  std::cerr << "Num sites: " << sites.size() << std::endl;
 
   std::string target_chrom = sites[0].chrom;
 
@@ -44,7 +43,7 @@ bool recombination::parse_map_file(std::vector<float>& recom_probs, const std::s
   while(site_index < sites.size() && sites[site_index].pos < last_entry.pos)
   {
     basepair_cm = last_entry.map_value / last_entry.pos;
-    recom_probs[site_index] = sites[site_index].pos * basepair_cm;
+    sites[site_index].recom = sites[site_index].pos * basepair_cm;
     ++site_index;
   }
 
@@ -61,7 +60,7 @@ bool recombination::parse_map_file(std::vector<float>& recom_probs, const std::s
     {
       assert(sites[site_index].pos - last_entry.pos < sites[site_index].pos); //TODO: handle gracefully
 
-      recom_probs[site_index] = last_entry.map_value + double(sites[site_index].pos - last_entry.pos) * basepair_cm;
+      sites[site_index].recom = last_entry.map_value + double(sites[site_index].pos - last_entry.pos) * basepair_cm;
       ++site_index;
       if (site_index % 1000 == 0)
         std::cerr << "Map file progress: " << site_index << "\t" << last_entry.chrom << ":" << last_entry.pos << " -> " << last_entry.map_value << "\t" << entry.chrom << ":" << entry.pos << " -> " << entry.map_value << std::endl;
@@ -74,7 +73,7 @@ bool recombination::parse_map_file(std::vector<float>& recom_probs, const std::s
   std::cerr << "Site index greater than last entry: " << site_index << std::endl;
   while (site_index < sites.size())
   {
-    recom_probs[site_index] = last_entry.map_value + double(sites[site_index].pos - last_entry.pos) * basepair_cm; // Should we assume that basepair_cm is zero?
+    sites[site_index].recom = last_entry.map_value + double(sites[site_index].pos - last_entry.pos) * basepair_cm; // Should we assume that basepair_cm is zero?
     ++site_index;
   }
   //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~//
@@ -82,14 +81,14 @@ bool recombination::parse_map_file(std::vector<float>& recom_probs, const std::s
 
   //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~//
   // convert from aligned genetic map to switch probabilities
-  for (std::size_t i = 0; i < recom_probs.size(); ++i)
+  for (std::size_t i = 0; i < sites.size(); ++i)
   {
-    if (i + 1 == recom_probs.size())
-      recom_probs[i] = 0.f; // Last recom prob must be zero so that the first step of backward traversal will have no recombination.
+    if (i + 1 == sites.size())
+      sites[i].recom = 0.f; // Last recom prob must be zero so that the first step of backward traversal will have no recombination.
     else
     {
-      float delta = (recom_probs[i + 1] - recom_probs[i]);
-      recom_probs[i] = std::max(0.01f * delta, recom_min);
+      float delta = (sites[i + 1].recom - sites[i].recom);
+      sites[i].recom = std::max(0.01f * delta, recom_min);
       //recom_probs[i] = std::min(0.01f, std::max(/*0.01f * */delta, recom_min));
       //recom_probs[i] = (1. - std::exp(-delta/50.))/2.;
     }

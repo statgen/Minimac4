@@ -5,30 +5,32 @@
 #include <numeric>
 #include <cassert>
 
-bool unique_haplotype_block::append_variant(const reference_site& site, const std::vector<std::int8_t>& allele_vec)
+bool unique_haplotype_block::compress_variant(const reference_site_info& site_info, const std::vector<std::int8_t>& alleles)
 {
-  if (allele_vec.empty())
+  if (alleles.empty())
     return false;
 
-  if (sites_.size() == 0)
+  sites_.emplace_back(site_info.chrom, site_info.pos, site_info.ref, site_info.alt, 0, std::vector<std::int8_t>());
+
+  if (sites_.size() == 1)
   {
-    unique_map_.resize(allele_vec.size());
-    unique_hap_matrix_.emplace_back(1, allele_vec[0]);
+    unique_map_.resize(alleles.size());
+    sites_[0].gt.push_back(alleles[0]);
     cardinalities_.push_back(1);
     unique_map_[0] = 0;
 
-    for (std::size_t i = 1; i < allele_vec.size(); ++i)
+    for (std::size_t i = 1; i < alleles.size(); ++i)
     {
       std::size_t j = 0;
-      for (; j < unique_hap_matrix_[0].size(); ++j)
+      for (; j < sites_[0].gt.size(); ++j)
       {
-        if (unique_hap_matrix_[0][j] == allele_vec[i])
+        if (sites_[0].gt[j] == alleles[i])
           break;
       }
 
-      if (j == unique_hap_matrix_[0].size())
+      if (j == sites_[0].gt.size())
       {
-        unique_hap_matrix_[0].emplace_back(allele_vec[i]);
+        sites_[0].gt.push_back(alleles[i]);
         cardinalities_.push_back(0);
       }
       unique_map_[i] = j;
@@ -37,29 +39,29 @@ bool unique_haplotype_block::append_variant(const reference_site& site, const st
   }
   else
   {
-    if (allele_vec.size() != unique_map_.size())
+    if (alleles.size() != unique_map_.size())
       return false;
 
-    std::size_t original_hap_cnt = unique_hap_matrix_[0].size();
-    unique_hap_matrix_.emplace_back(original_hap_cnt, std::int8_t(-1));
+    std::size_t original_hap_cnt = sites_[0].gt.size();
+    sites_.back().gt.resize(original_hap_cnt, std::int8_t(-1));
 
-    for (std::size_t i = 0; i < allele_vec.size(); ++i)
+    for (std::size_t i = 0; i < alleles.size(); ++i)
     {
       std::size_t original_hap_idx = unique_map_[i];
-      if (unique_hap_matrix_.back()[original_hap_idx] != allele_vec[i])
+      if (sites_.back().gt[original_hap_idx] != alleles[i])
       {
-        if (unique_hap_matrix_.back()[original_hap_idx] == -1)
+        if (sites_.back().gt[original_hap_idx] == -1)
         {
           // this is the first haplotype mapped to this column, so set allele for new variant
-          unique_hap_matrix_.back()[original_hap_idx] = allele_vec[i];
+          sites_.back().gt[original_hap_idx] = alleles[i];
         }
         else
         {
           // this haplotype no longer matches its column
           --cardinalities_[original_hap_idx];
           std::size_t j = original_hap_cnt;
-          std::size_t j_end = unique_hap_matrix_[0].size();
-          const std::size_t k_end = unique_hap_matrix_.size() - 1;
+          std::size_t j_end = sites_[0].gt.size();
+          const std::size_t k_end = sites_.size() - 1;
 
           for ( ; j < j_end; ++j)
           {
@@ -67,11 +69,11 @@ bool unique_haplotype_block::append_variant(const reference_site& site, const st
             std::size_t k = 0;
             for ( ; k < k_end; ++k)
             {
-              if (unique_hap_matrix_[k][j] != unique_hap_matrix_[k][original_hap_idx])
+              if (sites_[k].gt[j] != sites_[k].gt[original_hap_idx])
                 break;
             }
 
-            if (k == k_end && unique_hap_matrix_[k][j] == allele_vec[i])
+            if (k == k_end && sites_[k].gt[j] == alleles[i])
               break;
           }
 
@@ -79,8 +81,8 @@ bool unique_haplotype_block::append_variant(const reference_site& site, const st
           {
             // does not match a newly created column, so insert new column
             for (std::size_t k = 0; k < k_end; ++k)
-              unique_hap_matrix_[k].push_back(unique_hap_matrix_[k][original_hap_idx]);
-            unique_hap_matrix_[k_end].push_back(allele_vec[i]);
+              sites_[k].gt.push_back(sites_[k].gt[original_hap_idx]);
+            sites_[k_end].gt.push_back(alleles[i]);
             cardinalities_.push_back(0);
           }
 
@@ -91,7 +93,12 @@ bool unique_haplotype_block::append_variant(const reference_site& site, const st
     }
   }
 
-  sites_.emplace_back(site);
+  assert(cardinalities_.size() == sites_.back().gt.size());
+  for (std::size_t i = 0; i < cardinalities_.size(); ++i)
+  {
+    if (sites_.back().gt[i])
+      sites_.back().ac += cardinalities_[i];
+  }
 
   assert(std::accumulate(cardinalities_.begin(), cardinalities_.end(), std::size_t(0)) == unique_map_.size());
 
@@ -101,11 +108,12 @@ bool unique_haplotype_block::append_variant(const reference_site& site, const st
 reduced_haplotypes::reduced_haplotypes(std::size_t min_block_size, std::size_t max_block_size)
 {
   blocks_.emplace_back();
+  block_offsets_.emplace_back(0);
   min_block_size_ = std::max(std::size_t(1), min_block_size);
   max_block_size_ = std::max(std::size_t(1), max_block_size);
 }
 
-bool reduced_haplotypes::append_variant(const reference_site& site, const std::vector<std::int8_t>& alleles)
+bool reduced_haplotypes::compress_variant(const reference_site_info& site_info, const std::vector<std::int8_t>& alleles)
 {
   auto comp_ratio = [](const unique_haplotype_block& b)
     {
@@ -113,7 +121,7 @@ bool reduced_haplotypes::append_variant(const reference_site& site, const std::v
     };
 
   float old_cr = comp_ratio(blocks_.back());
-  bool ret = blocks_.back().append_variant(site, alleles);
+  bool ret = blocks_.back().compress_variant(site_info, alleles);
   if (ret)
     ++variant_count_;
 
@@ -124,6 +132,7 @@ bool reduced_haplotypes::append_variant(const reference_site& site, const std::v
     if (new_cr > old_cr)
     {
       blocks_.emplace_back();
+      block_offsets_.push_back(block_offsets_.back() + cnt);
       //std::cerr << "compression old/new: " << old_cr << " / " << new_cr << std::endl;
       return ret;
     }

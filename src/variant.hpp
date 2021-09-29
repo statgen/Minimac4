@@ -13,6 +13,9 @@ struct target_variant
   std::string alt;
   bool in_tar; // site exists in target file
   bool in_ref; // site exists in reference file
+  float af;
+  float err;
+  float recom;
   std::vector<std::int8_t> gt;
 };
 
