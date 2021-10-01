@@ -385,6 +385,7 @@ void hidden_markov_model::impute(double& prob_sum, std::size_t& prev_best_hap,
   }
 
   dose = p_alt;
+  dose = float(std::int16_t(dose * bin_scalar_ + 0.5f)) / bin_scalar_; // bin
 
   if (observed < 0)
   {
@@ -411,6 +412,7 @@ void hidden_markov_model::impute(double& prob_sum, std::size_t& prev_best_hap,
     }
 
     loo_dose = loo_p_alt / (loo_p_alt + loo_p_ref);
+    loo_dose = float(std::int16_t(loo_dose * bin_scalar_ + 0.5f)) / bin_scalar_; // bin
   }
 
   prev_best_hap = best_unique_haps.size() == 1 ? best_unique_haps.front() : std::numeric_limits<std::size_t>::max();
@@ -427,7 +429,7 @@ void hidden_markov_model::impute(double& prob_sum, std::size_t& prev_best_hap,
   const std::vector<std::vector<std::size_t>>& reverse_map,
   const std::vector<std::int8_t>& template_haps,
   const std::vector<target_variant>& tar_variants,
-  std::size_t row, std::size_t column, best_templates_results& output)
+  std::size_t row, std::size_t column, std::size_t out_column, best_templates_results& output)
 {
   std::vector<std::uint32_t> best_unique_haps;
   std::vector<double> best_unique_probs;
@@ -443,15 +445,15 @@ void hidden_markov_model::impute(double& prob_sum, std::size_t& prev_best_hap,
     template_haps,
     tar_variants[row].gt[column], tar_variants[row].err, tar_variants[row].af,
     best_unique_haps, best_unique_probs,
-    output.dosage(row, column), output.loo_dosage(row, column));
+    output.dosage(row, out_column), output.loo_dosage(row, out_column));
 
   const float threshold = 0.01;
   double denorm_threshold = threshold * prob_sum;
 
   double best_orig_prob = 0.f;
-  std::vector<float>& best_probs = output.best_probs(row, column);
-  std::vector<std::uint32_t>& best_haps = output.best_templates(row, column);
-  std::vector<bool>& best_uniq_flags = output.best_uniq_flags(row, column);
+  std::vector<float>& best_probs = output.best_probs(row, out_column);
+  std::vector<std::uint32_t>& best_haps = output.best_templates(row, out_column);
+  std::vector<bool>& best_uniq_flags = output.best_uniq_flags(row, out_column);
   for (std::size_t i = 0; i < best_unique_haps.size(); ++i)
   {
     std::size_t uniq_idx = best_unique_haps[i];
@@ -563,12 +565,12 @@ void hidden_markov_model::impute(double& prob_sum, std::size_t& prev_best_hap,
   const std::vector<std::vector<std::size_t>>& reverse_map,
   const std::vector<std::int8_t>& template_haps,
   const std::vector<target_variant>& tar_variants,
-  std::size_t row, std::size_t column, full_dosages_results& output, reduced_haplotypes::iterator& full_ref_ritr, const reduced_haplotypes::iterator& full_ref_rend)
+  std::size_t row, std::size_t column, std::size_t out_column, full_dosages_results& output, reduced_haplotypes::iterator& full_ref_ritr, const reduced_haplotypes::iterator& full_ref_rend)
 {
   assert(row == 0 || tar_variants[row].pos >= tar_variants[row - 1].pos);
   std::size_t mid_point = row == 0 ? 1 : std::max<std::int32_t>(1, std::int32_t(tar_variants[row].pos) - std::int32_t(tar_variants[row].pos - tar_variants[row - 1].pos) / 2);
-//  if (full_ref_ritr == full_ref_rend || full_ref_ritr->pos <= mid_point) // TODO: stop traverse_backward at beginning of region.
-//    return;
+  if (full_ref_ritr == full_ref_rend || full_ref_ritr->pos <= mid_point) // TODO: stop traverse_backward at beginning of region.
+    return;
 
   float typed_dose = std::numeric_limits<float>::quiet_NaN();
   float typed_loo_dose = std::numeric_limits<float>::quiet_NaN();
@@ -587,8 +589,8 @@ void hidden_markov_model::impute(double& prob_sum, std::size_t& prev_best_hap,
     tar_variants[row].gt[column], tar_variants[row].err, tar_variants[row].af, best_typed_haps, best_typed_probs,
     typed_dose, typed_loo_dose);
 
-  if (full_ref_ritr == full_ref_rend || full_ref_ritr->pos <= mid_point) // TODO: stop traverse_backward at beginning of region.
-    return;
+//  if (full_ref_ritr == full_ref_rend || full_ref_ritr->pos <= mid_point) // TODO: stop traverse_backward at beginning of region.
+//    return;
 
   // vvvvvvvvvvvvvvvv TODO vvvvvvvvvvvvvvvv //
   double best_sum = std::accumulate(best_typed_probs.begin(), best_typed_probs.end(), 0.);
@@ -600,8 +602,8 @@ void hidden_markov_model::impute(double& prob_sum, std::size_t& prev_best_hap,
   {
     if (sites_match(tar_variants[row], *full_ref_ritr))
     {
-      output.dosage(full_ref_ritr.global_idx(), column) = typed_dose;
-      output.loo_dosage(full_ref_ritr.global_idx(), column) = typed_loo_dose;
+      output.dosage(full_ref_ritr.global_idx(), out_column) = typed_dose;
+      output.loo_dosage(row, out_column) = typed_loo_dose;
     }
     else
     {
@@ -649,7 +651,9 @@ void hidden_markov_model::impute(double& prob_sum, std::size_t& prev_best_hap,
       if (n_templates - an > 0)
         p_alt += (1. - best_sum) * (double(full_ref_ritr->ac - ac) / double(n_templates - an));
 
-      output.dosage(full_ref_ritr.global_idx(), column) = p_alt;
+
+      p_alt = std::max(0.f, std::min(1.f, p_alt));
+      output.dosage(full_ref_ritr.global_idx(), out_column) = float(std::int16_t(p_alt * bin_scalar_ + 0.5f)) / bin_scalar_;
     }
   }
 }
@@ -718,14 +722,14 @@ void hidden_markov_model::typed_to_full_probs(
     assert(i < full_probs.size());
     full_haps[i] = it->first;
     full_probs[i] = it->second / prob_sum;
-    if (full_probs[i] > (1. - 0.01))
-    {
-      full_probs[0] = full_probs[i];
-      full_haps[0] = full_haps[i];
-      full_probs.resize(1);
-      full_haps.resize(1);
-      return;
-    }
+//    if (full_probs[i] > (1. - 0.01))
+//    {
+//      full_probs[0] = full_probs[i];
+//      full_haps[0] = full_haps[i];
+//      full_probs.resize(1);
+//      full_haps.resize(1);
+//      return;
+//    }
   }
 #else
   float full_sum = 0.f;

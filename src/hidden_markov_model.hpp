@@ -10,17 +10,18 @@
 
 class full_dosages_results
 {
-private:
+public:
   std::vector<std::vector<float>> dosages_;
   std::vector<std::vector<float>> loo_dosages_;
 public:
-  void resize(std::size_t n_rows, std::size_t n_columns)
+  void resize(std::size_t n_rows, std::size_t n_loo_rows, std::size_t n_columns)
   {
     dosages_.resize(n_rows, std::vector<float>(n_columns));
-    loo_dosages_.resize(n_rows, std::vector<float>(n_columns));
+    loo_dosages_.resize(n_loo_rows, std::vector<float>(n_columns));
   }
 
   std::array<std::size_t, 2> dimensions() const { return {dosages_.size(), dosages_.empty() ? 0 : dosages_[0].size()}; }
+  std::array<std::size_t, 2> dimensions_loo() const { return {dosages_.size(), dosages_.empty() ? 0 : dosages_[0].size()}; }
 
   float& dosage(std::size_t i, std::size_t j) { return dosages_[i][j]; }
   const float& dosage(std::size_t i, std::size_t j) const  { return dosages_[i][j]; }
@@ -77,6 +78,8 @@ private:
   std::vector<bool> precision_jumps_;
   float background_error_;
   static constexpr float jump_fix = 1e15f;
+  const std::int16_t bin_scalar_ = 100;
+
 public:
   hidden_markov_model(float background_error = 1e-5f);
 
@@ -88,6 +91,7 @@ public:
   void traverse_backward(const std::deque<unique_haplotype_block>& ref_haps,
     const std::vector<target_variant>& tar_variant,
     std::size_t hap_idx,
+    std::size_t out_idx,
     const std::vector<std::vector<std::vector<std::size_t>>>& reverse_maps,
     Args& ... args); //best_templates_results& output);
 private:
@@ -118,7 +122,7 @@ private:
     const std::vector<std::vector<std::size_t>>& reverse_map,
     const std::vector<std::int8_t>& template_haps,
     const std::vector<target_variant>& tar_variants,
-    std::size_t row, std::size_t column, best_templates_results& output);
+    std::size_t row, std::size_t column, std::size_t out_column, best_templates_results& output);
 
   void impute(double& prob_sum, std::size_t& prev_best_hap,
     const std::vector<float>& left_probs,
@@ -131,7 +135,7 @@ private:
     const std::vector<std::vector<std::size_t>>& reverse_map,
     const std::vector<std::int8_t>& template_haps,
     const std::vector<target_variant>& tar_variants,
-    std::size_t row, std::size_t column, full_dosages_results& output, reduced_haplotypes::iterator& full_ref_ritr, const reduced_haplotypes::iterator& full_ref_rend);
+    std::size_t row, std::size_t column, std::size_t out_column, full_dosages_results& output, reduced_haplotypes::iterator& full_ref_ritr, const reduced_haplotypes::iterator& full_ref_rend);
 
   void initialize_likelihoods(std::vector<float>& probs, std::vector<float>& probs_norecom, std::vector<float>& proportions, const unique_haplotype_block& ref_block);
   void typed_to_full_probs(
@@ -151,6 +155,7 @@ template <typename ... Args>
 void hidden_markov_model::traverse_backward(const std::deque<unique_haplotype_block>& ref_haps,
   const std::vector<target_variant>& tar_variants,
   std::size_t hap_idx,
+  std::size_t out_idx,
   const std::vector<std::vector<std::vector<std::size_t>>>& reverse_maps,
   Args& ... args)
 {
@@ -244,7 +249,7 @@ void hidden_markov_model::traverse_backward(const std::deque<unique_haplotype_bl
         prob_sum *= jump_fix;
 
       std::int8_t observed = tar_variants[global_idx].gt[hap_idx];
-      impute(prob_sum, best_hap, forward_probs_[block_idx][i], backward, forward_norecom_probs_[block_idx][i], backward_norecom, junction_prob_proportions_[block_idx], junction_proportions_backward, constants, reverse_maps[block_idx], template_variants[i].gt, tar_variants, global_idx, hap_idx, args...);
+      impute(prob_sum, best_hap, forward_probs_[block_idx][i], backward, forward_norecom_probs_[block_idx][i], backward_norecom, junction_prob_proportions_[block_idx], junction_proportions_backward, constants, reverse_maps[block_idx], template_variants[i].gt, tar_variants, global_idx, hap_idx, out_idx, args...);
 
       if (observed >= 0)
         condition(backward, backward_norecom, template_variants[i].gt, observed, tar_variants[global_idx].err, tar_variants[global_idx].af);

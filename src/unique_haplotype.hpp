@@ -100,7 +100,10 @@ public:
       ++variant_idx_;
       assert(block_idx_ < parent_->blocks_.size());
       if (variant_idx_ >= parent_->blocks_[block_idx_].variant_size())
+      {
         ++block_idx_;
+        variant_idx_ = 0;
+      }
       return *this;
     }
 
@@ -141,7 +144,7 @@ public:
   };
 
   iterator begin() const { return iterator(*this, 0, 0); }
-  iterator end() const { return iterator(*this, blocks_.size() - 1, blocks_.size() ? blocks_.back().variant_size() : 0); }
+  iterator end() const { return iterator(*this, blocks_.size(), 0); }
 
   reduced_haplotypes() {}
   reduced_haplotypes(std::size_t min_block_size, std::size_t max_block_size);

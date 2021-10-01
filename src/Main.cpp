@@ -273,6 +273,7 @@ private:
   savvy::genomic_region reg_ = {""};
   std::int64_t overlap_;
   std::int16_t threads_ = 1;
+  bool deferred_interpolation_ = false;
   bool help_ = false;
 
 public:
@@ -291,6 +292,7 @@ public:
   const savvy::genomic_region& region() const { return reg_; }
   std::int64_t overlap() const { return overlap_; }
   std::int16_t threads() const { return threads_; }
+  bool deferred_interpolation() const { return deferred_interpolation_; }
 
   prog_args() :
     getopt_wrapper(
@@ -303,6 +305,7 @@ public:
         {"region", required_argument, 0, 'r', "Genomic region to impute"},
         {"threads", required_argument, 0, 't', "Number of threads (default: 1)"},
         {"overlap", required_argument, 0, 'w', "Size (in Bp) of overlap before and after region to use as input to HMM (default: 1000000)"},
+        {"deferred-interpolation", no_argument, 0, '\x01', "Enables experimental deferred interpolation algorithm"},
       })
   {
   }
@@ -372,6 +375,12 @@ public:
       case 'w':
         overlap_ = std::atoll(optarg ? optarg : "");
         break;
+      case '\x01':
+        if (std::string(long_options_[long_index].name) =="deferred-interpolation")
+        {
+          deferred_interpolation_ = true;
+          break;
+        } // else pass through to default
       default:
         return false;
       }
@@ -606,6 +615,12 @@ private:
   std::vector<std::string> fmt_fields_;
   std::size_t n_samples_ = 0;
   const std::int16_t bin_scalar_ = 100; //256;
+  struct variant_update_ctx
+  {
+    savvy::compressed_vector<std::int8_t> sparse_gt;
+    savvy::compressed_vector<float> sparse_dosages;
+    std::vector<float> gp_vec;
+  };
 public:
   haplotype_interpolator(const std::string& file_path, savvy::file::format file_format, std::uint8_t out_compression, const std::vector<std::string>& sample_ids, const std::vector<std::string>& fmt_fields, const std::string& chromosome) :
     out_file_(file_path, file_format, gen_headers(fmt_fields, chromosome), sample_ids, out_compression),
@@ -656,18 +671,108 @@ public:
     return headers;
   }
 
-  static bool sites_match(const target_variant& t, const savvy::variant& r)
+  bool sites_match(const target_variant& t, const reference_site_info& r)
   {
-    bool ret = t.pos == r.position() && t.alt == r.alts()[0] && t.ref == r.ref();
-    return ret;
-    //return typed_variants[global_idx].pos == ref_var.position() && typed_variants[global_idx].alt == ref_var.alts()[0] && typed_variants[global_idx].ref == ref_var.ref();
+    return t.pos == r.pos && t.alt == r.alt && t.ref == r.ref;
   }
 
-  bool piecewise_constant(const std::vector<target_variant>& typed_variants, const reduced_haplotypes& reduced_reference, const best_templates_results& hmm_results, const std::string& reference_path, const savvy::genomic_region& reg, const std::string& output_path)
+  bool write_dosages(const full_dosages_results& hmm_results, const std::vector<target_variant>& tar_variants, const reduced_haplotypes& full_reference_data, const std::string& output_path, omp::internal::thread_pool2& tpool)
+  {
+    assert(hmm_results.dimensions()[0] == full_reference_data.variant_size());
+
+    std::vector<variant_update_ctx> update_contexts(tpool.thread_count());
+    std::vector<savvy::variant> out_vars(tpool.thread_count());
+
+    assert(!tar_variants.empty());
+    std::vector<std::vector<float>> dosage_vecs(tpool.thread_count(), std::vector<float>(tar_variants[0].gt.size()));
+    std::vector<std::vector<float>> loo_dosage_vecs(tpool.thread_count(), std::vector<float>(tar_variants[0].gt.size()));
+    const std::vector<std::int8_t> empty_gt_vec;
+    const std::vector<float> empty_loo_vec;
+
+    std::vector<std::size_t> tar_indices(tpool.thread_count());
+    std::size_t tar_idx = 0;
+    std::size_t i = 0;
+#if 0
+    auto ref_it = full_reference_data.begin();
+    auto ref_it_end = full_reference_data.end();
+    while (i < full_reference_data.variant_size())
+    {
+      assert(i == ref_it.global_idx());
+      std::fill(tar_indices.begin(), tar_indices.end(), tar_idx);
+      tpool([this, i, tar_idx, ref_it, ref_it_end, &tar_indices, &tar_variants, &hmm_results, &dosage_vecs, &loo_dosage_vecs, &out_vars, &update_contexts, &empty_loo_vec, &empty_gt_vec](std::size_t thread_idx)
+        {
+          std::size_t ref_idx = i + thread_idx;
+          std::size_t local_tar_idx = tar_idx;
+          auto local_ref_it = ref_it;
+          auto& dosages = dosage_vecs[thread_idx];
+          auto& loo_dosages = loo_dosage_vecs[thread_idx];
+
+          for (std::size_t j = 0; j < thread_idx && local_ref_it != ref_it_end; ++j)
+            ++local_ref_it;
+
+          if (local_ref_it == ref_it_end)
+            return;
+
+          while (local_tar_idx < tar_variants.size() && tar_variants[local_tar_idx].pos < local_ref_it->pos)
+            ++local_tar_idx;
+
+          tar_indices[thread_idx] = local_tar_idx;
+
+          bool ref_matches_tar = local_tar_idx < tar_variants.size() && sites_match(tar_variants[local_tar_idx], *local_ref_it);
+
+//          for (std::size_t j = 0; j < dosages.size(); ++j)
+//            dosages[j] = float(std::int16_t(hmm_results.dosage(ref_idx, j) * bin_scalar_ + 0.5f)) / bin_scalar_;
+//
+//          if (ref_matches_tar)
+//          {
+//            for (std::size_t j = 0; j < loo_dosages.size(); ++j)
+//              loo_dosages[j] = float(std::int16_t(hmm_results.loo_dosage(local_tar_idx, j) * bin_scalar_ + 0.5f)) / bin_scalar_;
+//          }
+
+
+          out_vars[thread_idx] = savvy::site_info(local_ref_it->chrom, local_ref_it->pos, local_ref_it->ref, {local_ref_it->alt}, ""/*ref_var.id()*/);
+          prepare_output_variant(out_vars[thread_idx], update_contexts[thread_idx], hmm_results.dosages_[ref_idx], ref_matches_tar ? hmm_results.loo_dosages_[local_tar_idx] : empty_loo_vec, ref_matches_tar ? tar_variants[local_tar_idx].gt : empty_gt_vec);
+        });
+
+      for (std::size_t j = 0; j < tpool.thread_count() && ref_it != ref_it_end; ++j,++ref_it,++i)
+      {
+        out_file_ << out_vars[j];
+        if (tar_indices[j] > tar_idx)
+          tar_idx = tar_indices[j];
+      }
+    }
+#else
+    for (auto ref_it = full_reference_data.begin(); ref_it != full_reference_data.end(); ++ref_it,++i)
+    {
+      assert(i == ref_it.global_idx());
+      while (tar_idx < tar_variants.size() && tar_variants[tar_idx].pos < ref_it->pos)
+        ++tar_idx;
+
+      bool ref_matches_tar = tar_idx < tar_variants.size() && sites_match(tar_variants[tar_idx], *ref_it);
+//      for (std::size_t j = 0; j < dosages.size(); ++j)
+//        dosages[j] = float(std::int16_t(hmm_results.dosage(i, j) * bin_scalar_ + 0.5f)) / bin_scalar_;
+//
+//      if (ref_matches_tar)
+//      {
+//        for (std::size_t j = 0; j < loo_dosages.size(); ++j)
+//          loo_dosages[j] = float(std::int16_t(hmm_results.loo_dosage(tar_idx, j) * bin_scalar_ + 0.5f)) / bin_scalar_;
+//      }
+
+
+
+      out_vars[0] = savvy::site_info(ref_it->chrom, ref_it->pos, ref_it->ref, {ref_it->alt}, ""/*ref_var.id()*/);
+      prepare_output_variant(out_vars[0], update_contexts[0], hmm_results.dosages_[i], ref_matches_tar ? hmm_results.loo_dosages_[tar_idx] : empty_loo_vec, ref_matches_tar ? tar_variants[tar_idx].gt : empty_gt_vec);
+      out_file_ << out_vars[0];
+    }
+#endif
+  }
+
+  bool piecewise_constant( const best_templates_results& hmm_results, const std::vector<target_variant>& typed_variants, const reduced_haplotypes& reduced_reference, const std::string& reference_path, const savvy::genomic_region& reg, const std::string& output_path)
   {
     auto dims = hmm_results.dimensions();
-    savvy::reader ref_file(reference_path);
     savvy::variant ref_var, out_var;
+    variant_update_ctx update_ctx;
+    savvy::reader ref_file(reference_path);
     ref_file.reset_bounds(reg);
 
     //savvy::writer out_file(output_path, savvy::file::format::bcf, {}, {});
@@ -680,6 +785,11 @@ public:
     savvy::compressed_vector<std::int8_t> genos;
     std::vector<std::size_t> allele_counts;
     std::vector<std::int8_t> dense_genos;
+
+    auto sites_match = [](const target_variant& t, const savvy::variant& r)
+    {
+      return t.pos == r.position() && t.alt == r.alts()[0] && t.ref == r.ref();
+    };
 
     ref_file >> ref_var;
 
@@ -784,7 +894,8 @@ public:
           for (auto it = genos.begin(); it != genos.end(); ++it)
             dense_genos[it.offset()] = 0; // make dense_genos all zero.
 
-          prepare_output_variant(out_var, ref_var, dosages, ref_matches_typed ? loo_dosages : empty_loo_vec, ref_matches_typed ? typed_variants[global_idx].gt : empty_gt_vec);
+          out_var = savvy::site_info(ref_var.chromosome(), ref_var.position(), ref_var.ref(), ref_var.alts(), ref_var.id());
+          prepare_output_variant(out_var, update_ctx, dosages, ref_matches_typed ? loo_dosages : empty_loo_vec, ref_matches_typed ? typed_variants[global_idx].gt : empty_gt_vec);
           out_file_ << out_var;
 
           ref_file >> ref_var;
@@ -803,17 +914,13 @@ public:
     return out_file_.good();
   }
 private:
-  void prepare_output_variant(savvy::variant& out_var, const savvy::variant& ref_var, const std::vector<float>& dosages, const std::vector<float>& loo_dosages, const std::vector<std::int8_t>& observed)
+  void prepare_output_variant(savvy::variant& out_var, variant_update_ctx& ctx, const std::vector<float>& dosages, const std::vector<float>& loo_dosages, const std::vector<std::int8_t>& observed)
   {
-    savvy::compressed_vector<std::int8_t> sparse_gt;
-    savvy::compressed_vector<float> sparse_dosages;
-    std::vector<float> gp_vec;
-    sparse_dosages.assign(dosages.begin(), dosages.end());
-    out_var = savvy::site_info(ref_var.chromosome(), ref_var.position(), ref_var.ref(), ref_var.alts(), ref_var.id());
+    ctx.sparse_dosages.assign(dosages.begin(), dosages.end());
 
-    std::size_t n = sparse_dosages.size();
-    float s_x = std::accumulate(sparse_dosages.begin(), sparse_dosages.end(), 0.f);
-    float s_xx = std::inner_product(sparse_dosages.begin(), sparse_dosages.end(), sparse_dosages.begin(), 0.f);
+    std::size_t n = ctx.sparse_dosages.size();
+    float s_x = std::accumulate(ctx.sparse_dosages.begin(), ctx.sparse_dosages.end(), 0.f);
+    float s_xx = std::inner_product(ctx.sparse_dosages.begin(), ctx.sparse_dosages.end(), ctx.sparse_dosages.begin(), 0.f);
     float af = s_x / n;
 
     float r2 = savvy::typed_value::missing_value<float>();
@@ -830,21 +937,21 @@ private:
       if (fmt == "HDS")
       {
         if (!hds_set)
-          sparse_dosages.assign(dosages.begin(), dosages.end());
-        out_var.set_format("HDS", sparse_dosages);
+          ctx.sparse_dosages.assign(dosages.begin(), dosages.end());
+        out_var.set_format("HDS", ctx.sparse_dosages);
         hds_set = true;
       }
       else if (fmt == "GT")
       {
-        sparse_gt.assign(dosages.begin(), dosages.end(), [](float v){ return std::int8_t(v < 0.5f ? 0 : 1); });
-        out_var.set_format("GT", sparse_gt);
+        ctx.sparse_gt.assign(dosages.begin(), dosages.end(), [](float v){ return std::int8_t(v < 0.5f ? 0 : 1); });
+        out_var.set_format("GT", ctx.sparse_gt);
       }
       else if (fmt == "DS")
       {
         if (!hds_set)
-          sparse_dosages.assign(dosages.begin(), dosages.end());
-        savvy::stride_reduce(sparse_dosages, sparse_dosages.size() / n_samples_);
-        out_var.set_format("DS", sparse_dosages);
+          ctx.sparse_dosages.assign(dosages.begin(), dosages.end());
+        savvy::stride_reduce(ctx.sparse_dosages, ctx.sparse_dosages.size() / n_samples_);
+        out_var.set_format("DS", ctx.sparse_dosages);
         hds_set = false;
       }
       else if (fmt == "GP")
@@ -858,15 +965,15 @@ private:
     if (observed.size())
     {
       assert(observed.size() == loo_dosages.size());
-      sparse_dosages.assign(loo_dosages.begin(), loo_dosages.end());
-      sparse_gt.assign(observed.begin(), observed.end());
-      s_x = std::accumulate(sparse_dosages.begin(), sparse_dosages.end(), 0.f);
-      s_xx = std::inner_product(sparse_dosages.begin(), sparse_dosages.end(), sparse_dosages.begin(), 0.f);
-      float s_y = std::accumulate(sparse_gt.begin(), sparse_gt.end(), 0.f);
+      ctx.sparse_dosages.assign(loo_dosages.begin(), loo_dosages.end());
+      ctx.sparse_gt.assign(observed.begin(), observed.end());
+      s_x = std::accumulate(ctx.sparse_dosages.begin(), ctx.sparse_dosages.end(), 0.f);
+      s_xx = std::inner_product(ctx.sparse_dosages.begin(), ctx.sparse_dosages.end(), ctx.sparse_dosages.begin(), 0.f);
+      float s_y = std::accumulate(ctx.sparse_gt.begin(), ctx.sparse_gt.end(), 0.f);
       // since observed can only be 0 or 1, s_yy is the same as s_y
       float s_yy = s_y; //std::inner_product(sparse_gt.begin(), sparse_gt.end(), sparse_gt.begin(), 0.f); // TODO: allow for missing oberserved genotypes.
       float s_xy = 0.f;
-      for (auto it = sparse_gt.begin(); it != sparse_gt.end(); ++it)
+      for (auto it = ctx.sparse_gt.begin(); it != ctx.sparse_gt.end(); ++it)
         s_xy += *it * loo_dosages[it.offset()];
 
       //                         n * Sum xy - Sum x * Sum y
@@ -913,7 +1020,7 @@ int main(int argc, char** argv)
 
   reduced_haplotypes typed_only_reference_data(16, 512);
   reduced_haplotypes full_reference_data;
-  load_reference_haplotypes(args.ref_path(), extended_region, args.region(), target_sites, typed_only_reference_data, &full_reference_data);
+  load_reference_haplotypes(args.ref_path(), extended_region, args.region(), target_sites, typed_only_reference_data, args.deferred_interpolation() ? nullptr : &full_reference_data);
   std::cerr << ("Loading reference haplotypes took " + std::to_string(std::difftime(std::time(nullptr), start_time)) + " seconds") << std::endl;
 
   start_time = std::time(nullptr);
@@ -955,7 +1062,7 @@ int main(int argc, char** argv)
   omp::internal::thread_pool2 tpool(args.threads());
   std::vector<hidden_markov_model> hmms(args.threads());
 
-  if (!full_reference_data.variant_size())
+  if (args.deferred_interpolation())
   {
     best_templates_results hmm_results;
     hmm_results.resize(target_sites.size(), target_sites[0].gt.size());
@@ -963,28 +1070,65 @@ int main(int argc, char** argv)
     omp::parallel_for_exp(omp::static_schedule(), omp::sequence_iterator(0), omp::sequence_iterator(target_sites[0].gt.size()), [&](int& i, const omp::iteration_context& ctx)
       {
         hmms[ctx.thread_index].traverse_forward(typed_only_reference_data.blocks(), target_sites, i);
-        hmms[ctx.thread_index].traverse_backward(typed_only_reference_data.blocks(), target_sites, i, reverse_maps, hmm_results);
+        hmms[ctx.thread_index].traverse_backward(typed_only_reference_data.blocks(), target_sites, i, i, reverse_maps, hmm_results);
       },
       tpool);
     std::cerr << ("Running HMM took " + std::to_string(std::difftime(std::time(nullptr), start_time)) + " seconds") << std::endl;
     start_time = std::time(nullptr);
     haplotype_interpolator interpolator(args.out_path(), args.out_format(), args.out_compression(), sample_ids, args.fmt_fields(), target_sites.front().chrom);
-    interpolator.piecewise_constant(target_sites, typed_only_reference_data, hmm_results, args.ref_path(), args.region(), args.out_path());
+    interpolator.piecewise_constant(hmm_results, target_sites, typed_only_reference_data, args.ref_path(), args.region(), args.out_path());
     std::cerr << ("Interpolating and writing output took " + std::to_string(std::difftime(std::time(nullptr), start_time)) + " seconds") << std::endl;
   }
   else
   {
+    std::size_t haplotype_buffer_size = 400; // TODO
+    std::vector<std::string> temp_file_paths;
+    temp_file_paths.reserve(target_sites[0].gt.size() / haplotype_buffer_size + 1);
     full_dosages_results hmm_results;
-    hmm_results.resize(full_reference_data.variant_size(), target_sites[0].gt.size());
+    hmm_results.resize(full_reference_data.variant_size(), target_sites.size(), std::min(haplotype_buffer_size, target_sites[0].gt.size()));
 
-    omp::parallel_for_exp(omp::static_schedule(), omp::sequence_iterator(0), omp::sequence_iterator(target_sites[0].gt.size()), [&](int& i, const omp::iteration_context& ctx)
-      {
-        hmms[ctx.thread_index].traverse_forward(typed_only_reference_data.blocks(), target_sites, i);
-        auto reverse_ref_itr = --full_reference_data.end();
-        hmms[ctx.thread_index].traverse_backward(typed_only_reference_data.blocks(), target_sites, i, reverse_maps, hmm_results, reverse_ref_itr, --full_reference_data.begin());
-      },
-      tpool);
-    std::cerr << ("Running HMM took " + std::to_string(std::difftime(std::time(nullptr), start_time)) + " seconds") << std::endl;
+    double impute_time = 0.;
+    double temp_write_time = 0.;
+    bool use_temp_files = target_sites[0].gt.size() > haplotype_buffer_size;
+    for (std::size_t i = 0; i < target_sites[0].gt.size(); i += haplotype_buffer_size)
+    {
+      start_time = std::time(nullptr);
+      omp::parallel_for_exp(omp::static_schedule(), omp::sequence_iterator(i), omp::sequence_iterator(std::min(i + haplotype_buffer_size, target_sites[0].gt.size())), [&](int& i, const omp::iteration_context& ctx)
+        {
+          hmms[ctx.thread_index].traverse_forward(typed_only_reference_data.blocks(), target_sites, i);
+          auto reverse_ref_itr = --full_reference_data.end();
+          hmms[ctx.thread_index].traverse_backward(typed_only_reference_data.blocks(), target_sites, i, i % haplotype_buffer_size, reverse_maps, hmm_results, reverse_ref_itr, --full_reference_data.begin());
+        }, tpool);
+      impute_time += std::difftime(std::time(nullptr), start_time);
+
+      start_time = std::time(nullptr);
+      temp_file_paths.push_back(use_temp_files ? "/tmp/m4_g" + std::to_string(i / haplotype_buffer_size) + ".sav" : args.out_path()); //TODO: use real temp files
+      haplotype_interpolator interpolator(temp_file_paths.back(),
+        use_temp_files ? savvy::file::format::sav : args.out_format(),
+        use_temp_files ? std::min<std::uint8_t>(3, args.out_compression()) : args.out_compression(),
+        sample_ids,
+        use_temp_files ? std::vector<std::string>{"HDS"} : args.fmt_fields(),
+        target_sites.front().chrom);
+      interpolator.write_dosages(hmm_results, target_sites, full_reference_data, args.out_path(), tpool);
+      temp_write_time += std::difftime(std::time(nullptr), start_time);
+    }
+
+    if (use_temp_files)
+    {
+      std::cerr << ("Running HMM took " + std::to_string(impute_time) + " seconds") << std::endl;
+      std::cerr << ("Writing temp files took " + std::to_string(temp_write_time) + " seconds") << std::endl;
+      return 1;
+      // TODO:
+      std::cerr << "Merging temp files ... " << std::endl;
+      start_time = std::time(nullptr);
+      haplotype_interpolator interpolator(args.out_path(), args.out_format(), args.out_compression(), sample_ids, args.fmt_fields(), target_sites.front().chrom);
+      interpolator.write_dosages(hmm_results, target_sites, full_reference_data, args.out_path(), tpool);
+      std::cerr << ("Merging temp files took " + std::to_string(std::difftime(std::time(nullptr), start_time)) + " seconds") << std::endl;
+    }
+    else
+    {
+      std::cerr << ("Writing output took " + std::to_string(temp_write_time) + " seconds") << std::endl;
+    }
   }
 
 
