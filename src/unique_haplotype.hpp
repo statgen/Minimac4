@@ -11,9 +11,11 @@
 struct reference_site_info
 {
   std::string chrom;
-  std::uint32_t pos;
+  std::uint32_t pos = 0;
   std::string ref;
   std::string alt;
+
+  reference_site_info() {}
 
   reference_site_info(std::string _chrom,
     std::uint32_t _pos,
@@ -30,6 +32,8 @@ struct reference_site_info
 
 struct reference_variant : public reference_site_info
 {
+  reference_variant() {}
+
   reference_variant(const std::string& _chrom,
     std::uint32_t _pos,
     const std::string& _ref,
@@ -42,7 +46,7 @@ struct reference_variant : public reference_site_info
     gt(std::move(_gt))
   {
   }
-  std::size_t ac;
+  std::size_t ac = 0;
   std::vector<std::int8_t> gt;
 };
 
@@ -51,33 +55,21 @@ class unique_haplotype_block
 private:
   std::vector<std::size_t> unique_map_;
   std::vector<std::size_t> cardinalities_;
-  std::vector<std::vector<std::size_t>> reverse_map_;
-  std::vector<reference_variant> sites_;
-  //std::vector<std::vector<std::int8_t>> unique_hap_matrix_;
+  std::vector<reference_variant> variants_;
 public:
-//  class unique_matrix_wrapper
-//  {
-//  public:
-//    unique_matrix_wrapper(const unique_haplotype_block& parent) : parent_(parent) {}
-//    const std::vector<std::int8_t>& operator[](std::size_t row_idx) const { return parent_.unique_hap_matrix_[row_idx]; }
-//    std::size_t n_rows() const { return parent_.unique_hap_matrix_.size(); }
-//    std::size_t n_columns() const { return parent_.unique_hap_matrix_.size() ? parent_.unique_hap_matrix_[0].size() : 0; }
-//  private:
-//    const unique_haplotype_block& parent_;
-//  };
-
-  unique_haplotype_block& operator=(const unique_haplotype_block&) = default;
-  unique_haplotype_block& operator=(unique_haplotype_block&&) = default;
-
   bool compress_variant(const reference_site_info& site_info, const std::vector<std::int8_t>& alleles);
 
-  //const std::vector<std::vector<std::int8_t>>& compressed_matrix() const { return unique_hap_matrix_; }
-  const std::vector<reference_variant>& variants() const { return sites_; }
+  const std::vector<reference_variant>& variants() const { return variants_; }
   const std::vector<std::size_t>& unique_map() const { return unique_map_; }
   std::size_t expanded_haplotype_size() const { return unique_map_.size(); }
-  std::size_t unique_haplotype_size() const { return sites_.empty() ? 0 : sites_[0].gt.size(); }
-  std::size_t variant_size() const { return sites_.size(); }
+  std::size_t unique_haplotype_size() const { return variants_.empty() ? 0 : variants_[0].gt.size(); }
+  std::size_t variant_size() const { return variants_.size(); }
   const std::vector<std::size_t>& cardinalities() const { return cardinalities_; }
+
+  void clear();
+  void trim(std::size_t min_pos, std::size_t max_pos);
+  void pop_variant();
+  bool deserialize(std::istream& is, std::uint8_t m3vcf_version, std::size_t n_haplotypes);
 };
 
 class reduced_haplotypes
@@ -143,16 +135,18 @@ public:
 
     std::size_t block_idx() const { return block_idx_; }
     std::size_t block_local_idx() const { return variant_idx_; }
-    std::size_t global_idx() const { return parent_->block_offsets_[block_idx_] + parent_->blocks_[block_idx_].variant_size(); }
-    const std::vector<std::size_t>& unique_map() const { parent_->blocks_[block_idx_].unique_map(); }
+    std::size_t global_idx() const { return parent_->block_offsets_[block_idx_] + variant_idx_; }
+    const std::vector<std::size_t>& unique_map() const { return parent_->blocks_[block_idx_].unique_map(); }
     const std::vector<std::size_t>& cardinalities() const { return parent_->blocks_[block_idx_].cardinalities(); }
   };
 
   iterator begin() const { return iterator(*this, 0, 0); }
   iterator end() const { return iterator(*this, blocks_.size() - 1, blocks_.size() ? blocks_.back().variant_size() : 0); }
 
+  reduced_haplotypes() {}
   reduced_haplotypes(std::size_t min_block_size, std::size_t max_block_size);
   bool compress_variant(const reference_site_info& site_info, const std::vector<std::int8_t>& alleles);
+  bool append_block(const unique_haplotype_block& block);
   float compression_ratio() const;
   const std::deque<unique_haplotype_block>& blocks() const { return blocks_; }
   std::size_t variant_size() const { return variant_count_; }

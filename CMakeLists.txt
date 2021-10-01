@@ -13,14 +13,14 @@ add_definitions(-DVERSION="${PROJECT_VERSION}" -DUSER="${USER}" -DDATE="${DATE}"
 
 set(CMAKE_FIND_LIBRARY_SUFFIXES ".a;${CMAKE_FIND_LIBRARY_SUFFIXES}") # Prefer libz.a when both are available
 
-find_package(OpenMP)
-if (OPENMP_FOUND)
-    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${OpenMP_C_FLAGS}")
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
-endif()
+#find_package(OpenMP)
+#if (OPENMP_FOUND)
+#    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${OpenMP_C_FLAGS}")
+#    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
+#endif()
 
 
-
+find_package(Threads)
 find_package(ZLIB REQUIRED)
 find_library(STATGEN_LIBRARY StatGen)
 find_library(OMPP_LIBRARY omp)
@@ -28,30 +28,30 @@ find_package(savvy REQUIRED)
 add_executable(minimac4
         src/hidden_markov_model.cpp src/hidden_markov_model.hpp
         src/recombination.cpp src/recombination.hpp
-        src/unique_haplotype.cpp src/unique_haplotype.hpp
-        src/Analysis.cpp
-        src/Analysis.h
-        src/AnalysisChunks.cpp
-        src/DosageData.cpp
-        src/DosageData.h
-        src/HaplotypeSet.cpp
-        src/HaplotypeSet.h
-        src/Imputation.cpp
-        src/Imputation.h
-        src/ImputationStatistics.cpp
-        src/ImputationStatistics.h
-        src/Main.cpp
-        src/MarkovModel.cpp
-        src/MarkovModel.h
-        src/MarkovParameters.cpp
-        src/MarkovParameters.h
-        src/MyVariables.h
-        src/Unique.cpp
-        src/Unique.h
-        src/Estimation.cpp
-        src/Estimation.h)
+        src/unique_haplotype.cpp src/unique_haplotype.hpp src/Main.cpp)
+#        src/Analysis.cpp
+#        src/Analysis.h
+#        src/AnalysisChunks.cpp
+#        src/DosageData.cpp
+#        src/DosageData.h
+#        src/HaplotypeSet.cpp
+#        src/HaplotypeSet.h
+#        src/Imputation.cpp
+#        src/Imputation.h
+#        src/ImputationStatistics.cpp
+#        src/ImputationStatistics.h
+#        src/Main.cpp
+#        src/MarkovModel.cpp
+#        src/MarkovModel.h
+#        src/MarkovParameters.cpp
+#        src/MarkovParameters.h
+#        src/MyVariables.h
+#        src/Unique.cpp
+#        src/Unique.h
+#        src/Estimation.cpp
+#        src/Estimation.h)
 
-target_link_libraries(minimac4 savvy ${OMPP_LIBRARY} ${STATGEN_LIBRARY} ${ZLIB_LIBRARIES})
+target_link_libraries(minimac4 savvy ${OMPP_LIBRARY} ${STATGEN_LIBRARY} ${ZLIB_LIBRARIES} Threads::Threads)
 
 install(TARGETS minimac4 RUNTIME DESTINATION bin)
 
