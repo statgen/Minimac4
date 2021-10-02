@@ -676,7 +676,71 @@ public:
     return t.pos == r.pos && t.alt == r.alt && t.ref == r.ref;
   }
 
-  bool write_dosages(const full_dosages_results& hmm_results, const std::vector<target_variant>& tar_variants, const reduced_haplotypes& full_reference_data, const std::string& output_path, omp::internal::thread_pool2& tpool)
+  bool merge_temp_files(const std::vector<std::string>& temp_files_paths)
+  {
+    if (temp_files_paths.empty())
+      return false;
+
+    std::list<savvy::reader> temp_files;
+    for (auto it = temp_files_paths.begin(); it != temp_files_paths.end(); ++it)
+    {
+      temp_files.emplace_back(*it);
+      std::remove(it->c_str());
+    }
+
+
+    savvy::variant out_var;
+    savvy::compressed_vector<float> pasted_hds;
+    savvy::compressed_vector<float> partial_hds;
+
+    int good_count = temp_files.size();
+    while (good_count == temp_files.size())
+    {
+      pasted_hds.clear();
+      good_count = 0;
+      for (auto it = temp_files.begin(); it != temp_files.end(); ++it)
+      {
+        good_count += (int)(*it >> out_var).good();
+        out_var.get_format("HDS", partial_hds);
+        std::size_t old_size = pasted_hds.size();
+        pasted_hds.resize(old_size + partial_hds.size());
+        for (auto jt = partial_hds.begin(); jt != partial_hds.end(); ++jt)
+          pasted_hds[old_size + jt.offset()] = *jt;
+      }
+
+      if (good_count)
+      {
+        if (good_count < temp_files.size())
+          return std::cerr << "Error: record mismatch in temp files" << std::endl, false;
+
+        std::size_t n = pasted_hds.size();
+        float s_x = std::accumulate(pasted_hds.begin(), pasted_hds.end(), 0.f);
+        float s_xx = std::inner_product(pasted_hds.begin(), pasted_hds.end(), pasted_hds.begin(), 0.f);
+        float af = s_x / n;
+
+        float r2 = savvy::typed_value::missing_value<float>();
+        if (af > 0.f && af < 1.f)
+          r2 = ((s_xx - s_x * s_x / n) / n) / (af * (1.f - af));
+
+        out_var.set_info("AF", af);
+        out_var.set_info("MAF", af > 0.5f ? 1.f - af : af);
+        out_var.set_info("R2", r2);
+
+        out_var.set_format("HDS", pasted_hds);
+        out_file_ << out_var;
+      }
+    }
+
+    int bad_count = 0;
+    for (auto it = temp_files.begin(); it != temp_files.end(); ++it)
+      bad_count += (int)it->bad();
+
+    if (bad_count || !out_file_.good())
+      return std::cerr << "Error: I/O failed during merging" << std::endl, false;
+    return true;
+  }
+
+  bool write_dosages(const full_dosages_results& hmm_results, const std::vector<target_variant>& tar_variants, std::pair<std::size_t, std::size_t> oberved_range, const reduced_haplotypes& full_reference_data, const std::string& output_path, omp::internal::thread_pool2& tpool)
   {
     assert(hmm_results.dimensions()[0] == full_reference_data.variant_size());
 
@@ -761,7 +825,9 @@ public:
 
 
       out_vars[0] = savvy::site_info(ref_it->chrom, ref_it->pos, ref_it->ref, {ref_it->alt}, ""/*ref_var.id()*/);
-      prepare_output_variant(out_vars[0], update_contexts[0], hmm_results.dosages_[i], ref_matches_tar ? hmm_results.loo_dosages_[tar_idx] : empty_loo_vec, ref_matches_tar ? tar_variants[tar_idx].gt : empty_gt_vec);
+      prepare_output_variant(out_vars[0], update_contexts[0], hmm_results.dosages_[i],
+        ref_matches_tar ? hmm_results.loo_dosages_[tar_idx] : empty_loo_vec,
+        ref_matches_tar ? std::vector<std::int8_t>(tar_variants[tar_idx].gt.begin() + oberved_range.first, tar_variants[tar_idx].gt.begin() + oberved_range.second) : empty_gt_vec);
       out_file_ << out_vars[0];
     }
 #endif
@@ -1092,6 +1158,15 @@ int main(int argc, char** argv)
     bool use_temp_files = target_sites[0].gt.size() > haplotype_buffer_size;
     for (std::size_t i = 0; i < target_sites[0].gt.size(); i += haplotype_buffer_size)
     {
+      std::size_t group_size = target_sites[0].gt.size() - i;
+      if (group_size < haplotype_buffer_size)
+      {
+        for (std::size_t j = 0; j < hmm_results.dosages_.size(); ++j)
+          hmm_results.dosages_[j].resize(group_size);
+        for (std::size_t j = 0; j < hmm_results.loo_dosages_.size(); ++j)
+          hmm_results.loo_dosages_[j].resize(group_size);
+      }
+
       start_time = std::time(nullptr);
       omp::parallel_for_exp(omp::static_schedule(), omp::sequence_iterator(i), omp::sequence_iterator(std::min(i + haplotype_buffer_size, target_sites[0].gt.size())), [&](int& i, const omp::iteration_context& ctx)
         {
@@ -1109,7 +1184,7 @@ int main(int argc, char** argv)
         sample_ids,
         use_temp_files ? std::vector<std::string>{"HDS"} : args.fmt_fields(),
         target_sites.front().chrom);
-      interpolator.write_dosages(hmm_results, target_sites, full_reference_data, args.out_path(), tpool);
+      interpolator.write_dosages(hmm_results, target_sites, {i, std::min(i + haplotype_buffer_size, target_sites[0].gt.size())}, full_reference_data, args.out_path(), tpool);
       temp_write_time += std::difftime(std::time(nullptr), start_time);
     }
 
@@ -1117,12 +1192,12 @@ int main(int argc, char** argv)
     {
       std::cerr << ("Running HMM took " + std::to_string(impute_time) + " seconds") << std::endl;
       std::cerr << ("Writing temp files took " + std::to_string(temp_write_time) + " seconds") << std::endl;
-      return 1;
+
       // TODO:
       std::cerr << "Merging temp files ... " << std::endl;
       start_time = std::time(nullptr);
       haplotype_interpolator interpolator(args.out_path(), args.out_format(), args.out_compression(), sample_ids, args.fmt_fields(), target_sites.front().chrom);
-      interpolator.write_dosages(hmm_results, target_sites, full_reference_data, args.out_path(), tpool);
+      interpolator.merge_temp_files(temp_file_paths);
       std::cerr << ("Merging temp files took " + std::to_string(std::difftime(std::time(nullptr), start_time)) + " seconds") << std::endl;
     }
     else
