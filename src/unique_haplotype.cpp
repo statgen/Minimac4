@@ -312,12 +312,20 @@ reduced_haplotypes::reduced_haplotypes(std::size_t min_block_size, std::size_t m
   max_block_size_ = std::max(std::size_t(1), max_block_size);
 }
 
-bool reduced_haplotypes::compress_variant(const reference_site_info& site_info, const std::vector<std::int8_t>& alleles)
+bool reduced_haplotypes::compress_variant(const reference_site_info& site_info, const std::vector<std::int8_t>& alleles, bool flush_block)
 {
   auto comp_ratio = [](const unique_haplotype_block& b)
     {
       return float(b.expanded_haplotype_size() + b.unique_haplotype_size() * b.variant_size()) / float(b.expanded_haplotype_size() * b.variant_size());
     };
+
+  if (flush_block && variant_count_)
+  {
+    float cr = comp_ratio(blocks_.back());
+    block_offsets_.push_back(block_offsets_.back() + blocks_.back().variant_size());
+    blocks_.emplace_back();
+    return blocks_.back().compress_variant(site_info, alleles);
+  }
 
   float old_cr = comp_ratio(blocks_.back());
   bool ret = blocks_.back().compress_variant(site_info, alleles);

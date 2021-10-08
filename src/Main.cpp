@@ -605,6 +605,7 @@ std::vector<target_variant> separate_target_only_variants(std::vector<target_var
   }
 
   target_sites.resize(shift_idx);
+  return target_only_sites;
 }
 
 class haplotype_interpolator
@@ -831,6 +832,7 @@ public:
       out_file_ << out_vars[0];
     }
 #endif
+    return out_file_.good();
   }
 
   bool piecewise_constant( const best_templates_results& hmm_results, const std::vector<target_variant>& typed_variants, const reduced_haplotypes& reduced_reference, const std::string& reference_path, const savvy::genomic_region& reg, const std::string& output_path)
@@ -940,6 +942,7 @@ public:
               }
 
               p += (1.f - prob_sum) * (float(genos.non_zero_size() - ac) / float(genos.size() - an));
+              p = std::max(0.f, std::min(1.f, p));
               p = float(std::int16_t(p * bin_scalar_ + 0.5f)) / bin_scalar_;
               // char s[256];
               // std::sprintf(s, "%0.3f", p);
@@ -1099,9 +1102,32 @@ int main(int argc, char** argv)
   target_sites.back().recom = 0.f; // Last recom prob must be zero so that the first step of backward traversal will have no recombination.
   if (args.map_path().size())
   {
-    start_time = std::time(nullptr);
-    if (!recombination::parse_map_file(args.map_path(), target_sites))
+//    start_time = std::time(nullptr);
+//    std::vector<reference_site_info> ref_sites;
+//    ref_sites.reserve(full_reference_data.variant_size());
+//    for (auto it = full_reference_data.begin(); it != full_reference_data.end(); ++it)
+//      ref_sites.emplace_back(*it);
+
+    if (!recombination::parse_map_file(args.map_path(), target_sites.begin(), target_sites.end()))
+    //if (!recombination::parse_map_file(args.map_path(), ref_sites.begin(), ref_sites.end()))
       return std::cerr << "Error: parsing map file failed\n", EXIT_FAILURE;
+
+//    auto tar_it = target_sites.begin();
+//    for (auto it = ref_sites.begin(); it != ref_sites.end(); ++it)
+//    {
+//      Error[i]=rHap.Error[rHap.MapTarToRef[i]];
+//      if(i>0)
+//      {
+//        int index=rHap.MapTarToRef[i-1];
+//        double temp=1.0;
+//        while(index<rHap.MapTarToRef[i])
+//        {
+//          temp*=(1.0-(rHap.Recom[index]));
+//          index++;
+//        }
+//        Recom[i-1]=(1.0-temp);
+//      }
+//    }
     std::cerr << ("Loading switch probabilities took " + std::to_string(std::difftime(std::time(nullptr), start_time)) + " seconds") << std::endl;
   }
 
@@ -1172,7 +1198,9 @@ int main(int argc, char** argv)
         {
           hmms[ctx.thread_index].traverse_forward(typed_only_reference_data.blocks(), target_sites, i);
           auto reverse_ref_itr = --full_reference_data.end();
-          hmms[ctx.thread_index].traverse_backward(typed_only_reference_data.blocks(), target_sites, i, i % haplotype_buffer_size, reverse_maps, hmm_results, reverse_ref_itr, --full_reference_data.begin());
+          std::size_t block_idx(-1);
+          hmms[ctx.thread_index].traverse_backward(typed_only_reference_data.blocks(), target_sites, i, i % haplotype_buffer_size, reverse_maps, hmm_results, reverse_ref_itr, --full_reference_data.begin(),
+            block_idx);
         }, tpool);
       impute_time += std::difftime(std::time(nullptr), start_time);
 
@@ -1188,9 +1216,9 @@ int main(int argc, char** argv)
       temp_write_time += std::difftime(std::time(nullptr), start_time);
     }
 
+    std::cerr << ("Running HMM took " + std::to_string(impute_time) + " seconds") << std::endl;
     if (use_temp_files)
     {
-      std::cerr << ("Running HMM took " + std::to_string(impute_time) + " seconds") << std::endl;
       std::cerr << ("Writing temp files took " + std::to_string(temp_write_time) + " seconds") << std::endl;
 
       // TODO:

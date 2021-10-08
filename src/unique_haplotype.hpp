@@ -14,6 +14,7 @@ struct reference_site_info
   std::uint32_t pos = 0;
   std::string ref;
   std::string alt;
+  //float recom = 0.f;
 
   reference_site_info() {}
 
@@ -107,6 +108,13 @@ public:
       return *this;
     }
 
+    iterator operator++(int)
+    {
+      iterator ret(*this);
+      ++(*this);
+      return ret;
+    }
+
     iterator& operator--()
     {
       if (variant_idx_ == 0)
@@ -124,6 +132,13 @@ public:
       }
 
       return *this;
+    }
+
+    iterator operator--(int)
+    {
+      iterator ret(*this);
+      --(*this);
+      return ret;
     }
 
     const reference_variant& operator*() const
@@ -148,7 +163,7 @@ public:
 
   reduced_haplotypes() {}
   reduced_haplotypes(std::size_t min_block_size, std::size_t max_block_size);
-  bool compress_variant(const reference_site_info& site_info, const std::vector<std::int8_t>& alleles);
+  bool compress_variant(const reference_site_info& site_info, const std::vector<std::int8_t>& alleles, bool flush_block = false);
   bool append_block(const unique_haplotype_block& block);
   float compression_ratio() const;
   const std::deque<unique_haplotype_block>& blocks() const { return blocks_; }

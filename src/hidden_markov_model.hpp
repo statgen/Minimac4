@@ -80,6 +80,15 @@ private:
   static constexpr float jump_fix = 1e15f;
   const std::int16_t bin_scalar_ = 100;
 
+  std::vector<std::uint32_t> best_s1_haps_;
+  std::vector<std::uint32_t> best_s2_haps_;
+  std::vector<std::uint32_t> best_s3_haps_;
+  std::vector<float> best_s1_probs_;
+  std::vector<float> best_s2_probs_;
+  std::vector<float> s2_probs_;
+  std::vector<std::size_t> s2_cardinalities_;
+  std::vector<float> best_s3_probs_;
+
 public:
   hidden_markov_model(float background_error = 1e-5f);
 
@@ -109,7 +118,7 @@ private:
     const std::vector<std::vector<std::size_t>>& reverse_map,
     const std::vector<std::int8_t>& template_haps,
     std::int8_t observed, float err, float af,
-    std::vector<std::uint32_t>& best_uniq_haps, std::vector<double>& best_uniq_probs, float& dose, float& loo_dose);
+    std::vector<std::uint32_t>& best_uniq_haps, std::vector<float>& best_uniq_probs, float& dose, float& loo_dose);
 
   void impute(double& prob_sum, std::size_t& prev_best_hap,
     const std::vector<float>& left_probs,
@@ -119,12 +128,13 @@ private:
     const std::vector<float>& left_junction_proportions,
     const std::vector<float>& right_junction_proportions,
     const std::vector<float>& constants,
+    const std::vector<std::size_t>& uniq_map,
     const std::vector<std::vector<std::size_t>>& reverse_map,
     const std::vector<std::int8_t>& template_haps,
     const std::vector<target_variant>& tar_variants,
     std::size_t row, std::size_t column, std::size_t out_column, best_templates_results& output);
 
-  void impute(double& prob_sum, std::size_t& prev_best_hap,
+  void impute_old(double& prob_sum, std::size_t& prev_best_hap,
     const std::vector<float>& left_probs,
     const std::vector<float>& right_probs,
     const std::vector<float>& left_probs_norecom,
@@ -132,10 +142,42 @@ private:
     const std::vector<float>& left_junction_proportions,
     const std::vector<float>& right_junction_proportions,
     const std::vector<float>& constants,
+    const std::vector<std::size_t>& uniq_map,
     const std::vector<std::vector<std::size_t>>& reverse_map,
     const std::vector<std::int8_t>& template_haps,
     const std::vector<target_variant>& tar_variants,
     std::size_t row, std::size_t column, std::size_t out_column, full_dosages_results& output, reduced_haplotypes::iterator& full_ref_ritr, const reduced_haplotypes::iterator& full_ref_rend);
+
+  void impute2(double& prob_sum, std::size_t& prev_best_hap,
+    const std::vector<float>& left_probs,
+    const std::vector<float>& right_probs,
+    const std::vector<float>& left_probs_norecom,
+    const std::vector<float>& right_probs_norecom,
+    const std::vector<float>& left_junction_proportions,
+    const std::vector<float>& right_junction_proportions,
+    const std::vector<float>& constants,
+    const std::vector<std::size_t>& uniq_map,
+    const std::vector<std::vector<std::size_t>>& reverse_map,
+    const std::vector<std::int8_t>& template_haps,
+    const std::vector<target_variant>& tar_variants,
+    std::size_t row, std::size_t column, std::size_t out_column,
+    full_dosages_results& output, reduced_haplotypes::iterator& full_ref_ritr, const reduced_haplotypes::iterator& full_ref_rend);
+
+  void impute(double& prob_sum, std::size_t& prev_best_expanded_hap,
+    const std::vector<float>& left_probs,
+    const std::vector<float>& right_probs,
+    const std::vector<float>& left_probs_norecom,
+    const std::vector<float>& right_probs_norecom,
+    const std::vector<float>& left_junction_proportions,
+    const std::vector<float>& right_junction_proportions,
+    const std::vector<float>& constants,
+    const std::vector<std::size_t>& uniq_map,
+    const std::vector<std::vector<std::size_t>>& reverse_map,
+    const std::vector<std::int8_t>& template_haps,
+    const std::vector<target_variant>& tar_variants,
+    std::size_t row, std::size_t column, std::size_t out_column,
+    full_dosages_results& output, reduced_haplotypes::iterator& full_ref_ritr, const reduced_haplotypes::iterator& full_ref_rend,
+    std::size_t& prev_block_idx);
 
   void initialize_likelihoods(std::vector<float>& probs, std::vector<float>& probs_norecom, std::vector<float>& proportions, const unique_haplotype_block& ref_block);
   void typed_to_full_probs(
@@ -148,7 +190,14 @@ private:
     const std::vector<std::vector<std::size_t>>& typed_reverse_map,
     const std::vector<std::size_t>& full_map,
     double prob_sum,
-    std::size_t full_hap_count);
+    std::size_t full_hap_count,
+    std::size_t& best_expanded_hap);
+  void s3_to_s1_probs(
+    const std::vector<float>& left_probs, const std::vector<float>& right_probs,
+    const std::vector<float>& left_probs_norecom, const std::vector<float>& right_probs_norecom,
+    const std::vector<float>& left_junction_proportions, const std::vector<float>& right_junction_proportions,
+    const std::vector<std::vector<std::size_t>>& s3_reverse_map, float prob_sum);
+  void s1_to_s2_probs(std::vector<std::size_t>& cardinalities, const std::vector<std::size_t>& uniq_map, std::size_t s2_size);
 };
 
 template <typename ... Args>
@@ -206,11 +255,11 @@ void hidden_markov_model::traverse_backward(const std::deque<unique_haplotype_bl
         junction_proportions_backward[i] /= extra[uniq_idx];
         assert(junction_proportions_backward[i] >= 0.f);
         //        assert(junction_proportions_backward[i] <= 1.f);
-        if (junction_proportions_backward[i] > 1.f)
-        {
-          auto a = junction_proportions_backward[i];
-          auto a2 = a;
-        }
+//        if (junction_proportions_backward[i] > 1.f)
+//        {
+//          auto a = junction_proportions_backward[i];
+//          auto a2 = a;
+//        }
       }
 
 #ifndef NDEBUG
@@ -222,6 +271,9 @@ void hidden_markov_model::traverse_backward(const std::deque<unique_haplotype_bl
       std::swap(backward, extra);
       backward_norecom = backward;
     }
+
+    best_s3_haps_.clear();
+    best_s3_probs_.clear();
 
     constants.clear();
     constants.resize(reverse_maps[block_idx].size());
@@ -249,7 +301,7 @@ void hidden_markov_model::traverse_backward(const std::deque<unique_haplotype_bl
         prob_sum *= jump_fix;
 
       std::int8_t observed = tar_variants[global_idx].gt[hap_idx];
-      impute(prob_sum, best_hap, forward_probs_[block_idx][i], backward, forward_norecom_probs_[block_idx][i], backward_norecom, junction_prob_proportions_[block_idx], junction_proportions_backward, constants, reverse_maps[block_idx], template_variants[i].gt, tar_variants, global_idx, hap_idx, out_idx, args...);
+      impute(prob_sum, best_hap, forward_probs_[block_idx][i], backward, forward_norecom_probs_[block_idx][i], backward_norecom, junction_prob_proportions_[block_idx], junction_proportions_backward, constants, ref_block.unique_map(), reverse_maps[block_idx], template_variants[i].gt, tar_variants, global_idx, hap_idx, out_idx, args...);
 
       if (observed >= 0)
         condition(backward, backward_norecom, template_variants[i].gt, observed, tar_variants[global_idx].err, tar_variants[global_idx].af);
