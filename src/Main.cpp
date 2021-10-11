@@ -445,7 +445,7 @@ bool load_target_haplotypes(const std::string& file_path, const savvy::genomic_r
 {
   savvy::reader input(file_path);
   sample_ids = input.samples();
-  input.reset_bounds(reg);
+  input.reset_bounds(reg, savvy::bounding_point::any);
   savvy::variant var;
   std::vector<std::int8_t> tmp_geno;
   while (input >> var)
