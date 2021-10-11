@@ -1,6 +1,9 @@
 #ifndef MINIMAC4_UNIQUE_HAPLOTYPE_HPP
 #define MINIMAC4_UNIQUE_HAPLOTYPE_HPP
 
+#include <savvy/reader.hpp>
+#include <savvy/writer.hpp>
+
 #include <cstdint>
 #include <string>
 #include <vector>
@@ -51,17 +54,35 @@ struct reference_variant : public reference_site_info
   std::vector<std::int8_t> gt;
 };
 
+struct sparse_ref_variant : public reference_site_info
+{
+  std::size_t ac;
+  std::vector<std::uint32_t> alt_allele_offsets;
+  sparse_ref_variant(const std::string& _chrom,
+    std::uint32_t _pos,
+    const std::string& _ref,
+    const std::string& _alt,
+    std::size_t _ac,
+    const std::size_t* off_it, const std::size_t* off_it_end)
+    :
+    reference_site_info(_chrom, _pos, _ref, _alt),
+    ac(_ac),
+    alt_allele_offsets(off_it, off_it_end)
+  {
+  }
+};
+
 class unique_haplotype_block
 {
 private:
-  std::vector<std::size_t> unique_map_;
+  std::vector<std::int64_t> unique_map_;
   std::vector<std::size_t> cardinalities_;
   std::vector<reference_variant> variants_;
 public:
   bool compress_variant(const reference_site_info& site_info, const std::vector<std::int8_t>& alleles);
 
   const std::vector<reference_variant>& variants() const { return variants_; }
-  const std::vector<std::size_t>& unique_map() const { return unique_map_; }
+  const std::vector<std::int64_t>& unique_map() const { return unique_map_; }
   std::size_t expanded_haplotype_size() const { return unique_map_.size(); }
   std::size_t unique_haplotype_size() const { return variants_.empty() ? 0 : variants_[0].gt.size(); }
   std::size_t variant_size() const { return variants_.size(); }
@@ -71,6 +92,8 @@ public:
   void trim(std::size_t min_pos, std::size_t max_pos);
   void pop_variant();
   bool deserialize(std::istream& is, std::uint8_t m3vcf_version, std::size_t n_haplotypes);
+  bool deserialize(savvy::reader& input_file);
+  bool serialize(savvy::writer& output_file);
 };
 
 class reduced_haplotypes
@@ -154,7 +177,7 @@ public:
     std::size_t block_idx() const { return block_idx_; }
     std::size_t block_local_idx() const { return variant_idx_; }
     std::size_t global_idx() const { return parent_->block_offsets_[block_idx_] + variant_idx_; }
-    const std::vector<std::size_t>& unique_map() const { return parent_->blocks_[block_idx_].unique_map(); }
+    const std::vector<std::int64_t>& unique_map() const { return parent_->blocks_[block_idx_].unique_map(); }
     const std::vector<std::size_t>& cardinalities() const { return parent_->blocks_[block_idx_].cardinalities(); }
   };
 

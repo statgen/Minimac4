@@ -128,7 +128,7 @@ private:
     const std::vector<float>& left_junction_proportions,
     const std::vector<float>& right_junction_proportions,
     const std::vector<float>& constants,
-    const std::vector<std::size_t>& uniq_map,
+    const std::vector<std::int64_t>& uniq_map,
     const std::vector<std::vector<std::size_t>>& reverse_map,
     const std::vector<std::int8_t>& template_haps,
     const std::vector<target_variant>& tar_variants,
@@ -142,7 +142,7 @@ private:
     const std::vector<float>& left_junction_proportions,
     const std::vector<float>& right_junction_proportions,
     const std::vector<float>& constants,
-    const std::vector<std::size_t>& uniq_map,
+    const std::vector<std::int64_t>& uniq_map,
     const std::vector<std::vector<std::size_t>>& reverse_map,
     const std::vector<std::int8_t>& template_haps,
     const std::vector<target_variant>& tar_variants,
@@ -156,7 +156,7 @@ private:
     const std::vector<float>& left_junction_proportions,
     const std::vector<float>& right_junction_proportions,
     const std::vector<float>& constants,
-    const std::vector<std::size_t>& uniq_map,
+    const std::vector<std::int64_t>& uniq_map,
     const std::vector<std::vector<std::size_t>>& reverse_map,
     const std::vector<std::int8_t>& template_haps,
     const std::vector<target_variant>& tar_variants,
@@ -171,7 +171,7 @@ private:
     const std::vector<float>& left_junction_proportions,
     const std::vector<float>& right_junction_proportions,
     const std::vector<float>& constants,
-    const std::vector<std::size_t>& uniq_map,
+    const std::vector<std::int64_t>& uniq_map,
     const std::vector<std::vector<std::size_t>>& reverse_map,
     const std::vector<std::int8_t>& template_haps,
     const std::vector<target_variant>& tar_variants,
@@ -188,7 +188,7 @@ private:
     const std::vector<float>& left_probs_norecom, const std::vector<float>& right_probs_norecom,
     const std::vector<float>& left_junction_proportions, const std::vector<float>& right_junction_proportions,
     const std::vector<std::vector<std::size_t>>& typed_reverse_map,
-    const std::vector<std::size_t>& full_map,
+    const std::vector<std::int64_t>& full_map,
     double prob_sum,
     std::size_t full_hap_count,
     std::size_t& best_expanded_hap);
@@ -197,7 +197,7 @@ private:
     const std::vector<float>& left_probs_norecom, const std::vector<float>& right_probs_norecom,
     const std::vector<float>& left_junction_proportions, const std::vector<float>& right_junction_proportions,
     const std::vector<std::vector<std::size_t>>& s3_reverse_map, float prob_sum);
-  void s1_to_s2_probs(std::vector<std::size_t>& cardinalities, const std::vector<std::size_t>& uniq_map, std::size_t s2_size);
+  void s1_to_s2_probs(std::vector<std::size_t>& cardinalities, const std::vector<std::int64_t>& uniq_map, std::size_t s2_size);
 };
 
 template <typename ... Args>

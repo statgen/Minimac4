@@ -454,7 +454,7 @@ bool load_target_haplotypes(const std::string& file_path, const savvy::genomic_r
     for (std::size_t i = 0; i < var.alts().size(); ++i)
     {
       std::size_t allele_idx = i + 1;
-      target_sites.push_back({var.chromosome(), var.position(), var.ref(), var.alts()[i], true, false, std::numeric_limits<float>::quiet_NaN(), 0.01, recombination::recom_min, {}});
+      target_sites.push_back({var.chromosome(), var.position(), var.ref(), var.alts()[i], true, false, std::numeric_limits<float>::quiet_NaN(), 0.00999, recombination::recom_min, 0, {}});
       if (var.alts().size() == 1)
         tmp_geno.swap(target_sites.back().gt);
       else
@@ -473,35 +473,99 @@ bool load_target_haplotypes(const std::string& file_path, const savvy::genomic_r
 bool load_reference_haplotypes(const std::string& file_path, const savvy::genomic_region& extended_reg, const savvy::genomic_region& impute_reg, std::vector<target_variant>& target_sites, reduced_haplotypes& typed_only_reference_data, reduced_haplotypes* full_reference_data)
 {
   savvy::reader input(file_path);
-  input.reset_bounds(extended_reg);
-  savvy::variant var;
-  std::vector<std::int8_t> tmp_geno;
 
-  if (!full_reference_data)
+  if (input)
   {
-    auto tar_it = target_sites.begin();
-    while (input >> var)
-    {
-      while (tar_it != target_sites.end() && tar_it->pos < var.position())
-        ++tar_it;
+    input.reset_bounds(extended_reg);
+    savvy::variant var;
+    std::vector<std::int8_t> tmp_geno;
 
-      for (auto it = tar_it; it != target_sites.end() && it->pos == var.position(); ++it)
+    if (full_reference_data)
+    {
+      auto tar_it = target_sites.begin();
+      unique_haplotype_block block;
+      std::size_t ref_cnt = 0;
+      while (block.deserialize(input))
       {
-        if (it->ref == var.ref() && it->alt == (var.alts().size() ? var.alts()[0] : ""))
-        {
-          var.get_format("GT", tmp_geno);
-          typed_only_reference_data.compress_variant({it->chrom, it->pos, it->ref, it->alt}, tmp_geno);
-          // freq.push_back(std::accumulate(tmp_geno.begin(), tmp_geno.end(), 0.f) / tmp_geno.size());
-          it->af = std::accumulate(tmp_geno.begin(), tmp_geno.end(), 0.f) / tmp_geno.size(); // TODO; remove
-          it->af = float((--typed_only_reference_data.end())->ac) / tmp_geno.size();
-          it->in_ref = true;
-          if (it != tar_it)
-            std::swap(*it, *tar_it);
-          ++tar_it;
+        if (block.variants().empty() || block.variants().front().pos > extended_reg.to())
           break;
+
+        for (auto ref_it = block.variants().begin(); ref_it != block.variants().end(); ++ref_it)
+        {
+          while (tar_it != target_sites.end() && tar_it->pos < ref_it->pos)
+          {
+            if (ref_cnt)
+            {
+              tar_it->ref_cnt = ref_cnt;
+              ref_cnt = 0;
+            }
+            ++tar_it;
+          }
+
+          for (auto it = tar_it; it != target_sites.end() && it->pos == ref_it->pos; ++it)
+          {
+            if (it->ref == ref_it->ref && it->alt == ref_it->alt)
+            {
+              tmp_geno.resize(block.unique_map().size());
+              for (std::size_t i = 0; i < tmp_geno.size(); ++i)
+                tmp_geno[i] = ref_it->gt[block.unique_map()[i]];
+              typed_only_reference_data.compress_variant({it->chrom, it->pos, it->ref, it->alt}, tmp_geno);
+              it->af = std::accumulate(tmp_geno.begin(), tmp_geno.end(), 0.f) / tmp_geno.size();
+              it->af = float((--typed_only_reference_data.end())->ac) / tmp_geno.size();
+              it->in_ref = true;
+              if (it != tar_it)
+                std::swap(*it, *tar_it);
+              if (ref_cnt)
+              {
+                tar_it->ref_cnt = ref_cnt;
+                ref_cnt = 0;
+              }
+              ++tar_it;
+              break;
+            }
+          }
+
+          if (ref_it->pos >= extended_reg.from())
+            ++ref_cnt;
+        }
+
+        if (full_reference_data)
+        {
+          // TODO: remove redundant variants
+          block.trim(impute_reg.from(), impute_reg.to());
+          if (!block.variants().empty())
+            full_reference_data->append_block(block);
         }
       }
     }
+    else
+    {
+      auto tar_it = target_sites.begin();
+      while (input >> var)
+      {
+        while (tar_it != target_sites.end() && tar_it->pos < var.position())
+          ++tar_it;
+
+        for (auto it = tar_it; it != target_sites.end() && it->pos == var.position(); ++it)
+        {
+          if (it->ref == var.ref() && it->alt == (var.alts().size() ? var.alts()[0] : ""))
+          {
+            var.get_format("GT", tmp_geno);
+            typed_only_reference_data.compress_variant({it->chrom, it->pos, it->ref, it->alt}, tmp_geno);
+            // freq.push_back(std::accumulate(tmp_geno.begin(), tmp_geno.end(), 0.f) / tmp_geno.size());
+            it->af = std::accumulate(tmp_geno.begin(), tmp_geno.end(), 0.f) / tmp_geno.size(); // TODO; remove
+            it->af = float((--typed_only_reference_data.end())->ac) / tmp_geno.size();
+            it->in_ref = true;
+            if (it != tar_it)
+              std::swap(*it, *tar_it);
+            ++tar_it;
+            break;
+          }
+        }
+      }
+    }
+
+    return !input.bad();
   }
   else
   {
@@ -538,6 +602,8 @@ bool load_reference_haplotypes(const std::string& file_path, const savvy::genomi
       }
     }
 
+    std::size_t ref_cnt = 0;
+
     auto tar_it = target_sites.begin();
     unique_haplotype_block block;
     std::vector<std::int8_t> tmp_geno;
@@ -549,7 +615,14 @@ bool load_reference_haplotypes(const std::string& file_path, const savvy::genomi
       for (auto ref_it = block.variants().begin(); ref_it != block.variants().end(); ++ref_it)
       {
         while (tar_it != target_sites.end() && tar_it->pos < ref_it->pos)
+        {
+          if (ref_cnt)
+          {
+            tar_it->ref_cnt = ref_cnt;
+            ref_cnt = 0;
+          }
           ++tar_it;
+        }
 
         for (auto it = tar_it; it != target_sites.end() && it->pos == ref_it->pos; ++it)
         {
@@ -564,10 +637,18 @@ bool load_reference_haplotypes(const std::string& file_path, const savvy::genomi
             it->in_ref = true;
             if (it != tar_it)
               std::swap(*it, *tar_it);
+            if (ref_cnt)
+            {
+              tar_it->ref_cnt = ref_cnt;
+              ref_cnt = 0;
+            }
             ++tar_it;
             break;
           }
         }
+
+        if (ref_it->pos >= extended_reg.from())
+          ++ref_cnt;
       }
 
       if (full_reference_data)
@@ -577,6 +658,12 @@ bool load_reference_haplotypes(const std::string& file_path, const savvy::genomi
         if (!block.variants().empty())
           full_reference_data->append_block(block);
       }
+    }
+
+    if (ref_cnt && tar_it != target_sites.end())
+    {
+      tar_it->ref_cnt = ref_cnt;
+      ref_cnt = 0;
     }
   }
 
@@ -1056,8 +1143,102 @@ private:
   }
 };
 
+bool convert_old_m3vcf(const std::string& input_path, const std::string& output_path)
+{
+  std::vector<std::pair<std::string, std::string>> headers;
+  std::vector<std::string> ids;
+
+  shrinkwrap::gz::istream input_file(input_path);
+  std::string line;
+
+  std::uint8_t m3vcf_version = 0;
+  const std::string m3vcf_version_line = "##fileformat=M3VCF";
+  const std::string vcf_version_line = "##fileformat=VCF";
+  while (std::getline(input_file, line))
+  {
+    std::size_t equal_pos = line.find('=');
+    if (equal_pos != std::string::npos)
+    {
+      std::string key = line.substr(0, equal_pos);
+      std::string val = line.substr(equal_pos + 1);
+      key.erase(0, key.find_first_not_of('#'));
+
+      if (key == "fileformat")
+      {
+        if (val.substr(0, 5) == "M3VCF")
+        {
+          if (val == "M3VCFv2.0")
+            m3vcf_version = 2;
+          else
+            m3vcf_version = 1;
+        }
+      }
+      else
+      {
+        headers.emplace_back(std::move(key), std::move(val));
+      }
+    }
+    else
+    {
+
+      break;
+    }
+  }
+
+  if (line.size() < 1 || line[0] != '#')
+  {
+    std::cerr << "Error: invalid reference file" << std::endl;
+    return false;
+  }
+
+  headers.insert(headers.begin(), {"subfileformat","M3VCFv3.0"});
+  headers.insert(headers.begin(), {"fileformat","VCFv4.2"});
+  headers.emplace_back("INFO","<ID=REPS,Number=1,Type=Integer,Description=\"Number of distinct haplotypes in block\">");
+  headers.emplace_back("INFO","<ID=VARIANTS,Number=1,Type=Integer,Description=\"Number of variants in block\">");
+  headers.emplace_back("INFO","<ID=END,Number=1,Type=Integer,Description=\"End position of record\">");
+  headers.emplace_back("INFO","<ID=UHA,Number=.,Type=Integer,Description=\"Unique haplotype allele\">");
+  headers.emplace_back("FORMAT","<ID=UHM,Number=.,Type=Integer,Description=\"Unique haplotype mapping\">");
+
+  //headers.emplace_back("ALT","<ID=DUP,Description=\"Duplication\">");
+
+
+  std::size_t tab_cnt = 0;
+  std::size_t last_pos = 0;
+  std::size_t tab_pos;
+  while ((tab_pos = line.find('\t', tab_pos)) != std::string::npos)
+  {
+    if (tab_cnt >= 9)
+    {
+      ids.emplace_back(line.substr(last_pos, tab_pos - last_pos));
+    }
+    last_pos = ++tab_pos;
+    ++tab_cnt;
+  }
+
+  ids.emplace_back(line.substr(last_pos, tab_pos - last_pos));
+  std::size_t n_samples = ids.size();
+
+  savvy::writer output_file(output_path, savvy::file::format::bcf, headers, ids, 6);
+
+
+  std::size_t block_cnt = 0;
+  unique_haplotype_block block;
+  std::vector<std::int8_t> tmp_geno;
+  while (block.deserialize(input_file, m3vcf_version, m3vcf_version == 1 ? n_samples : 2 * n_samples))
+  {
+    if (block.variants().empty())
+      break;
+
+    block.serialize(output_file);
+    ++block_cnt;
+  }
+
+  return !input_file.bad() && output_file.good();
+}
+
 int main(int argc, char** argv)
 {
+  //return convert_old_m3vcf("../1000g-test/topmed.chr20.gtonly.filtered.rehdr.pass_only.phased.ligated.shuffled.m3vcf.gz", "../1000g-test/topmed.chr20.gtonly.filtered.rehdr.pass_only.phased.ligated.shuffled.m3bcf") ? 0 : 1;
   prog_args args;
   if (!args.parse(argc, argv))
   {
@@ -1112,22 +1293,23 @@ int main(int argc, char** argv)
     //if (!recombination::parse_map_file(args.map_path(), ref_sites.begin(), ref_sites.end()))
       return std::cerr << "Error: parsing map file failed\n", EXIT_FAILURE;
 
-//    auto tar_it = target_sites.begin();
-//    for (auto it = ref_sites.begin(); it != ref_sites.end(); ++it)
-//    {
-//      Error[i]=rHap.Error[rHap.MapTarToRef[i]];
-//      if(i>0)
-//      {
-//        int index=rHap.MapTarToRef[i-1];
-//        double temp=1.0;
-//        while(index<rHap.MapTarToRef[i])
-//        {
-//          temp*=(1.0-(rHap.Recom[index]));
-//          index++;
-//        }
-//        Recom[i-1]=(1.0-temp);
-//      }
-//    }
+#if 0
+    auto tar_it = target_sites.begin();
+    for (auto it = target_sites.begin(); it != target_sites.end(); ++it)
+    {
+      auto prev_it = it++;
+      if (it != target_sites.end())
+      {
+        assert(prev_it->ref_cnt > 0);
+        float recom = std::max(recombination::recom_min, prev_it->recom / prev_it->ref_cnt);
+        float temp = (1.f - recom);
+        for (std::size_t i = 0; i < prev_it->ref_cnt; ++i)
+          temp *= (1.f - recom);
+        prev_it->recom = 1.f - temp;
+        assert(prev_it->recom <= 1.f && prev_it->recom >= 0.f);
+      }
+    }
+#endif
     std::cerr << ("Loading switch probabilities took " + std::to_string(std::difftime(std::time(nullptr), start_time)) + " seconds") << std::endl;
   }
 

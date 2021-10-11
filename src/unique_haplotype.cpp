@@ -146,9 +146,83 @@ void unique_haplotype_block::pop_variant()
   variants_.pop_back();
 }
 
+bool unique_haplotype_block::serialize(savvy::writer& output_file)
+{
+  savvy::variant var;
+  if (!variants_.empty())
+  {
+    var = savvy::site_info(variants_.front().chrom,
+      variants_.front().pos,
+      variants_.front().ref, {"<BLOCK>"});
+
+    var.set_info("END", std::int32_t(variants_.back().pos));
+    var.set_info("VARIANTS", std::int32_t(variants_.size()));
+    var.set_info("REPS", std::int32_t(cardinalities_.size()));
+
+    var.set_format("UHM", unique_map_);
+
+    output_file << var;
+    output_file.set_block_size(0); // Using set_block_size as a workaround to align zstd blocks with m3vcf blocks.
+
+    for (auto it = variants_.begin(); it != variants_.end(); ++it)
+    {
+      var = savvy::variant(it->chrom, it->pos, it->ref, {it->alt});
+      var.set_info("AC", std::int32_t(it->ac));
+      var.set_info("AN", std::int32_t(unique_map_.size()));
+      var.set_info("UHA", it->gt);
+
+      output_file << var;
+    }
+    output_file.set_block_size(1 + variants_.size());
+  }
+}
+
+bool unique_haplotype_block::deserialize(savvy::reader& input_file)
+{
+  clear();
+
+  savvy::variant var;
+  while (input_file >> var && (var.alts().empty() || var.alts()[0] != "<BLOCK>")) {} //
+
+  std::int64_t n_variants = 0;
+  std::int64_t n_reps = 0;
+  var.get_info("VARIANTS", n_variants);
+  var.get_info("REPS", n_reps);
+  var.get_format("UHM", unique_map_);
+
+  cardinalities_.resize(n_reps);
+  for (auto it = unique_map_.begin(); it != unique_map_.end(); ++it)
+    ++cardinalities_[*it];
+
+  variants_.resize(n_variants);
+  for (std::size_t i = 0; i < variants_.size(); ++i)
+  {
+    if (!(input_file >> var))
+    {
+      clear();
+      std::cerr << "Error: truncated m3vcf v3 file\n";
+      return false;
+    }
+
+    variants_[i].chrom = var.chrom();
+    variants_[i].pos = var.position();
+    variants_[i].ref = var.ref();
+    variants_[i].alt = var.alts().size() ? var.alts()[0] : "";
+    var.get_info("UHA", variants_[i].gt);
+    variants_[i].ac = std::inner_product(variants_[i].gt.begin(), variants_[i].gt.end(), cardinalities_.begin(), 0ull);
+  }
+
+  return input_file.good();
+}
+
 bool unique_haplotype_block::deserialize(std::istream& is, std::uint8_t m3vcf_version, std::size_t n_haplotypes)
 {
   clear();
+  is.peek();
+  if (!is)
+    return false;
+
+
   unique_map_.reserve(n_haplotypes);
 
   auto split_string_to_vector = [](const char* in, char delim)
@@ -216,6 +290,7 @@ bool unique_haplotype_block::deserialize(std::istream& is, std::uint8_t m3vcf_ve
       if (*p != '|')
       {
         clear();
+        is.setstate(is.rdstate() | std::ios::badbit);
         std::cerr << "Error: invalid m3vcf v" << m3vcf_version << " file\n";
         return false;
       }
@@ -226,6 +301,7 @@ bool unique_haplotype_block::deserialize(std::istream& is, std::uint8_t m3vcf_ve
   if (unique_map_.size() != n_haplotypes)
   {
     clear();
+    is.setstate(is.rdstate() | std::ios::badbit);
     std::cerr << "Error: invalid m3vcf v" << m3vcf_version << " file\n";
     return false;
   }
@@ -240,6 +316,7 @@ bool unique_haplotype_block::deserialize(std::istream& is, std::uint8_t m3vcf_ve
     if (!std::getline(is, line))
     {
       clear();
+      is.setstate(is.rdstate() | std::ios::badbit);
       std::cerr << "Error: truncated m3vcf v" << m3vcf_version << " file\n";
       return false;
     }
@@ -248,6 +325,7 @@ bool unique_haplotype_block::deserialize(std::istream& is, std::uint8_t m3vcf_ve
     if (cols.size() != 9)
     {
       clear();
+      is.setstate(is.rdstate() | std::ios::badbit);
       std::cerr << "Error: invalid m3vcf v" << m3vcf_version << " file\n";
       return false;
     }
@@ -269,6 +347,7 @@ bool unique_haplotype_block::deserialize(std::istream& is, std::uint8_t m3vcf_ve
         if (offset >= n_reps)
         {
           clear();
+          is.setstate(is.rdstate() | std::ios::badbit);
           std::cerr << "Error: invalid m3vcf v" << m3vcf_version << " file\n";
           return false;
         }
@@ -295,13 +374,17 @@ bool unique_haplotype_block::deserialize(std::istream& is, std::uint8_t m3vcf_ve
       if (variants_[i].gt.size() != n_reps)
       {
         clear();
+        is.setstate(is.rdstate() | std::ios::badbit);
         std::cerr << "Error: invalid m3vcf v" << m3vcf_version << " file\n";
         return false;
       }
     }
   }
 
-  return is.good();
+  if (is.good())
+    return true;
+  is.setstate(is.rdstate() | std::ios::badbit);
+  return false;
 }
 
 reduced_haplotypes::reduced_haplotypes(std::size_t min_block_size, std::size_t max_block_size)

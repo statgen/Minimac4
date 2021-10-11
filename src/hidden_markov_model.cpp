@@ -434,7 +434,7 @@ void hidden_markov_model::impute(double& prob_sum, std::size_t& prev_best_hap,
   const std::vector<float>& left_junction_proportions,
   const std::vector<float>& right_junction_proportions,
   const std::vector<float>& constants,
-  const std::vector<std::size_t>& uniq_map,
+  const std::vector<std::int64_t>& uniq_map,
   const std::vector<std::vector<std::size_t>>& reverse_map,
   const std::vector<std::int8_t>& template_haps,
   const std::vector<target_variant>& tar_variants,
@@ -571,7 +571,7 @@ void hidden_markov_model::impute2(double& prob_sum, std::size_t& prev_best_expan
   const std::vector<float>& left_junction_proportions,
   const std::vector<float>& right_junction_proportions,
   const std::vector<float>& constants,
-  const std::vector<std::size_t>& uniq_map,
+  const std::vector<std::int64_t>& uniq_map,
   const std::vector<std::vector<std::size_t>>& reverse_map,
   const std::vector<std::int8_t>& template_haps,
   const std::vector<target_variant>& tar_variants,
@@ -767,7 +767,7 @@ void hidden_markov_model::impute_old(double& prob_sum, std::size_t& prev_best_ex
   const std::vector<float>& left_junction_proportions,
   const std::vector<float>& right_junction_proportions,
   const std::vector<float>& constants,
-  const std::vector<std::size_t>& uniq_map,
+  const std::vector<std::int64_t>& uniq_map,
   const std::vector<std::vector<std::size_t>>& reverse_map,
   const std::vector<std::int8_t>& template_haps,
   const std::vector<target_variant>& tar_variants,
@@ -989,7 +989,7 @@ void hidden_markov_model::s3_to_s1_probs(
   }
 }
 
-void hidden_markov_model::s1_to_s2_probs(std::vector<std::size_t>& cardinalities, const std::vector<std::size_t>& unique_map, std::size_t s2_size)
+void hidden_markov_model::s1_to_s2_probs(std::vector<std::size_t>& cardinalities, const std::vector<std::int64_t>& unique_map, std::size_t s2_size)
 {
   //std::unordered_map<std::size_t, float> full_ref_prob_hash;
   //full_ref_prob_hash.reserve(s2_size);
@@ -1034,7 +1034,7 @@ void hidden_markov_model::typed_to_full_probs(
   const std::vector<float>& left_probs_norecom, const std::vector<float>& right_probs_norecom,
   const std::vector<float>& left_junction_proportions, const std::vector<float>& right_junction_proportions,
   const std::vector<std::vector<std::size_t>>& typed_reverse_map,
-  const std::vector<std::size_t>& full_map,
+  const std::vector<std::int64_t>& full_map,
   double prob_sumd,
   std::size_t full_uniq_hap_count, std::size_t& best_expanded_hap)
 {
@@ -1152,7 +1152,7 @@ void hidden_markov_model::impute(double& prob_sum, std::size_t& prev_best_typed_
   const std::vector<float>& left_junction_proportions,
   const std::vector<float>& right_junction_proportions,
   const std::vector<float>& constants,
-  const std::vector<std::size_t>& uniq_map,
+  const std::vector<std::int64_t>& uniq_map,
   const std::vector<std::vector<std::size_t>>& reverse_map,
   const std::vector<std::int8_t>& template_haps,
   const std::vector<target_variant>& tar_variants,

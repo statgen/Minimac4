@@ -109,10 +109,15 @@ bool recombination::parse_map_file(const std::string& map_file_path, VarIter var
       prev_var_it->recom = 0.f; // Last recom prob must be zero so that the first step of backward traversal will have no recombination.
     else
     {
-      float delta = (var_it->recom - prev_var_it->recom);
-      prev_var_it->recom = std::max(0.01f * delta, recom_min);
-      //sites[i].recom = std::min(0.01f, std::max(delta, recom_min));
-      //sites[i].recom = (1. - std::exp(-delta/50.))/2.;
+      if (var_it->pos == prev_var_it->pos)
+        prev_var_it->recom = 0.f;
+      else
+      {
+        float delta = (var_it->recom - prev_var_it->recom);
+        prev_var_it->recom = std::max(0.01f * delta, recom_min);
+        //sites[i].recom = std::min(0.01f, std::max(delta, recom_min));
+        //sites[i].recom = (1. - std::exp(-delta/50.))/2.;
+      }
     }
   }
   //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~//
