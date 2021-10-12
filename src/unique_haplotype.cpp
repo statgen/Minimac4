@@ -179,7 +179,10 @@ bool unique_haplotype_block::serialize(savvy::writer& output_file)
       output_file << var;
     }
     output_file.set_block_size(1 + variants_.size());
+    return output_file.good();
   }
+
+  return std::cerr << "Error: Cannot write empty block\n", false;
 }
 
 int unique_haplotype_block::deserialize(savvy::reader& input_file, savvy::variant& var)
@@ -440,7 +443,7 @@ bool reduced_haplotypes::compress_variant(const reference_site_info& site_info, 
   return ret;
 }
 
-bool reduced_haplotypes::append_block(const unique_haplotype_block& block)
+void reduced_haplotypes::append_block(const unique_haplotype_block& block)
 {
   assert(block.variants().size());
   if (!blocks_.empty())
@@ -451,6 +454,8 @@ bool reduced_haplotypes::append_block(const unique_haplotype_block& block)
     {
       blocks_.back().pop_variant();
       --variant_count_;
+      if (blocks_.back().variant_size() == 0)
+        blocks_.pop_back();
     }
   }
 

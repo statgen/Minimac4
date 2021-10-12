@@ -187,7 +187,7 @@ public:
   reduced_haplotypes() {}
   reduced_haplotypes(std::size_t min_block_size, std::size_t max_block_size);
   bool compress_variant(const reference_site_info& site_info, const std::vector<std::int8_t>& alleles, bool flush_block = false);
-  bool append_block(const unique_haplotype_block& block);
+  void append_block(const unique_haplotype_block& block);
   float compression_ratio() const;
   const std::deque<unique_haplotype_block>& blocks() const { return blocks_; }
   std::size_t variant_size() const { return variant_count_; }
