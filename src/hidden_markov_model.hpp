@@ -78,7 +78,7 @@ private:
   std::vector<bool> precision_jumps_;
   float background_error_;
   static constexpr float jump_fix = 1e15f;
-  const std::int16_t bin_scalar_ = 100;
+  const std::int16_t bin_scalar_ = 1000;
 
   std::vector<std::uint32_t> best_s1_haps_;
   std::vector<std::uint32_t> best_s2_haps_;
