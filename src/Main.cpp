@@ -299,6 +299,7 @@ public:
       "Usage: minimac4 [opts ...] <reference.m3vcf.gz> <target.vcf.gz>",
       {
         {"help", no_argument, 0, 'h', "Print usage"},
+        {"format", required_argument, 0, 'f', "Comma-separated list of format fields to generate (GT, HDS, DS, GP, or SD; default: HDS)"},
         {"map", required_argument, 0, 'm', "Genetic map file"},
         {"output", required_argument, 0, 'o', "Output path (default: /dev/stdout)"},
         {"output-format", required_argument, 0, 'O', "Output file format (bcf, sav, vcf.gz, ubcf, usav, or vcf; default: bcf)"},
@@ -322,6 +323,9 @@ public:
       case 'h':
         help_ = true;
         return true;
+      case 'f':
+        fmt_fields_ = split_string_to_vector(optarg ? optarg : "", ',');
+        break;
       case 'm':
         map_path_ = optarg ? optarg : "";
         break;
@@ -439,13 +443,29 @@ private:
       }
     }
   }
+
+  std::vector<std::string> split_string_to_vector(const char* in, char delim)
+  {
+    std::vector<std::string> ret;
+    const char* d = nullptr;
+    std::string token;
+    const char* s = in;
+    const char*const e = in + strlen(in);
+    while ((d = std::find(s, e,  delim)) != e)
+    {
+      ret.emplace_back(std::string(s, d));
+      s = d ? d + 1 : d;
+    }
+    ret.emplace_back(std::string(s,d));
+    return ret;
+  }
 };
 
 bool load_target_haplotypes(const std::string& file_path, const savvy::genomic_region& reg, std::vector<target_variant>& target_sites, std::vector<std::string>& sample_ids)
 {
   savvy::reader input(file_path);
   sample_ids = input.samples();
-  input.reset_bounds(reg, savvy::bounding_point::any);
+  input.reset_bounds(reg);
   savvy::variant var;
   std::vector<std::int8_t> tmp_geno;
   while (input >> var)
@@ -476,16 +496,31 @@ bool load_reference_haplotypes(const std::string& file_path, const savvy::genomi
 
   if (input)
   {
-    input.reset_bounds(extended_reg);
+    input.reset_bounds(extended_reg, savvy::bounding_point::any);
     savvy::variant var;
     std::vector<std::int8_t> tmp_geno;
 
     if (full_reference_data)
     {
+      bool is_m3vcf_v3 = false;
+      for (auto it = input.headers().begin(); !is_m3vcf_v3 && it != input.headers().end(); ++it)
+      {
+        if (it->first == "subfileformat" && (it->second == "M3VCFv3.0" || it->second == "MVCFv3.0"))
+          is_m3vcf_v3 = true;
+      }
+
+      if (!is_m3vcf_v3)
+        return std::cerr << "Error: reference file must be an M3VCF\n", false;
+
+      savvy::variant var;
+      if (!input.read(var))
+        return std::cerr << "Error: no variant records in reference query region\n", false;
+
       auto tar_it = target_sites.begin();
       unique_haplotype_block block;
       std::size_t ref_cnt = 0;
-      while (block.deserialize(input))
+      int res;
+      while ((res = block.deserialize(input, var)) > 0)
       {
         if (block.variants().empty() || block.variants().front().pos > extended_reg.to())
           break;
@@ -537,6 +572,9 @@ bool load_reference_haplotypes(const std::string& file_path, const savvy::genomi
             full_reference_data->append_block(block);
         }
       }
+
+      if (res < 0)
+        return false;
     }
     else
     {
@@ -701,6 +739,7 @@ private:
   savvy::writer out_file_;
   savvy::file::format file_format_;
   std::vector<std::string> fmt_fields_;
+  std::unordered_set<std::string> fmt_field_set_;
   std::size_t n_samples_ = 0;
   const std::int16_t bin_scalar_ = 100; //256;
   struct variant_update_ctx
@@ -714,6 +753,7 @@ public:
     out_file_(file_path, file_format, gen_headers(fmt_fields, chromosome), sample_ids, out_compression),
     file_format_(file_format),
     fmt_fields_(fmt_fields),
+    fmt_field_set_(fmt_fields.begin(), fmt_fields.end()),
     n_samples_(sample_ids.size())
   {
 
@@ -780,6 +820,8 @@ public:
     savvy::variant out_var;
     savvy::compressed_vector<float> pasted_hds;
     savvy::compressed_vector<float> partial_hds;
+    savvy::compressed_vector<std::int8_t> gt_buffer;
+    std::vector<float> dense_zeros;
 
     int good_count = temp_files.size();
     while (good_count == temp_files.size())
@@ -814,7 +856,8 @@ public:
         out_var.set_info("MAF", af > 0.5f ? 1.f - af : af);
         out_var.set_info("R2", r2);
 
-        out_var.set_format("HDS", pasted_hds);
+        //out_var.set_format("HDS", pasted_hds);
+        generate_extra_format_fields(out_var, pasted_hds, gt_buffer, dense_zeros);
         out_file_ << out_var;
       }
     }
@@ -1141,6 +1184,37 @@ private:
 
     out_var.set_info(observed.size() ? "TYPED" : "IMPUTED", std::vector<std::int8_t>());
   }
+
+  void generate_extra_format_fields(savvy::variant& out_var, savvy::compressed_vector<float>& sparse_dosages, savvy::compressed_vector<std::int8_t>& sparse_gt, std::vector<float>& dense_zero_vec)
+  {
+    bool hds_set = true;
+
+    if (fmt_field_set_.find("GT") != fmt_field_set_.end())
+    {
+      sparse_gt.assign(sparse_dosages.value_data(), sparse_dosages.value_data() + sparse_dosages.non_zero_size(), sparse_dosages.index_data(), sparse_dosages.size(), [](float v){ return std::int8_t(v < 0.5f ? 0 : 1); });
+      out_var.set_format("GT", sparse_gt);
+    }
+
+    if (fmt_field_set_.find("HDS") != fmt_field_set_.end())
+    {
+      out_var.set_format("HDS", sparse_dosages);
+    }
+
+    if (fmt_field_set_.find("DS") != fmt_field_set_.end())
+    {
+      savvy::stride_reduce(sparse_dosages, sparse_dosages.size() / n_samples_);
+      out_var.set_format("DS", sparse_dosages);
+      hds_set = false;
+    }
+
+    if (fmt_field_set_.find("GP") != fmt_field_set_.end())
+    {
+    }
+
+    if (fmt_field_set_.find("SD") != fmt_field_set_.end())
+    {
+    }
+  }
 };
 
 bool convert_old_m3vcf(const std::string& input_path, const std::string& output_path)
@@ -1196,7 +1270,7 @@ bool convert_old_m3vcf(const std::string& input_path, const std::string& output_
   headers.emplace_back("INFO","<ID=REPS,Number=1,Type=Integer,Description=\"Number of distinct haplotypes in block\">");
   headers.emplace_back("INFO","<ID=VARIANTS,Number=1,Type=Integer,Description=\"Number of variants in block\">");
   headers.emplace_back("INFO","<ID=END,Number=1,Type=Integer,Description=\"End position of record\">");
-  headers.emplace_back("INFO","<ID=UHA,Number=.,Type=Integer,Description=\"Unique haplotype allele\">");
+  headers.emplace_back("INFO","<ID=UHA,Number=.,Type=Integer,Description=\"Unique haplotype alleles\">");
   headers.emplace_back("FORMAT","<ID=UHM,Number=.,Type=Integer,Description=\"Unique haplotype mapping\">");
 
   //headers.emplace_back("ALT","<ID=DUP,Description=\"Duplication\">");
@@ -1356,6 +1430,8 @@ int main(int argc, char** argv)
   else
   {
     std::size_t haplotype_buffer_size = 400; // TODO
+    std::size_t ploidy = target_sites[0].gt.size() / sample_ids.size();
+    assert(ploidy && target_sites[0].gt.size() % sample_ids.size() == 0);
     std::vector<std::string> temp_file_paths;
     temp_file_paths.reserve(target_sites[0].gt.size() / haplotype_buffer_size + 1);
     full_dosages_results hmm_results;
@@ -1391,7 +1467,7 @@ int main(int argc, char** argv)
       haplotype_interpolator interpolator(temp_file_paths.back(),
         use_temp_files ? savvy::file::format::sav : args.out_format(),
         use_temp_files ? std::min<std::uint8_t>(3, args.out_compression()) : args.out_compression(),
-        sample_ids,
+        {sample_ids.begin() + (i / ploidy), sample_ids.begin() + (i + group_size) / ploidy},
         use_temp_files ? std::vector<std::string>{"HDS"} : args.fmt_fields(),
         target_sites.front().chrom);
       interpolator.write_dosages(hmm_results, target_sites, {i, std::min(i + haplotype_buffer_size, target_sites[0].gt.size())}, full_reference_data, args.out_path(), tpool);

@@ -155,7 +155,12 @@ bool unique_haplotype_block::serialize(savvy::writer& output_file)
       variants_.front().pos,
       variants_.front().ref, {"<BLOCK>"});
 
-    var.set_info("END", std::int32_t(variants_.back().pos));
+
+//    std::int32_t last_end_val;
+//    if (variants_.back().get_info("END", last_end_val))
+//      var.set_info("END", last_end_val);
+//    else
+    var.set_info("END", std::int32_t(variants_.back().pos + std::max(variants_.back().ref.size(), variants_.back().alt.size()) - 1));
     var.set_info("VARIANTS", std::int32_t(variants_.size()));
     var.set_info("REPS", std::int32_t(cardinalities_.size()));
 
@@ -177,16 +182,13 @@ bool unique_haplotype_block::serialize(savvy::writer& output_file)
   }
 }
 
-bool unique_haplotype_block::deserialize(savvy::reader& input_file)
+int unique_haplotype_block::deserialize(savvy::reader& input_file, savvy::variant& var)
 {
   clear();
 
-  savvy::variant var;
-  while (input_file >> var && (var.alts().empty() || var.alts()[0] != "<BLOCK>")) {} //
-
   std::int64_t n_variants = 0;
-  std::int64_t n_reps = 0;
   var.get_info("VARIANTS", n_variants);
+  std::int64_t n_reps = 0;
   var.get_info("REPS", n_reps);
   var.get_format("UHM", unique_map_);
 
@@ -194,25 +196,30 @@ bool unique_haplotype_block::deserialize(savvy::reader& input_file)
   for (auto it = unique_map_.begin(); it != unique_map_.end(); ++it)
     ++cardinalities_[*it];
 
-  variants_.resize(n_variants);
-  for (std::size_t i = 0; i < variants_.size(); ++i)
+  variants_.reserve(n_variants);
+  while (input_file >> var)
   {
-    if (!(input_file >> var))
-    {
-      clear();
-      std::cerr << "Error: truncated m3vcf v3 file\n";
-      return false;
-    }
+    if (!var.alts().empty() && var.alts()[0] == "<BLOCK>")
+      break;
 
-    variants_[i].chrom = var.chrom();
-    variants_[i].pos = var.position();
-    variants_[i].ref = var.ref();
-    variants_[i].alt = var.alts().size() ? var.alts()[0] : "";
-    var.get_info("UHA", variants_[i].gt);
-    variants_[i].ac = std::inner_product(variants_[i].gt.begin(), variants_[i].gt.end(), cardinalities_.begin(), 0ull);
+    variants_.emplace_back();
+
+    variants_.back().chrom = var.chrom();
+    variants_.back().pos = var.position();
+    variants_.back().ref = var.ref();
+    variants_.back().alt = var.alts().size() ? var.alts()[0] : "";
+    var.get_info("UHA", variants_.back().gt);
+    if (variants_.back().gt.size() != cardinalities_.size())
+      return -1;
+    variants_.back().ac = std::inner_product(variants_.back().gt.begin(), variants_.back().gt.end(), cardinalities_.begin(), 0ull);
   }
 
-  return input_file.good();
+  if (input_file.good())
+    return variants_.size() + 1;
+  else if (input_file.bad())
+    return -1;
+  else
+    return 0;
 }
 
 bool unique_haplotype_block::deserialize(std::istream& is, std::uint8_t m3vcf_version, std::size_t n_haplotypes)

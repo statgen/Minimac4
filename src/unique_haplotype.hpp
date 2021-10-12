@@ -92,7 +92,7 @@ public:
   void trim(std::size_t min_pos, std::size_t max_pos);
   void pop_variant();
   bool deserialize(std::istream& is, std::uint8_t m3vcf_version, std::size_t n_haplotypes);
-  bool deserialize(savvy::reader& input_file);
+  int deserialize(savvy::reader& input_file, savvy::variant& var); // return <0 is error, 0 is EOF, >0 good
   bool serialize(savvy::writer& output_file);
 };
 
