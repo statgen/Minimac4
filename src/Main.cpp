@@ -742,6 +742,11 @@ private:
   std::unordered_set<std::string> fmt_field_set_;
   std::size_t n_samples_ = 0;
   const std::int16_t bin_scalar_ = 100; //256;
+
+  // buffers
+  savvy::compressed_vector<std::int8_t> sparse_gt_;
+  std::vector<float> dense_float_vec_;
+  std::vector<float> dense_zero_vec_;
   struct variant_update_ctx
   {
     savvy::compressed_vector<std::int8_t> sparse_gt;
@@ -820,8 +825,6 @@ public:
     savvy::variant out_var;
     savvy::compressed_vector<float> pasted_hds;
     savvy::compressed_vector<float> partial_hds;
-    savvy::compressed_vector<std::int8_t> gt_buffer;
-    std::vector<float> dense_zeros;
 
     int good_count = temp_files.size();
     while (good_count == temp_files.size())
@@ -857,7 +860,7 @@ public:
         out_var.set_info("R2", r2);
 
         //out_var.set_format("HDS", pasted_hds);
-        generate_extra_format_fields(out_var, pasted_hds, gt_buffer, dense_zeros);
+        generate_extra_format_fields(out_var, pasted_hds);
         out_file_ << out_var;
       }
     }
@@ -1185,19 +1188,122 @@ private:
     out_var.set_info(observed.size() ? "TYPED" : "IMPUTED", std::vector<std::int8_t>());
   }
 
-  void generate_extra_format_fields(savvy::variant& out_var, savvy::compressed_vector<float>& sparse_dosages, savvy::compressed_vector<std::int8_t>& sparse_gt, std::vector<float>& dense_zero_vec)
+  void generate_extra_format_fields(savvy::variant& out_var, savvy::compressed_vector<float>& sparse_dosages)
   {
     bool hds_set = true;
 
+    std::size_t stride = sparse_dosages.size() / n_samples_;
+
     if (fmt_field_set_.find("GT") != fmt_field_set_.end())
     {
-      sparse_gt.assign(sparse_dosages.value_data(), sparse_dosages.value_data() + sparse_dosages.non_zero_size(), sparse_dosages.index_data(), sparse_dosages.size(), [](float v){ return std::int8_t(v < 0.5f ? 0 : 1); });
-      out_var.set_format("GT", sparse_gt);
+      out_var.set_format("HDS", {});
+
+      sparse_gt_.assign(sparse_dosages.value_data(), sparse_dosages.value_data() + sparse_dosages.non_zero_size(), sparse_dosages.index_data(), sparse_dosages.size(), [](float v)
+        {
+          if (savvy::typed_value::is_end_of_vector(v))
+            return savvy::typed_value::end_of_vector_value<std::int8_t>();
+          return std::int8_t(v < 0.5f ? 0 : 1);
+        });
+      out_var.set_format("GT", sparse_gt_);
     }
 
     if (fmt_field_set_.find("HDS") != fmt_field_set_.end())
     {
       out_var.set_format("HDS", sparse_dosages);
+    }
+    else
+    {
+      out_var.set_format("HDS", {});
+    }
+
+    if (fmt_field_set_.find("GP") != fmt_field_set_.end() || fmt_field_set_.find("SD") != fmt_field_set_.end())
+    {
+      // set dense dosage vector
+      dense_zero_vec_.resize(sparse_dosages.size());
+      for (auto it = sparse_dosages.begin(); it != sparse_dosages.end(); ++it)
+        dense_zero_vec_[it.offset()] = *it;
+
+      std::vector<float>& dense_hds = dense_zero_vec_;
+
+      if (fmt_field_set_.find("GP") != fmt_field_set_.end())
+      {
+        if (stride == 1)
+        {
+          // All samples are haploid
+          dense_float_vec_.resize(n_samples_ * 2);
+          for (std::size_t i = 0; i < n_samples_; ++i)
+          {
+            std::size_t dest_idx = i * 2;
+            dense_float_vec_[dest_idx] = 1.f - dense_hds[i];
+            dense_float_vec_[dest_idx + 1] = dense_hds[i];
+          }
+        }
+        else if (stride == 2)
+        {
+          dense_float_vec_.resize(n_samples_ * 3);
+          for (std::size_t i = 0; i < n_samples_; ++i)
+          {
+            std::size_t src_idx = i * 2;
+            std::size_t dest_idx = i * 3;
+            float x = dense_hds[src_idx];
+            float y = dense_hds[src_idx + 1];
+            if (savvy::typed_value::is_end_of_vector(y))
+            {
+              // haploid
+              dense_float_vec_[dest_idx] = 1.f - x;
+              dense_float_vec_[dest_idx + 1] = x;
+              dense_float_vec_[dest_idx + 2] = y;
+            }
+            else
+            {
+              // diploid
+              dense_float_vec_[dest_idx] = (1.f - x) * (1.f - y);
+              dense_float_vec_[dest_idx + 1] = x * (1.f - y) + y * (1.f - x);
+              dense_float_vec_[dest_idx + 2] = x * y;
+            }
+          }
+        }
+
+        out_var.set_format("GP", dense_float_vec_);
+      }
+
+      if (fmt_field_set_.find("SD") != fmt_field_set_.end())
+      {
+        dense_float_vec_.resize(n_samples_);
+        if (stride == 1)
+        {
+          // All samples are haploid
+          for (std::size_t i = 0; i < n_samples_; ++i)
+          {
+            dense_float_vec_[i] = dense_hds[i] * (1.f - dense_hds[i]);
+          }
+
+          out_var.set_format("SD", dense_float_vec_);
+        }
+        else if (stride == 2)
+        {
+          for (std::size_t i = 0; i < dense_hds.size(); i += 2)
+          {
+            float x = dense_hds[i];
+            float y = dense_hds[i + 1];
+            if (savvy::typed_value::is_end_of_vector(y)) // haploid
+              dense_float_vec_[i / 2] = x * (1.f - x);
+            else // diploid
+              dense_float_vec_[i / 2] = x * (1.f - x) + y * (1.f - y);
+          }
+
+          out_var.set_format("SD", dense_float_vec_);
+        }
+        else
+        {
+          // TODO: suppress error excessive error messages
+          std::cerr << "Error: only haploid and diploid samples are supported when generating SD\n";
+        }
+      }
+
+      // unset dense dosage vector
+      for (auto it = sparse_dosages.begin(); it != sparse_dosages.end(); ++it)
+        dense_zero_vec_[it.offset()] = 0.f;
     }
 
     if (fmt_field_set_.find("DS") != fmt_field_set_.end())
@@ -1205,14 +1311,6 @@ private:
       savvy::stride_reduce(sparse_dosages, sparse_dosages.size() / n_samples_);
       out_var.set_format("DS", sparse_dosages);
       hds_set = false;
-    }
-
-    if (fmt_field_set_.find("GP") != fmt_field_set_.end())
-    {
-    }
-
-    if (fmt_field_set_.find("SD") != fmt_field_set_.end())
-    {
     }
   }
 };
