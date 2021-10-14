@@ -1,6 +1,8 @@
 #ifndef MINIMAC4_UNIQUE_HAPLOTYPE_HPP
 #define MINIMAC4_UNIQUE_HAPLOTYPE_HPP
 
+#include "variant.hpp"
+
 #include <savvy/reader.hpp>
 #include <savvy/writer.hpp>
 
@@ -10,67 +12,6 @@
 #include <deque>
 #include <limits>
 #include <cassert>
-
-struct reference_site_info
-{
-  std::string chrom;
-  std::uint32_t pos = 0;
-  std::string ref;
-  std::string alt;
-  //float recom = 0.f;
-
-  reference_site_info() {}
-
-  reference_site_info(std::string _chrom,
-    std::uint32_t _pos,
-    std::string _ref,
-    std::string _alt)
-  :
-    chrom(std::move(_chrom)),
-    pos(_pos),
-    ref(std::move(_ref)),
-    alt(std::move(_alt))
-  {
-  }
-};
-
-struct reference_variant : public reference_site_info
-{
-  reference_variant() {}
-
-  reference_variant(const std::string& _chrom,
-    std::uint32_t _pos,
-    const std::string& _ref,
-    const std::string& _alt,
-    std::size_t _ac,
-    std::vector<std::int8_t> _gt)
-    :
-    reference_site_info(_chrom, _pos, _ref, _alt),
-    ac(_ac),
-    gt(std::move(_gt))
-  {
-  }
-  std::size_t ac = 0;
-  std::vector<std::int8_t> gt;
-};
-
-struct sparse_ref_variant : public reference_site_info
-{
-  std::size_t ac;
-  std::vector<std::uint32_t> alt_allele_offsets;
-  sparse_ref_variant(const std::string& _chrom,
-    std::uint32_t _pos,
-    const std::string& _ref,
-    const std::string& _alt,
-    std::size_t _ac,
-    const std::size_t* off_it, const std::size_t* off_it_end)
-    :
-    reference_site_info(_chrom, _pos, _ref, _alt),
-    ac(_ac),
-    alt_allele_offsets(off_it, off_it_end)
-  {
-  }
-};
 
 class unique_haplotype_block
 {
@@ -197,6 +138,7 @@ inline bool operator==(const reduced_haplotypes::iterator& lhs, const reduced_ha
 {
   return lhs.block_idx() == rhs.block_idx() && lhs.block_local_idx() == rhs.block_local_idx();
 }
+
 inline bool operator!=(const reduced_haplotypes::iterator& lhs, const reduced_haplotypes::iterator& rhs)
 {
   return !(lhs == rhs);

@@ -26,9 +26,12 @@ find_library(STATGEN_LIBRARY StatGen)
 find_library(OMPP_LIBRARY omp)
 find_package(savvy REQUIRED)
 add_executable(minimac4
+        src/dosage_writer.cpp src/dosage_writer.hpp
         src/hidden_markov_model.cpp src/hidden_markov_model.hpp
+        src/input_prep.cpp src/input_prep.hpp
         src/recombination.cpp src/recombination.hpp
-        src/unique_haplotype.cpp src/unique_haplotype.hpp src/Main.cpp)
+        src/unique_haplotype.cpp src/unique_haplotype.hpp
+        src/Main.cpp)
 #        src/Analysis.cpp
 #        src/Analysis.h
 #        src/AnalysisChunks.cpp
