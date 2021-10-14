@@ -552,10 +552,7 @@ int main(int argc, char** argv)
     omp::parallel_for_exp(omp::static_schedule(), omp::sequence_iterator(i), omp::sequence_iterator(std::min(i + haplotype_buffer_size, target_sites[0].gt.size())), [&](int& i, const omp::iteration_context& ctx)
       {
         hmms[ctx.thread_index].traverse_forward(typed_only_reference_data.blocks(), target_sites, i);
-        auto reverse_ref_itr = --full_reference_data.end();
-        std::size_t block_idx(-1);
-        hmms[ctx.thread_index].traverse_backward(typed_only_reference_data.blocks(), target_sites, i, i % haplotype_buffer_size, reverse_maps, hmm_results, reverse_ref_itr, --full_reference_data.begin(),
-          block_idx);
+        hmms[ctx.thread_index].traverse_backward(typed_only_reference_data.blocks(), target_sites, i, i % haplotype_buffer_size, reverse_maps, hmm_results, full_reference_data);
       }, tpool);
     impute_time += std::difftime(std::time(nullptr), start_time);
 
