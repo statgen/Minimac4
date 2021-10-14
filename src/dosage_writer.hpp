@@ -35,16 +35,16 @@ public:
   bool merge_temp_files(const std::vector<std::string>& temp_files_paths);
 
   bool write_dosages(const full_dosages_results& hmm_results, const std::vector<target_variant>& tar_variants, std::pair<std::size_t, std::size_t> observed_range, const reduced_haplotypes& full_reference_data);
-
-  bool piecewise_constant( const best_templates_results& hmm_results, const std::vector<target_variant>& typed_variants, const reduced_haplotypes& reduced_reference, const std::string& reference_path, const savvy::genomic_region& reg, const std::string& output_path);
 private:
   static std::vector<std::pair<std::string, std::string>> gen_headers(const std::vector<std::string>& fmt_fields, const std::string& chromosome);
 
   static bool sites_match(const target_variant& t, const reference_site_info& r);
 
-  void prepare_output_variant(savvy::variant& out_var, variant_update_ctx& ctx, const std::vector<float>& dosages, const std::vector<float>& loo_dosages, const std::vector<std::int8_t>& observed);
+  void set_r2_info_field(savvy::variant& out_var, float s_x, float s_xx, std::size_t n);
+  void set_er2_info_field(savvy::variant& out_var, float s_x, float s_xx, float s_y, float s_yy, float s_xy, std::size_t n);
+  void set_info_fields(savvy::variant& out_var, const savvy::compressed_vector<float>& sparse_dosages, const std::vector<float>& loo_dosages, const std::vector<std::int8_t>& observed, bool temp);
 
-  void generate_extra_format_fields(savvy::variant& out_var, savvy::compressed_vector<float>& sparse_dosages);
+  void set_format_fields(savvy::variant& out_var, savvy::compressed_vector<float>& sparse_dosages);
 };
 
 #endif // MINIMAC4_DOSAGE_WRITER_HPP

@@ -295,7 +295,6 @@ public:
   std::int64_t overlap() const { return overlap_; }
   std::int16_t threads() const { return threads_; }
   std::size_t temp_buffer() const { return temp_buffer_ ; }
-  bool deferred_interpolation() const { return deferred_interpolation_; }
 
   prog_args() :
     getopt_wrapper(
@@ -309,8 +308,7 @@ public:
         {"output-format", required_argument, 0, 'O', "Output file format (bcf, sav, vcf.gz, ubcf, usav, or vcf; default: bcf)"},
         {"region", required_argument, 0, 'r', "Genomic region to impute"},
         {"threads", required_argument, 0, 't', "Number of threads (default: 1)"},
-        {"overlap", required_argument, 0, 'w', "Size (in basepairs) of overlap before and after region to use as input to HMM (default: 1000000)"},
-        {"deferred-interpolation", no_argument, 0, '\x01', nullptr}, //Enables experimental deferred interpolation algorithm
+        {"overlap", required_argument, 0, 'w', "Size (in basepairs) of overlap before and after region to use as input to HMM (default: 1000000)"}
       })
   {
   }
@@ -502,7 +500,7 @@ int main(int argc, char** argv)
 
   reduced_haplotypes typed_only_reference_data(16, 512);
   reduced_haplotypes full_reference_data;
-  load_reference_haplotypes(args.ref_path(), extended_region, args.region(), target_sites, typed_only_reference_data, args.deferred_interpolation() ? nullptr : &full_reference_data);
+  load_reference_haplotypes(args.ref_path(), extended_region, args.region(), target_sites, typed_only_reference_data, full_reference_data);
   std::cerr << ("Loading reference haplotypes took " + std::to_string(std::difftime(std::time(nullptr), start_time)) + " seconds") << std::endl;
 
   start_time = std::time(nullptr);
@@ -516,27 +514,8 @@ int main(int argc, char** argv)
   if (args.map_path().size())
   {
     start_time = std::time(nullptr);
-
     if (!recombination::parse_map_file(args.map_path(), target_sites.begin(), target_sites.end()))
       return std::cerr << "Error: parsing map file failed\n", EXIT_FAILURE;
-
-#if 0
-    auto tar_it = target_sites.begin();
-    for (auto it = target_sites.begin(); it != target_sites.end(); ++it)
-    {
-      auto prev_it = it++;
-      if (it != target_sites.end())
-      {
-        assert(prev_it->ref_cnt > 0);
-        float recom = std::max(recombination::recom_min, prev_it->recom / prev_it->ref_cnt);
-        float temp = (1.f - recom);
-        for (std::size_t i = 0; i < prev_it->ref_cnt; ++i)
-          temp *= (1.f - recom);
-        prev_it->recom = 1.f - temp;
-        assert(prev_it->recom <= 1.f && prev_it->recom >= 0.f);
-      }
-    }
-#endif
     std::cerr << ("Loading switch probabilities took " + std::to_string(std::difftime(std::time(nullptr), start_time)) + " seconds") << std::endl;
   }
 
@@ -547,88 +526,68 @@ int main(int argc, char** argv)
   omp::internal::thread_pool2 tpool(args.threads());
   std::vector<hidden_markov_model> hmms(args.threads());
 
-  if (args.deferred_interpolation())
-  {
-    best_templates_results hmm_results;
-    hmm_results.resize(target_sites.size(), target_sites[0].gt.size());
+  std::size_t ploidy = target_sites[0].gt.size() / sample_ids.size();
+  std::size_t haplotype_buffer_size = args.temp_buffer() * ploidy;
+  assert(ploidy && target_sites[0].gt.size() % sample_ids.size() == 0);
+  std::vector<std::string> temp_file_paths;
+  temp_file_paths.reserve(target_sites[0].gt.size() / haplotype_buffer_size + 1);
+  full_dosages_results hmm_results;
+  hmm_results.resize(full_reference_data.variant_size(), target_sites.size(), std::min(haplotype_buffer_size, target_sites[0].gt.size()));
 
-    omp::parallel_for_exp(omp::static_schedule(), omp::sequence_iterator(0), omp::sequence_iterator(target_sites[0].gt.size()), [&](int& i, const omp::iteration_context& ctx)
+  double impute_time = 0.;
+  double temp_write_time = 0.;
+  bool use_temp_files = target_sites[0].gt.size() > haplotype_buffer_size;
+  for (std::size_t i = 0; i < target_sites[0].gt.size(); i += haplotype_buffer_size)
+  {
+    std::size_t group_size = target_sites[0].gt.size() - i;
+    if (group_size < haplotype_buffer_size)
+    {
+      for (std::size_t j = 0; j < hmm_results.dosages_.size(); ++j)
+        hmm_results.dosages_[j].resize(group_size);
+      for (std::size_t j = 0; j < hmm_results.loo_dosages_.size(); ++j)
+        hmm_results.loo_dosages_[j].resize(group_size);
+    }
+
+    start_time = std::time(nullptr);
+    omp::parallel_for_exp(omp::static_schedule(), omp::sequence_iterator(i), omp::sequence_iterator(std::min(i + haplotype_buffer_size, target_sites[0].gt.size())), [&](int& i, const omp::iteration_context& ctx)
       {
         hmms[ctx.thread_index].traverse_forward(typed_only_reference_data.blocks(), target_sites, i);
-        hmms[ctx.thread_index].traverse_backward(typed_only_reference_data.blocks(), target_sites, i, i, reverse_maps, hmm_results);
-      },
-      tpool);
-    std::cerr << ("Running HMM took " + std::to_string(std::difftime(std::time(nullptr), start_time)) + " seconds") << std::endl;
+        auto reverse_ref_itr = --full_reference_data.end();
+        std::size_t block_idx(-1);
+        hmms[ctx.thread_index].traverse_backward(typed_only_reference_data.blocks(), target_sites, i, i % haplotype_buffer_size, reverse_maps, hmm_results, reverse_ref_itr, --full_reference_data.begin(),
+          block_idx);
+      }, tpool);
+    impute_time += std::difftime(std::time(nullptr), start_time);
+
     start_time = std::time(nullptr);
-    dosage_writer interpolator(args.out_path(), args.out_format(), args.out_compression(), sample_ids, args.fmt_fields(), target_sites.front().chrom);
-    interpolator.piecewise_constant(hmm_results, target_sites, typed_only_reference_data, args.ref_path(), args.region(), args.out_path());
-    std::cerr << ("Interpolating and writing output took " + std::to_string(std::difftime(std::time(nullptr), start_time)) + " seconds") << std::endl;
+    temp_file_paths.push_back(use_temp_files ? "/tmp/m4_g" + std::to_string(i / haplotype_buffer_size) + ".sav" : args.out_path()); //TODO: use real temp files
+    dosage_writer output(temp_file_paths.back(),
+      use_temp_files ? savvy::file::format::sav : args.out_format(),
+      use_temp_files ? std::min<std::uint8_t>(3, args.out_compression()) : args.out_compression(),
+      {sample_ids.begin() + (i / ploidy), sample_ids.begin() + (i + group_size) / ploidy},
+      use_temp_files ? std::vector<std::string>{"HDS"} : args.fmt_fields(),
+      target_sites.front().chrom);
+    output.write_dosages(hmm_results, target_sites, {i, std::min(i + haplotype_buffer_size, target_sites[0].gt.size())}, full_reference_data);
+    temp_write_time += std::difftime(std::time(nullptr), start_time);
+  }
+
+  std::cerr << ("Running HMM took " + std::to_string(impute_time) + " seconds") << std::endl;
+  if (use_temp_files)
+  {
+    std::cerr << ("Writing temp files took " + std::to_string(temp_write_time) + " seconds") << std::endl;
+
+    // TODO:
+    std::cerr << "Merging temp files ... " << std::endl;
+    start_time = std::time(nullptr);
+    dosage_writer output(args.out_path(), args.out_format(), args.out_compression(), sample_ids, args.fmt_fields(), target_sites.front().chrom);
+    output.merge_temp_files(temp_file_paths);
+    std::cerr << ("Merging temp files took " + std::to_string(std::difftime(std::time(nullptr), start_time)) + " seconds") << std::endl;
   }
   else
   {
-
-    std::size_t ploidy = target_sites[0].gt.size() / sample_ids.size();
-    std::size_t haplotype_buffer_size = args.temp_buffer() * ploidy;
-    assert(ploidy && target_sites[0].gt.size() % sample_ids.size() == 0);
-    std::vector<std::string> temp_file_paths;
-    temp_file_paths.reserve(target_sites[0].gt.size() / haplotype_buffer_size + 1);
-    full_dosages_results hmm_results;
-    hmm_results.resize(full_reference_data.variant_size(), target_sites.size(), std::min(haplotype_buffer_size, target_sites[0].gt.size()));
-
-    double impute_time = 0.;
-    double temp_write_time = 0.;
-    bool use_temp_files = target_sites[0].gt.size() > haplotype_buffer_size;
-    for (std::size_t i = 0; i < target_sites[0].gt.size(); i += haplotype_buffer_size)
-    {
-      std::size_t group_size = target_sites[0].gt.size() - i;
-      if (group_size < haplotype_buffer_size)
-      {
-        for (std::size_t j = 0; j < hmm_results.dosages_.size(); ++j)
-          hmm_results.dosages_[j].resize(group_size);
-        for (std::size_t j = 0; j < hmm_results.loo_dosages_.size(); ++j)
-          hmm_results.loo_dosages_[j].resize(group_size);
-      }
-
-      start_time = std::time(nullptr);
-      omp::parallel_for_exp(omp::static_schedule(), omp::sequence_iterator(i), omp::sequence_iterator(std::min(i + haplotype_buffer_size, target_sites[0].gt.size())), [&](int& i, const omp::iteration_context& ctx)
-        {
-          hmms[ctx.thread_index].traverse_forward(typed_only_reference_data.blocks(), target_sites, i);
-          auto reverse_ref_itr = --full_reference_data.end();
-          std::size_t block_idx(-1);
-          hmms[ctx.thread_index].traverse_backward(typed_only_reference_data.blocks(), target_sites, i, i % haplotype_buffer_size, reverse_maps, hmm_results, reverse_ref_itr, --full_reference_data.begin(),
-            block_idx);
-        }, tpool);
-      impute_time += std::difftime(std::time(nullptr), start_time);
-
-      start_time = std::time(nullptr);
-      temp_file_paths.push_back(use_temp_files ? "/tmp/m4_g" + std::to_string(i / haplotype_buffer_size) + ".sav" : args.out_path()); //TODO: use real temp files
-      dosage_writer interpolator(temp_file_paths.back(),
-        use_temp_files ? savvy::file::format::sav : args.out_format(),
-        use_temp_files ? std::min<std::uint8_t>(3, args.out_compression()) : args.out_compression(),
-        {sample_ids.begin() + (i / ploidy), sample_ids.begin() + (i + group_size) / ploidy},
-        use_temp_files ? std::vector<std::string>{"HDS"} : args.fmt_fields(),
-        target_sites.front().chrom);
-      interpolator.write_dosages(hmm_results, target_sites, {i, std::min(i + haplotype_buffer_size, target_sites[0].gt.size())}, full_reference_data);
-      temp_write_time += std::difftime(std::time(nullptr), start_time);
-    }
-
-    std::cerr << ("Running HMM took " + std::to_string(impute_time) + " seconds") << std::endl;
-    if (use_temp_files)
-    {
-      std::cerr << ("Writing temp files took " + std::to_string(temp_write_time) + " seconds") << std::endl;
-
-      // TODO:
-      std::cerr << "Merging temp files ... " << std::endl;
-      start_time = std::time(nullptr);
-      dosage_writer interpolator(args.out_path(), args.out_format(), args.out_compression(), sample_ids, args.fmt_fields(), target_sites.front().chrom);
-      interpolator.merge_temp_files(temp_file_paths);
-      std::cerr << ("Merging temp files took " + std::to_string(std::difftime(std::time(nullptr), start_time)) + " seconds") << std::endl;
-    }
-    else
-    {
-      std::cerr << ("Writing output took " + std::to_string(temp_write_time) + " seconds") << std::endl;
-    }
+    std::cerr << ("Writing output took " + std::to_string(temp_write_time) + " seconds") << std::endl;
   }
+
 
 
 

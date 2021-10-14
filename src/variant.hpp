@@ -16,7 +16,6 @@ struct target_variant
   float af;
   float err;
   float recom;
-  std::size_t ref_cnt;
   std::vector<std::int8_t> gt;
 };
 
