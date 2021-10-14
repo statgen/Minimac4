@@ -6,6 +6,7 @@
 #include <unordered_map>
 
 constexpr float hidden_markov_model::jump_fix;
+constexpr float hidden_markov_model::jump_threshold;
 
 hidden_markov_model::hidden_markov_model(float background_error) :
   background_error_(background_error)
@@ -259,16 +260,13 @@ bool hidden_markov_model::transpose(const std::vector<float>& from, std::vector<
     sum += from[i];
   }
 
-  //sum *= (recom / n_templates);
   double complement = 1. - recom;
 
-  // avoid underflows
-  if (sum < 1e-10)
+  // prevent probs from getting too small
+  if (sum < jump_threshold) // 1e-10
   {
-    sum *= jump_fix; //1e15;
-    complement *= jump_fix; //1e15;
-    //    for(int i=0;i<noReducedStatesCurrent;i++)
-    //      noRecomProb[i]*=JumpFix;
+    sum *= jump_fix; // 1e15
+    complement *= jump_fix; // 1e15
     jumped = true;
   }
 
@@ -279,10 +277,10 @@ bool hidden_markov_model::transpose(const std::vector<float>& from, std::vector<
   {
     to[i] = from[i] * complement + (uniq_cardinalities[i] * sum);
     to_norecom[i] = from_norecom[i] * complement;
-    assert(to[i]>=0.0f);
-    //assert(noRecomProb[i]>=0.0f);
-    assert(to[i]<1e18);
-    //assert(noRecomProb[i]<1e18);
+    assert(to[i] >= 0.0f);
+    assert(to_norecom[i] >= 0.0f);
+    assert(to[i] < 1e18);
+    assert(to_norecom[i] < 1e18);
   }
 
   return jumped;
@@ -310,7 +308,7 @@ void hidden_markov_model::condition(std::vector<float>& probs, std::vector<float
   }
 }
 
-void hidden_markov_model::impute(double& prob_sum, std::size_t& prev_best_hap,
+void hidden_markov_model::impute_typed_site(double& prob_sum, std::size_t& prev_best_hap,
   const std::vector<float>& left_probs,
   const std::vector<float>& right_probs,
   const std::vector<float>& left_probs_norecom,
@@ -566,7 +564,7 @@ void hidden_markov_model::impute(double& prob_sum, std::size_t& prev_best_typed_
   float typed_loo_dose = std::numeric_limits<float>::quiet_NaN();
   std::vector<std::uint32_t> best_typed_haps;
   std::vector<float> best_typed_probs;
-  impute(prob_sum, prev_best_typed_hap,
+  impute_typed_site(prob_sum, prev_best_typed_hap,
     left_probs,
     right_probs,
     left_probs_norecom,
