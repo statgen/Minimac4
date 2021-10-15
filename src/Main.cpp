@@ -539,7 +539,7 @@ int main(int argc, char** argv)
   bool use_temp_files = target_sites[0].gt.size() > haplotype_buffer_size;
   for (std::size_t i = 0; i < target_sites[0].gt.size(); i += haplotype_buffer_size)
   {
-    std::size_t group_size = target_sites[0].gt.size() - i;
+    std::size_t group_size = std::min(target_sites[0].gt.size() - i, haplotype_buffer_size);
     if (group_size < haplotype_buffer_size)
     {
       for (std::size_t j = 0; j < hmm_results.dosages_.size(); ++j)
@@ -549,7 +549,7 @@ int main(int argc, char** argv)
     }
 
     start_time = std::time(nullptr);
-    omp::parallel_for_exp(omp::static_schedule(), omp::sequence_iterator(i), omp::sequence_iterator(std::min(i + haplotype_buffer_size, target_sites[0].gt.size())), [&](int& i, const omp::iteration_context& ctx)
+    omp::parallel_for_exp(omp::static_schedule(), omp::sequence_iterator(i), omp::sequence_iterator(i + group_size), [&](int& i, const omp::iteration_context& ctx)
       {
         hmms[ctx.thread_index].traverse_forward(typed_only_reference_data.blocks(), target_sites, i);
         hmms[ctx.thread_index].traverse_backward(typed_only_reference_data.blocks(), target_sites, i, i % haplotype_buffer_size, reverse_maps, hmm_results, full_reference_data);
@@ -563,8 +563,9 @@ int main(int argc, char** argv)
       use_temp_files ? std::min<std::uint8_t>(3, args.out_compression()) : args.out_compression(),
       {sample_ids.begin() + (i / ploidy), sample_ids.begin() + (i + group_size) / ploidy},
       use_temp_files ? std::vector<std::string>{"HDS"} : args.fmt_fields(),
-      target_sites.front().chrom);
-    output.write_dosages(hmm_results, target_sites, {i, std::min(i + haplotype_buffer_size, target_sites[0].gt.size())}, full_reference_data);
+      target_sites.front().chrom,
+      use_temp_files);
+    output.write_dosages(hmm_results, target_sites, {i, i + group_size}, full_reference_data);
     temp_write_time += std::difftime(std::time(nullptr), start_time);
   }
 
@@ -576,7 +577,7 @@ int main(int argc, char** argv)
     // TODO:
     std::cerr << "Merging temp files ... " << std::endl;
     start_time = std::time(nullptr);
-    dosage_writer output(args.out_path(), args.out_format(), args.out_compression(), sample_ids, args.fmt_fields(), target_sites.front().chrom);
+    dosage_writer output(args.out_path(), args.out_format(), args.out_compression(), sample_ids, args.fmt_fields(), target_sites.front().chrom, false);
     output.merge_temp_files(temp_file_paths);
     std::cerr << ("Merging temp files took " + std::to_string(std::difftime(std::time(nullptr), start_time)) + " seconds") << std::endl;
   }

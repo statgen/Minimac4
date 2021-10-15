@@ -1,34 +1,59 @@
 #include "dosage_writer.hpp"
 
-dosage_writer::dosage_writer(const std::string& file_path, savvy::file::format file_format, std::uint8_t out_compression, const std::vector<std::string>& sample_ids, const std::vector<std::string>& fmt_fields, const std::string& chromosome) :
-  out_file_(file_path, file_format, gen_headers(fmt_fields, chromosome), sample_ids, out_compression),
+dosage_writer::dosage_writer(const std::string& file_path, savvy::file::format file_format, std::uint8_t out_compression, const std::vector<std::string>& sample_ids, const std::vector<std::string>& fmt_fields, const std::string& chromosome, bool is_temp) :
+  out_file_(file_path, file_format, gen_headers(fmt_fields, chromosome, is_temp), sample_ids, out_compression),
   file_format_(file_format),
   fmt_fields_(fmt_fields),
   fmt_field_set_(fmt_fields.begin(), fmt_fields.end()),
-  n_samples_(sample_ids.size())
+  n_samples_(sample_ids.size()),
+  is_temp_file_(is_temp)
 {
 
 }
 
-std::vector<std::pair<std::string, std::string>> dosage_writer::gen_headers(const std::vector<std::string>& fmt_fields, const std::string& chromosome)
+std::vector<std::pair<std::string, std::string>> dosage_writer::gen_headers(const std::vector<std::string>& fmt_fields, const std::string& chromosome, bool is_temp)
 {
   std::time_t t = std::time(nullptr);
   char datestr[11];
   assert(std::strftime(datestr, sizeof(datestr), "%Y%m%d", std::localtime(&t)));
 
-  std::vector<std::pair<std::string, std::string>> headers = {
-    {"fileformat","VCFv4.2"},
-    {"filedate", datestr},
-    {"source","Minimac v" + std::string(VERSION)},
-    {"phasing","full"},
-    {"contig","<ID=" + std::string(chromosome) + ">"},
-    {"INFO","<ID=AF,Number=1,Type=Float,Description=\"Estimated Alternate Allele Frequency\">"},
-    {"INFO","<ID=MAF,Number=1,Type=Float,Description=\"Estimated Minor Allele Frequency\">"},
-    {"INFO","<ID=R2,Number=1,Type=Float,Description=\"Estimated Imputation Accuracy (R-square)\">"},
-    {"INFO","<ID=ER2,Number=1,Type=Float,Description=\"Empirical (Leave-One-Out) R-square (available only for genotyped variants)\">"},
-    {"INFO","<ID=IMPUTED,Number=0,Type=Flag,Description=\"Marker was imputed but NOT genotyped\">"},
-    {"INFO","<ID=TYPED,Number=0,Type=Flag,Description=\"Marker was genotyped AND imputed\">"},
-    {"INFO","<ID=TYPED_ONLY,Number=0,Type=Flag,Description=\"Marker was genotyped but NOT imputed\">"}};
+  std::vector<std::pair<std::string, std::string>> headers;
+
+  if (is_temp)
+  {
+    headers = {
+      {"fileformat","VCFv4.2"},
+      {"filedate", datestr},
+      {"source","Minimac v" + std::string(VERSION)},
+      {"phasing","full"},
+      {"contig","<ID=" + std::string(chromosome) + ">"},
+      {"INFO","<ID=S_X,Number=1,Type=Float,Description=\"Sum of dosages\">"},
+      {"INFO","<ID=S_XX,Number=1,Type=Float,Description=\"Sum of squared dosages\">"},
+      {"INFO","<ID=LOO_S_X,Number=1,Type=Float,Description=\"Sum of LOO dosages\">"},
+      {"INFO","<ID=LOO_S_XX,Number=1,Type=Float,Description=\"Sum of squared LOO dosages\">"},
+      {"INFO","<ID=LOO_S_Y,Number=1,Type=Float,Description=\"Sum of observed genotypes\">"},
+      {"INFO","<ID=LOO_S_YY,Number=1,Type=Float,Description=\"Sum of squared observed genotypes\">"},
+      {"INFO","<ID=LOO_S_XY,Number=1,Type=Float,Description=\"Dot product of LOO dosages and observed genotypes\">"},
+      {"INFO","<ID=IMPUTED,Number=0,Type=Flag,Description=\"Marker was imputed but NOT genotyped\">"},
+      {"INFO","<ID=TYPED,Number=0,Type=Flag,Description=\"Marker was genotyped AND imputed\">"},
+      {"INFO","<ID=TYPED_ONLY,Number=0,Type=Flag,Description=\"Marker was genotyped but NOT imputed\">"}};
+  }
+  else
+  {
+    headers = {
+      {"fileformat", "VCFv4.2"},
+      {"filedate", datestr},
+      {"source", "Minimac v" + std::string(VERSION)},
+      {"phasing", "full"},
+      {"contig", "<ID=" + std::string(chromosome) + ">"},
+      {"INFO", "<ID=AF,Number=1,Type=Float,Description=\"Estimated Alternate Allele Frequency\">"},
+      {"INFO", "<ID=MAF,Number=1,Type=Float,Description=\"Estimated Minor Allele Frequency\">"},
+      {"INFO", "<ID=R2,Number=1,Type=Float,Description=\"Estimated Imputation Accuracy (R-square)\">"},
+      {"INFO", "<ID=ER2,Number=1,Type=Float,Description=\"Empirical (Leave-One-Out) R-square (available only for genotyped variants)\">"},
+      {"INFO", "<ID=IMPUTED,Number=0,Type=Flag,Description=\"Marker was imputed but NOT genotyped\">"},
+      {"INFO", "<ID=TYPED,Number=0,Type=Flag,Description=\"Marker was genotyped AND imputed\">"},
+      {"INFO", "<ID=TYPED_ONLY,Number=0,Type=Flag,Description=\"Marker was genotyped but NOT imputed\">"}};
+  }
 
   headers.reserve(headers.size() + 5);
   for (const auto& f : fmt_fields)
@@ -75,6 +100,9 @@ bool dosage_writer::merge_temp_files(const std::vector<std::string>& temp_files_
   int good_count = temp_files.size();
   while (good_count == temp_files.size())
   {
+    float s_x{}, s_xx{}, loo_s_x{}, loo_s_xx{}, loo_s_y{}, loo_s_yy{}, loo_s_xy{};
+    bool is_typed = false;
+
     pasted_hds.clear();
     good_count = 0;
     for (auto it = temp_files.begin(); it != temp_files.end(); ++it)
@@ -85,27 +113,53 @@ bool dosage_writer::merge_temp_files(const std::vector<std::string>& temp_files_
       pasted_hds.resize(old_size + partial_hds.size());
       for (auto jt = partial_hds.begin(); jt != partial_hds.end(); ++jt)
         pasted_hds[old_size + jt.offset()] = *jt;
+
+      float tmp;
+      if (out_var.get_info("S_X", tmp)) s_x += tmp;
+      if (out_var.get_info("S_XX", tmp)) s_xx += tmp;
+      if (out_var.get_info("LOO_S_X", tmp))
+      {
+        loo_s_x += tmp;
+        if (out_var.get_info("LOO_S_XX", tmp)) loo_s_xx += tmp;
+        if (out_var.get_info("LOO_S_Y", tmp)) loo_s_y += tmp;
+        // if (out_var.get_info("LOO_S_YY", tmp)) loo_s_yy += tmp;
+        if (out_var.get_info("LOO_S_XY", tmp)) loo_s_xy += tmp;
+        is_typed = true;
+      }
     }
+
+    loo_s_yy = loo_s_y;
 
     if (good_count)
     {
       if (good_count < temp_files.size())
         return std::cerr << "Error: record mismatch in temp files" << std::endl, false;
 
+      out_var.remove_info("S_X");
+      out_var.remove_info("S_XX");
+
       std::size_t n = pasted_hds.size();
-      float s_x = std::accumulate(pasted_hds.begin(), pasted_hds.end(), 0.f);
-      float s_xx = std::inner_product(pasted_hds.begin(), pasted_hds.end(), pasted_hds.begin(), 0.f);
+//      float s_x = std::accumulate(pasted_hds.begin(), pasted_hds.end(), 0.f);
+//      float s_xx = std::inner_product(pasted_hds.begin(), pasted_hds.end(), pasted_hds.begin(), 0.f);
+
       float af = s_x / n;
-
-      float r2 = savvy::typed_value::missing_value<float>();
-      if (af > 0.f && af < 1.f)
-        r2 = ((s_xx - s_x * s_x / n) / n) / (af * (1.f - af));
-
       out_var.set_info("AF", af);
       out_var.set_info("MAF", af > 0.5f ? 1.f - af : af);
-      out_var.set_info("R2", r2);
 
-      //out_var.set_format("HDS", pasted_hds);
+      set_r2_info_field(out_var, s_x, s_xx, n);
+
+      if (is_typed)
+      {
+        assert(std::find_if(out_var.info_fields().begin(), out_var.info_fields().end(), [](const std::pair<std::string, savvy::typed_value>& v) { return v.first == "TYPED"; }) != out_var.info_fields().end());
+        out_var.remove_info("LOO_S_X");
+        out_var.remove_info("LOO_S_XX");
+        out_var.remove_info("LOO_S_Y");
+        out_var.remove_info("LOO_S_YY");
+        out_var.remove_info("LOO_S_XY");
+
+        set_er2_info_field(out_var, loo_s_x, loo_s_xx, loo_s_y, loo_s_yy, loo_s_xy, n);
+      }
+
       set_format_fields(out_var, pasted_hds);
       out_file_ << out_var;
     }
@@ -134,7 +188,7 @@ bool dosage_writer::write_dosages(const full_dosages_results& hmm_results, const
   const std::vector<std::int8_t> empty_gt_vec;
   const std::vector<float> empty_loo_vec;
 
-  bool is_temp_file = observed_range.first == 0 && observed_range.second == tar_variants[0].gt.size();
+  assert(!is_temp_file_ || observed_range.first != 0 || observed_range.second != tar_variants[0].gt.size());
 
   std::size_t tar_idx = 0;
   std::size_t i = 0;
@@ -161,14 +215,15 @@ bool dosage_writer::write_dosages(const full_dosages_results& hmm_results, const
     sparse_dosages.assign(hmm_results.dosages_[i].begin(), hmm_results.dosages_[i].end());
     if (ref_matches_tar)
     {
-      set_info_fields(out_var, sparse_dosages, hmm_results.loo_dosages_[tar_idx], std::vector<std::int8_t>(tar_variants[tar_idx].gt.begin() + observed_range.first, tar_variants[tar_idx].gt.begin() + observed_range.second), is_temp_file);
+      set_info_fields(out_var, sparse_dosages, hmm_results.loo_dosages_[tar_idx], std::vector<std::int8_t>(tar_variants[tar_idx].gt.begin() + observed_range.first, tar_variants[tar_idx].gt.begin() + observed_range.second));
       set_format_fields(out_var, sparse_dosages);
     }
     else
     {
-      set_info_fields(out_var, sparse_dosages, {}, {}, is_temp_file);
+      set_info_fields(out_var, sparse_dosages, {}, {});
       set_format_fields(out_var, sparse_dosages);
     }
+
     out_file_ << out_var;
   }
 
@@ -194,7 +249,7 @@ void dosage_writer::set_er2_info_field(savvy::variant& out_var, float s_x, float
   out_var.set_info("ER2", std::isnan(emp_r) ? savvy::typed_value::missing_value<float>() : emp_r * emp_r);
 }
 
-void dosage_writer::set_info_fields(savvy::variant& out_var, const savvy::compressed_vector<float>& sparse_dosages, const std::vector<float>& loo_dosages, const std::vector<std::int8_t>& observed, bool temp)
+void dosage_writer::set_info_fields(savvy::variant& out_var, const savvy::compressed_vector<float>& sparse_dosages, const std::vector<float>& loo_dosages, const std::vector<std::int8_t>& observed)
 {
   std::size_t n = sparse_dosages.size();
 
@@ -202,7 +257,7 @@ void dosage_writer::set_info_fields(savvy::variant& out_var, const savvy::compre
   float s_xx = std::inner_product(sparse_dosages.begin(), sparse_dosages.end(), sparse_dosages.begin(), 0.f);
   float af = s_x / n;
 
-  if (temp)
+  if (is_temp_file_)
   {
     out_var.set_info("S_X", s_x);
     out_var.set_info("S_XX", s_xx);
@@ -229,7 +284,7 @@ void dosage_writer::set_info_fields(savvy::variant& out_var, const savvy::compre
 //    for (auto it = ctx.sparse_gt.begin(); it != ctx.sparse_gt.end(); ++it)
 //      s_xy += *it * loo_dosages[it.offset()];
 
-    if (temp)
+    if (is_temp_file_)
     {
       out_var.set_info("LOO_S_X", s_x);
       out_var.set_info("LOO_S_XX", s_xx);
