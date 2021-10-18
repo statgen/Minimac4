@@ -31,6 +31,7 @@ std::vector<std::pair<std::string, std::string>> dosage_writer::gen_headers(cons
       {"contig","<ID=" + std::string(chromosome) + ">"},
       {"INFO","<ID=S_X,Number=1,Type=Float,Description=\"Sum of dosages\">"},
       {"INFO","<ID=S_XX,Number=1,Type=Float,Description=\"Sum of squared dosages\">"},
+      {"INFO","<ID=S_CS,Number=1,Type=Float,Description=\"Sum of call scores\">"},
       {"INFO","<ID=LOO_S_X,Number=1,Type=Float,Description=\"Sum of LOO dosages\">"},
       {"INFO","<ID=LOO_S_XX,Number=1,Type=Float,Description=\"Sum of squared LOO dosages\">"},
       {"INFO","<ID=LOO_S_Y,Number=1,Type=Float,Description=\"Sum of observed genotypes\">"},
@@ -50,6 +51,7 @@ std::vector<std::pair<std::string, std::string>> dosage_writer::gen_headers(cons
       {"contig", "<ID=" + std::string(chromosome) + ">"},
       {"INFO", "<ID=AF,Number=1,Type=Float,Description=\"Estimated Alternate Allele Frequency\">"},
       {"INFO", "<ID=MAF,Number=1,Type=Float,Description=\"Estimated Minor Allele Frequency\">"},
+      {"INFO", "<ID=AVGCS,Number=1,Type=Float,Description=\"Average Call Score\">"},
       {"INFO", "<ID=R2,Number=1,Type=Float,Description=\"Estimated Imputation Accuracy (R-square)\">"},
       {"INFO", "<ID=ER2,Number=1,Type=Float,Description=\"Empirical (Leave-One-Out) R-square (available only for genotyped variants)\">"},
       {"INFO", "<ID=IMPUTED,Number=0,Type=Flag,Description=\"Marker was imputed but NOT genotyped\">"},
@@ -139,7 +141,7 @@ bool dosage_writer::merge_temp_files(std::list<savvy::reader>& temp_files, std::
   int good_count = temp_files.size();
   while (good_count == temp_files.size())
   {
-    float s_x{}, s_xx{}, loo_s_x{}, loo_s_xx{}, loo_s_y{}, loo_s_yy{}, loo_s_xy{};
+    float s_cs{}, s_x{}, s_xx{}, loo_s_x{}, loo_s_xx{}, loo_s_y{}, loo_s_yy{}, loo_s_xy{};
     bool is_typed = false;
 
     pasted_hds.clear();
@@ -157,6 +159,7 @@ bool dosage_writer::merge_temp_files(std::list<savvy::reader>& temp_files, std::
       float tmp;
       if (out_var.get_info("S_X", tmp)) s_x += tmp;
       if (out_var.get_info("S_XX", tmp)) s_xx += tmp;
+      if (out_var.get_info("S_CS", tmp)) s_cs += tmp;
       if (out_var.get_info("LOO_S_X", tmp))
       {
         loo_s_x += tmp;
@@ -177,6 +180,7 @@ bool dosage_writer::merge_temp_files(std::list<savvy::reader>& temp_files, std::
 
       out_var.remove_info("S_X");
       out_var.remove_info("S_XX");
+      out_var.remove_info("S_CS");
 
       std::size_t n = pasted_hds.size();
 //      float s_x = std::accumulate(pasted_hds.begin(), pasted_hds.end(), 0.f);
@@ -185,6 +189,7 @@ bool dosage_writer::merge_temp_files(std::list<savvy::reader>& temp_files, std::
       float af = s_x / n;
       out_var.set_info("AF", af);
       out_var.set_info("MAF", af > 0.5f ? 1.f - af : af);
+      out_var.set_info("AVGCS", s_cs / n);
 
       set_r2_info_field(out_var, s_x, s_xx, n);
 
@@ -346,16 +351,21 @@ void dosage_writer::set_info_fields(savvy::variant& out_var, const savvy::compre
   float s_x = std::accumulate(sparse_dosages.begin(), sparse_dosages.end(), 0.f);
   float s_xx = std::inner_product(sparse_dosages.begin(), sparse_dosages.end(), sparse_dosages.begin(), 0.f);
   float af = s_x / n;
+  float s_cs(sparse_dosages.size() - sparse_dosages.non_zero_size());
+  for (auto it = sparse_dosages.begin(); it != sparse_dosages.end(); ++it)
+    s_cs += *it > 0.5f ? *it : 1.f - *it;
 
   if (is_temp_file_)
   {
     out_var.set_info("S_X", s_x);
     out_var.set_info("S_XX", s_xx);
+    out_var.set_info("S_CS", s_cs);
   }
   else
   {
     out_var.set_info("AF", af);
     out_var.set_info("MAF", af > 0.5f ? 1.f - af : af);
+    out_var.set_info("AVGCS", s_cs / n);
     set_r2_info_field(out_var, s_x, s_xx, n);
   }
 
