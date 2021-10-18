@@ -16,7 +16,8 @@ std::vector<std::pair<std::string, std::string>> dosage_writer::gen_headers(cons
 {
   std::time_t t = std::time(nullptr);
   char datestr[11];
-  assert(std::strftime(datestr, sizeof(datestr), "%Y%m%d", std::localtime(&t)));
+  std::string filedate(datestr, std::strftime(datestr, sizeof(datestr), "%Y%m%d", std::localtime(&t)));
+  assert(filedate.size());
 
   std::vector<std::pair<std::string, std::string>> headers;
 
@@ -24,7 +25,7 @@ std::vector<std::pair<std::string, std::string>> dosage_writer::gen_headers(cons
   {
     headers = {
       {"fileformat","VCFv4.2"},
-      {"filedate", datestr},
+      {"filedate", filedate},
       {"source","Minimac v" + std::string(VERSION)},
       {"phasing","full"},
       {"contig","<ID=" + std::string(chromosome) + ">"},
@@ -43,7 +44,7 @@ std::vector<std::pair<std::string, std::string>> dosage_writer::gen_headers(cons
   {
     headers = {
       {"fileformat", "VCFv4.2"},
-      {"filedate", datestr},
+      {"filedate", filedate},
       {"source", "Minimac v" + std::string(VERSION)},
       {"phasing", "full"},
       {"contig", "<ID=" + std::string(chromosome) + ">"},
@@ -80,11 +81,12 @@ std::vector<std::pair<std::string, std::string>> dosage_writer::gen_emp_headers(
 {
   std::time_t t = std::time(nullptr);
   char datestr[11];
-  assert(std::strftime(datestr, sizeof(datestr), "%Y%m%d", std::localtime(&t)));
+  std::string filedate(datestr, std::strftime(datestr, sizeof(datestr), "%Y%m%d", std::localtime(&t)));
+  assert(filedate.size());
 
   std::vector<std::pair<std::string, std::string>> headers = {
     {"fileformat", "VCFv4.2"},
-    {"filedate", datestr},
+    {"filedate", filedate},
     {"source", "Minimac v" + std::string(VERSION)},
     {"phasing", "full"},
     {"contig", "<ID=" + std::string(chromosome) + ">"},
