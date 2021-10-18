@@ -52,7 +52,7 @@ std::vector<std::pair<std::string, std::string>> dosage_writer::gen_headers(cons
       {"contig", "<ID=" + std::string(chromosome) + ">"},
       {"INFO", "<ID=AF,Number=1,Type=Float,Description=\"Estimated Alternate Allele Frequency\">"},
       {"INFO", "<ID=MAF,Number=1,Type=Float,Description=\"Estimated Minor Allele Frequency\">"},
-      {"INFO", "<ID=AVGCS,Number=1,Type=Float,Description=\"Average Call Score\">"},
+      {"INFO", "<ID=AVG_CS,Number=1,Type=Float,Description=\"Average Call Score\">"},
       {"INFO", "<ID=R2,Number=1,Type=Float,Description=\"Estimated Imputation Accuracy (R-square)\">"},
       {"INFO", "<ID=ER2,Number=1,Type=Float,Description=\"Empirical (Leave-One-Out) R-square (available only for genotyped variants)\">"},
       {"INFO", "<ID=IMPUTED,Number=0,Type=Flag,Description=\"Marker was imputed but NOT genotyped\">"},
@@ -190,7 +190,7 @@ bool dosage_writer::merge_temp_files(std::list<savvy::reader>& temp_files, std::
       float af = s_x / n;
       out_var.set_info("AF", af);
       out_var.set_info("MAF", af > 0.5f ? 1.f - af : af);
-      out_var.set_info("AVGCS", s_cs / n);
+      out_var.set_info("AVG_CS", s_cs / n);
 
       set_r2_info_field(out_var, s_x, s_xx, n);
 
@@ -379,7 +379,7 @@ void dosage_writer::set_info_fields(savvy::variant& out_var, const savvy::compre
   {
     out_var.set_info("AF", af);
     out_var.set_info("MAF", af > 0.5f ? 1.f - af : af);
-    out_var.set_info("AVGCS", s_cs / n);
+    out_var.set_info("AVG_CS", s_cs / n);
     set_r2_info_field(out_var, s_x, s_xx, n);
   }
 
