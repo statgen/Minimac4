@@ -1,7 +1,8 @@
 #include "dosage_writer.hpp"
 
-dosage_writer::dosage_writer(const std::string& file_path, savvy::file::format file_format, std::uint8_t out_compression, const std::vector<std::string>& sample_ids, const std::vector<std::string>& fmt_fields, const std::string& chromosome, bool is_temp) :
+dosage_writer::dosage_writer(const std::string& file_path, const std::string& emp_file_path, savvy::file::format file_format, std::uint8_t out_compression, const std::vector<std::string>& sample_ids, const std::vector<std::string>& fmt_fields, const std::string& chromosome, bool is_temp) :
   out_file_(file_path, file_format, gen_headers(fmt_fields, chromosome, is_temp), sample_ids, out_compression),
+  emp_out_file_(emp_file_path.empty() ? nullptr : new savvy::writer(emp_file_path, file_format, gen_emp_headers(chromosome), sample_ids, out_compression)),
   file_format_(file_format),
   fmt_fields_(fmt_fields),
   fmt_field_set_(fmt_fields.begin(), fmt_fields.end()),
@@ -75,27 +76,63 @@ std::vector<std::pair<std::string, std::string>> dosage_writer::gen_headers(cons
   return headers;
 }
 
+std::vector<std::pair<std::string, std::string>> dosage_writer::gen_emp_headers(const std::string& chromosome)
+{
+  std::time_t t = std::time(nullptr);
+  char datestr[11];
+  assert(std::strftime(datestr, sizeof(datestr), "%Y%m%d", std::localtime(&t)));
+
+  std::vector<std::pair<std::string, std::string>> headers = {
+    {"fileformat", "VCFv4.2"},
+    {"filedate", datestr},
+    {"source", "Minimac v" + std::string(VERSION)},
+    {"phasing", "full"},
+    {"contig", "<ID=" + std::string(chromosome) + ">"},
+    {"INFO", "<ID=IMPUTED,Number=0,Type=Flag,Description=\"Marker was imputed but NOT genotyped\">"},
+    {"INFO", "<ID=TYPED,Number=0,Type=Flag,Description=\"Marker was genotyped AND imputed\">"},
+    {"INFO", "<ID=TYPED_ONLY,Number=0,Type=Flag,Description=\"Marker was genotyped but NOT imputed\">"},
+    {"FORMAT","<ID=GT,Number=1,Type=String,Description=\"Genotyped alleles from Array\">"},
+    {"FORMAT","<ID=LDS,Number=2,Type=Float,Description=\"Leave-one-out Imputed Dosage : Estimated Haploid Alternate Allele Dosage assuming site was NOT genotyped\">"}};
+
+  // TODO: command string
+
+  return headers;
+}
+
 bool dosage_writer::sites_match(const target_variant& t, const reference_site_info& r)
 {
   return t.pos == r.pos && t.alt == r.alt && t.ref == r.ref;
 }
 
-bool dosage_writer::merge_temp_files(const std::vector<std::string>& temp_files_paths)
+bool dosage_writer::merge_temp_files(std::list<std::string>& temp_file_paths, std::list<std::string>& temp_emp_file_paths)
 {
-  if (temp_files_paths.empty())
+  std::list<savvy::reader> temp_files(temp_file_paths.begin(), temp_file_paths.end());
+  std::list<savvy::reader> temp_emp_files(temp_emp_file_paths.begin(), temp_emp_file_paths.end());
+  std::for_each(temp_file_paths.begin(), temp_file_paths.end(), [](std::string&s) { std::remove(s.c_str()); });
+  std::for_each(temp_emp_file_paths.begin(), temp_emp_file_paths.end(), [](std::string&s) { std::remove(s.c_str()); });
+  return merge_temp_files(temp_files, temp_emp_files);
+}
+
+bool dosage_writer::merge_temp_files(std::list<savvy::reader>& temp_files, std::list<savvy::reader>& temp_emp_files)
+{
+  if (temp_files.empty())
     return false;
+#if 0 // For when temp file readers are created before fully written.
+  for (auto it = temp_files.begin(); it != temp_files.end(); ++it)
+    it->reset_bounds(savvy::slice_bounds(0));
 
-  std::list<savvy::reader> temp_files;
-  for (auto it = temp_files_paths.begin(); it != temp_files_paths.end(); ++it)
-  {
-    temp_files.emplace_back(*it);
-    std::remove(it->c_str());
-  }
-
-
+  for (auto it = temp_emp_files.begin(); it != temp_emp_files.end(); ++it)
+    it->reset_bounds(savvy::slice_bounds(0));
+#endif
   savvy::variant out_var;
+  savvy::variant out_var_emp;
   savvy::compressed_vector<float> pasted_hds;
   savvy::compressed_vector<float> partial_hds;
+
+  std::vector<float> pasted_lds;
+  std::vector<float> partial_lds;
+  std::vector<std::int8_t> pasted_gt;
+  std::vector<std::int8_t> partial_gt;
 
   int good_count = temp_files.size();
   while (good_count == temp_files.size())
@@ -104,10 +141,11 @@ bool dosage_writer::merge_temp_files(const std::vector<std::string>& temp_files_
     bool is_typed = false;
 
     pasted_hds.clear();
+
     good_count = 0;
     for (auto it = temp_files.begin(); it != temp_files.end(); ++it)
     {
-      good_count += (int)(*it >> out_var).good();
+      good_count += (int)it->read(out_var).good();
       out_var.get_format("HDS", partial_hds);
       std::size_t old_size = pasted_hds.size();
       pasted_hds.resize(old_size + partial_hds.size());
@@ -158,6 +196,35 @@ bool dosage_writer::merge_temp_files(const std::vector<std::string>& temp_files_
         out_var.remove_info("LOO_S_XY");
 
         set_er2_info_field(out_var, loo_s_x, loo_s_xx, loo_s_y, loo_s_yy, loo_s_xy, n);
+
+        if (emp_out_file_)
+        {
+          pasted_lds.clear();
+          pasted_gt.clear();
+          pasted_lds.reserve(n);
+          pasted_gt.reserve(n);
+
+          int good_count_emp = 0;
+          for (auto it = temp_emp_files.begin(); it != temp_emp_files.end(); ++it)
+          {
+            good_count_emp += (int)it->read(out_var_emp).good();
+
+            out_var_emp.get_format("LDS", partial_lds);
+            for (auto jt = partial_lds.begin(); jt != partial_lds.end(); ++jt)
+              pasted_lds.push_back(*jt);
+
+            out_var_emp.get_format("GT", partial_gt);
+            for (auto jt = partial_gt.begin(); jt != partial_gt.end(); ++jt)
+              pasted_gt.push_back(*jt);
+          }
+
+          if (good_count_emp < temp_emp_files.size())
+            return std::cerr << "Error: record mismatch in empirical temp files" << std::endl, false;
+
+          out_var_emp.set_format("GT", pasted_gt);
+          out_var_emp.set_format("LDS", pasted_lds);
+          emp_out_file_->write(out_var_emp);
+        }
       }
 
       set_format_fields(out_var, pasted_hds);
@@ -170,7 +237,18 @@ bool dosage_writer::merge_temp_files(const std::vector<std::string>& temp_files_
     bad_count += (int)it->bad();
 
   if (bad_count || !out_file_.good())
-    return std::cerr << "Error: I/O failed during merging" << std::endl, false;
+    return std::cerr << "Error: I/O failed while merging" << std::endl, false;
+
+  if (emp_out_file_)
+  {
+    bad_count = 0;
+    for (auto it = temp_emp_files.begin(); it != temp_emp_files.end(); ++it)
+      bad_count += (int)it->bad();
+
+    if (bad_count || !emp_out_file_->good())
+      return std::cerr << "Error: I/O failed while merging empirical" << std::endl, false;
+  }
+
   return true;
 }
 
@@ -180,6 +258,7 @@ bool dosage_writer::write_dosages(const full_dosages_results& hmm_results, const
 
   variant_update_ctx update_context;
   savvy::variant out_var;
+  savvy::variant out_var_emp;
 
   assert(!tar_variants.empty());
 //  std::vector<float> dosages(tar_variants[0].gt.size());
@@ -215,8 +294,17 @@ bool dosage_writer::write_dosages(const full_dosages_results& hmm_results, const
     sparse_dosages.assign(hmm_results.dosages_[i].begin(), hmm_results.dosages_[i].end());
     if (ref_matches_tar)
     {
-      set_info_fields(out_var, sparse_dosages, hmm_results.loo_dosages_[tar_idx], std::vector<std::int8_t>(tar_variants[tar_idx].gt.begin() + observed_range.first, tar_variants[tar_idx].gt.begin() + observed_range.second));
+      std::vector<std::int8_t> observed(tar_variants[tar_idx].gt.begin() + observed_range.first, tar_variants[tar_idx].gt.begin() + observed_range.second);
+      set_info_fields(out_var, sparse_dosages, hmm_results.loo_dosages_[tar_idx], observed);
       set_format_fields(out_var, sparse_dosages);
+      if (emp_out_file_)
+      {
+        out_var_emp = savvy::site_info(ref_it->chrom, ref_it->pos, ref_it->ref, {ref_it->alt}, ""/*ref_var.id()*/);
+        out_var_emp.set_info("TYPED", std::vector<std::int8_t>());
+        out_var_emp.set_format("GT", observed);
+        out_var_emp.set_format("LDS", hmm_results.loo_dosages_[tar_idx]);
+        emp_out_file_->write(out_var_emp);
+      }
     }
     else
     {

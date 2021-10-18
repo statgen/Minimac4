@@ -14,7 +14,7 @@
 #include <savvy/writer.hpp>
 #include <omp.hpp>
 
-#include <stdio.h>
+#include <cstdio>
 #include <iostream>
 #include <ctime>
 #include <unistd.h>
@@ -268,6 +268,7 @@ private:
   std::string tar_path_;
   std::string map_path_;
   std::string out_path_ = "/dev/stdout";
+  std::string emp_out_path_;
   savvy::file::format out_format_ = savvy::file::format::bcf;
   std::uint8_t out_compression_ = 6;
   std::vector<std::string> fmt_fields_ = {"GT","HDS","DS"};
@@ -275,7 +276,6 @@ private:
   std::size_t temp_buffer_ = 200;
   std::int64_t overlap_;
   std::int16_t threads_ = 1;
-  bool deferred_interpolation_ = false;
   bool help_ = false;
 
 public:
@@ -288,6 +288,7 @@ public:
   const std::string& tar_path() const { return tar_path_; }
   const std::string& map_path() const { return map_path_; }
   const std::string& out_path() const { return out_path_; }
+  const std::string& emp_out_path() const { return emp_out_path_; }
   savvy::file::format out_format() const { return out_format_; }
   std::uint8_t out_compression() const { return out_compression_; }
   const std::vector<std::string>& fmt_fields() const { return fmt_fields_; }
@@ -301,6 +302,7 @@ public:
       "Usage: minimac4 [opts ...] <reference.m3vcf.gz> <target.vcf.gz>",
       {
         {"temp-buffer", required_argument, 0, 'b', "Number of samples to impute before writing to temporary files (default: 200)"},
+        {"empirical-output", required_argument, 0, 'e', "Output path for empirical dosages"},
         {"help", no_argument, 0, 'h', "Print usage"},
         {"format", required_argument, 0, 'f', "Comma-separated list of format fields to generate (GT, HDS, DS, GP, or SD; default: HDS)"},
         {"map", required_argument, 0, 'm', "Genetic map file"},
@@ -324,6 +326,9 @@ public:
       {
       case 'b':
         temp_buffer_ = std::size_t(std::atoll(optarg ? optarg : ""));
+        break;
+      case 'e':
+        emp_out_path_ = optarg ? optarg : "";
         break;
       case 'h':
         help_ = true;
@@ -385,9 +390,8 @@ public:
         overlap_ = std::atoll(optarg ? optarg : "");
         break;
       case '\x01':
-        if (std::string(long_options_[long_index].name) =="deferred-interpolation")
+        if (false) //std::string(long_options_[long_index].name) =="long-option")
         {
-          deferred_interpolation_ = true;
           break;
         } // else pass through to default
       default:
@@ -468,6 +472,9 @@ private:
 
 int main(int argc, char** argv)
 {
+//  test_class t(test_class::file_ptr_t(fopen("","")));
+//  test_class t2(fopen("",""));
+
   //return convert_old_m3vcf("../1000g-test/topmed.chr20.gtonly.filtered.rehdr.pass_only.phased.ligated.shuffled.m3vcf.gz", "../1000g-test/topmed.chr20.gtonly.filtered.rehdr.pass_only.phased.ligated.shuffled.m3bcf") ? 0 : 1;
   prog_args args;
   if (!args.parse(argc, argv))
@@ -529,8 +536,12 @@ int main(int argc, char** argv)
   std::size_t ploidy = target_sites[0].gt.size() / sample_ids.size();
   std::size_t haplotype_buffer_size = args.temp_buffer() * ploidy;
   assert(ploidy && target_sites[0].gt.size() % sample_ids.size() == 0);
-  std::vector<std::string> temp_file_paths;
-  temp_file_paths.reserve(target_sites[0].gt.size() / haplotype_buffer_size + 1);
+
+//  std::list<savvy::reader> temp_files;
+//  std::list<savvy::reader> temp_emp_files;
+  std::list<std::string> temp_files;
+  std::list<std::string> temp_emp_files;
+
   full_dosages_results hmm_results;
   hmm_results.resize(full_reference_data.variant_size(), target_sites.size(), std::min(haplotype_buffer_size, target_sites[0].gt.size()));
 
@@ -557,15 +568,57 @@ int main(int argc, char** argv)
     impute_time += std::difftime(std::time(nullptr), start_time);
 
     start_time = std::time(nullptr);
-    temp_file_paths.push_back(use_temp_files ? "/tmp/m4_g" + std::to_string(i / haplotype_buffer_size) + ".sav" : args.out_path()); //TODO: use real temp files
-    dosage_writer output(temp_file_paths.back(),
+    std::string out_path;
+    std::string out_emp_path;
+    int tmp_fd = -1;
+    int tmp_emp_fd = -1;
+    if (use_temp_files)
+    {
+      out_path =  "/tmp/m4_" + std::to_string(i / haplotype_buffer_size) + "_XXXXXX";
+      tmp_fd = mkstemp(&out_path[0]);
+      if (tmp_fd < 0)
+        return std::cerr << "Error: could not open temp file (" << out_path << ")" << std::endl, EXIT_FAILURE;
+
+      if (args.emp_out_path().size())
+      {
+        out_emp_path =  "/tmp/m4_" + std::to_string(i / haplotype_buffer_size) + "_emp_XXXXXX";
+        tmp_emp_fd = mkstemp(&out_emp_path[0]);
+        if (tmp_emp_fd < 0)
+          return std::cerr << "Error: could not open temp file (" << out_emp_path << ")" << std::endl, EXIT_FAILURE;
+      }
+    }
+    else
+    {
+      out_path = args.out_path();
+      out_emp_path = args.emp_out_path();
+    }
+
+    dosage_writer output(out_path, out_emp_path,
       use_temp_files ? savvy::file::format::sav : args.out_format(),
       use_temp_files ? std::min<std::uint8_t>(3, args.out_compression()) : args.out_compression(),
       {sample_ids.begin() + (i / ploidy), sample_ids.begin() + (i + group_size) / ploidy},
       use_temp_files ? std::vector<std::string>{"HDS"} : args.fmt_fields(),
       target_sites.front().chrom,
       use_temp_files);
-    output.write_dosages(hmm_results, target_sites, {i, i + group_size}, full_reference_data);
+
+    if (use_temp_files)
+    {
+      temp_files.emplace_back(out_path);
+      ::close(tmp_fd);
+      // std::remove(out_path.c_str()); // TODO: update savvy to indices to use FILE*
+      assert(tmp_fd > 0);
+
+      if (out_emp_path.size())
+      {
+        temp_emp_files.emplace_back(out_emp_path);
+        ::close(tmp_emp_fd);
+        // std::remove(out_emp_path.c_str()); // TODO: update savvy to indices to use FILE*
+        assert(tmp_emp_fd > 0);
+      }
+    }
+
+    if (!output.write_dosages(hmm_results, target_sites, {i, i + group_size}, full_reference_data))
+      return std::cerr << "Error: failed writing output\n", EXIT_FAILURE;
     temp_write_time += std::difftime(std::time(nullptr), start_time);
   }
 
@@ -574,11 +627,11 @@ int main(int argc, char** argv)
   {
     std::cerr << ("Writing temp files took " + std::to_string(temp_write_time) + " seconds") << std::endl;
 
-    // TODO:
     std::cerr << "Merging temp files ... " << std::endl;
     start_time = std::time(nullptr);
-    dosage_writer output(args.out_path(), args.out_format(), args.out_compression(), sample_ids, args.fmt_fields(), target_sites.front().chrom, false);
-    output.merge_temp_files(temp_file_paths);
+    dosage_writer output(args.out_path(), args.emp_out_path(), args.out_format(), args.out_compression(), sample_ids, args.fmt_fields(), target_sites.front().chrom, false);
+    if (!output.merge_temp_files(temp_files, temp_emp_files))
+      return std::cerr << "Error: failed merging temp files\n", EXIT_FAILURE;
     std::cerr << ("Merging temp files took " + std::to_string(std::difftime(std::time(nullptr), start_time)) + " seconds") << std::endl;
   }
   else

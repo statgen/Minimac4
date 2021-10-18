@@ -8,15 +8,17 @@
 #include <savvy/reader.hpp>
 #include <savvy/writer.hpp>
 
+#include <memory>
+
 class dosage_writer
 {
 private:
   savvy::writer out_file_;
+  std::unique_ptr<savvy::writer> emp_out_file_;
   savvy::file::format file_format_;
   std::vector<std::string> fmt_fields_;
   std::unordered_set<std::string> fmt_field_set_;
   std::size_t n_samples_ = 0;
-  const std::int16_t bin_scalar_ = 100; //256;
   bool is_temp_file_;
 
   // buffers
@@ -31,13 +33,15 @@ private:
     std::vector<float> gp_vec;
   };
 public:
-  dosage_writer(const std::string& file_path, savvy::file::format file_format, std::uint8_t out_compression, const std::vector<std::string>& sample_ids, const std::vector<std::string>& fmt_fields, const std::string& chromosome, bool is_temp);
+  dosage_writer(const std::string& file_path, const std::string& emp_file_path, savvy::file::format file_format, std::uint8_t out_compression, const std::vector<std::string>& sample_ids, const std::vector<std::string>& fmt_fields, const std::string& chromosome, bool is_temp);
 
-  bool merge_temp_files(const std::vector<std::string>& temp_files_paths);
+  bool merge_temp_files(std::list<savvy::reader>& temp_files, std::list<savvy::reader>& temp_emp_files);
+  bool merge_temp_files(std::list<std::string>& temp_file_paths, std::list<std::string>& temp_emp_file_paths);
 
   bool write_dosages(const full_dosages_results& hmm_results, const std::vector<target_variant>& tar_variants, std::pair<std::size_t, std::size_t> observed_range, const reduced_haplotypes& full_reference_data);
 private:
   static std::vector<std::pair<std::string, std::string>> gen_headers(const std::vector<std::string>& fmt_fields, const std::string& chromosome, bool is_temp);
+  static std::vector<std::pair<std::string, std::string>> gen_emp_headers(const std::string& chromosome);
 
   static bool sites_match(const target_variant& t, const reference_site_info& r);
 
