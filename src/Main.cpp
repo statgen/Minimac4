@@ -269,6 +269,7 @@ private:
   std::string map_path_;
   std::string out_path_ = "/dev/stdout";
   std::string emp_out_path_;
+  std::string sites_out_path_;
   savvy::file::format out_format_ = savvy::file::format::bcf;
   std::uint8_t out_compression_ = 6;
   std::vector<std::string> fmt_fields_ = {"GT","HDS","DS"};
@@ -289,6 +290,7 @@ public:
   const std::string& map_path() const { return map_path_; }
   const std::string& out_path() const { return out_path_; }
   const std::string& emp_out_path() const { return emp_out_path_; }
+  const std::string& sites_out_path() const { return sites_out_path_; }
   savvy::file::format out_format() const { return out_format_; }
   std::uint8_t out_compression() const { return out_compression_; }
   const std::vector<std::string>& fmt_fields() const { return fmt_fields_; }
@@ -309,6 +311,7 @@ public:
         {"output", required_argument, 0, 'o', "Output path (default: /dev/stdout)"},
         {"output-format", required_argument, 0, 'O', "Output file format (bcf, sav, vcf.gz, ubcf, usav, or vcf; default: bcf)"},
         {"region", required_argument, 0, 'r', "Genomic region to impute"},
+        {"sites", required_argument, 0, 's', "Output path for sites-only file"},
         {"threads", required_argument, 0, 't', "Number of threads (default: 1)"},
         {"overlap", required_argument, 0, 'w', "Size (in basepairs) of overlap before and after region to use as input to HMM (default: 1000000)"}
       })
@@ -382,6 +385,9 @@ public:
         }
       case 'r':
         reg_ = string_to_region(optarg ? optarg : "");
+        break;
+      case 's':
+        sites_out_path_ = optarg ? optarg : "";
         break;
       case 't':
         threads_ = atoi(optarg ? optarg : "");
@@ -594,6 +600,7 @@ int main(int argc, char** argv)
     }
 
     dosage_writer output(out_path, out_emp_path,
+      use_temp_files ? "" : args.sites_out_path(),
       use_temp_files ? savvy::file::format::sav : args.out_format(),
       use_temp_files ? std::min<std::uint8_t>(3, args.out_compression()) : args.out_compression(),
       {sample_ids.begin() + (i / ploidy), sample_ids.begin() + (i + group_size) / ploidy},
@@ -629,7 +636,7 @@ int main(int argc, char** argv)
 
     std::cerr << "Merging temp files ... " << std::endl;
     start_time = std::time(nullptr);
-    dosage_writer output(args.out_path(), args.emp_out_path(), args.out_format(), args.out_compression(), sample_ids, args.fmt_fields(), target_sites.front().chrom, false);
+    dosage_writer output(args.out_path(), args.emp_out_path(), args.sites_out_path(), args.out_format(), args.out_compression(), sample_ids, args.fmt_fields(), target_sites.front().chrom, false);
     if (!output.merge_temp_files(temp_files, temp_emp_files))
       return std::cerr << "Error: failed merging temp files\n", EXIT_FAILURE;
     std::cerr << ("Merging temp files took " + std::to_string(std::difftime(std::time(nullptr), start_time)) + " seconds") << std::endl;

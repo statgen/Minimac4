@@ -15,6 +15,7 @@ class dosage_writer
 private:
   savvy::writer out_file_;
   std::unique_ptr<savvy::writer> emp_out_file_;
+  std::unique_ptr<savvy::writer> sites_out_file_;
   savvy::file::format file_format_;
   std::vector<std::string> fmt_fields_;
   std::unordered_set<std::string> fmt_field_set_;
@@ -33,7 +34,7 @@ private:
     std::vector<float> gp_vec;
   };
 public:
-  dosage_writer(const std::string& file_path, const std::string& emp_file_path, savvy::file::format file_format, std::uint8_t out_compression, const std::vector<std::string>& sample_ids, const std::vector<std::string>& fmt_fields, const std::string& chromosome, bool is_temp);
+  dosage_writer(const std::string& file_path, const std::string& emp_file_path, const std::string& sites_file_path, savvy::file::format file_format, std::uint8_t out_compression, const std::vector<std::string>& sample_ids, const std::vector<std::string>& fmt_fields, const std::string& chromosome, bool is_temp);
 
   bool merge_temp_files(std::list<savvy::reader>& temp_files, std::list<savvy::reader>& temp_emp_files);
   bool merge_temp_files(std::list<std::string>& temp_file_paths, std::list<std::string>& temp_emp_file_paths);

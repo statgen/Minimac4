@@ -1,8 +1,9 @@
 #include "dosage_writer.hpp"
 
-dosage_writer::dosage_writer(const std::string& file_path, const std::string& emp_file_path, savvy::file::format file_format, std::uint8_t out_compression, const std::vector<std::string>& sample_ids, const std::vector<std::string>& fmt_fields, const std::string& chromosome, bool is_temp) :
+dosage_writer::dosage_writer(const std::string& file_path, const std::string& emp_file_path, const std::string& sites_file_path, savvy::file::format file_format, std::uint8_t out_compression, const std::vector<std::string>& sample_ids, const std::vector<std::string>& fmt_fields, const std::string& chromosome, bool is_temp) :
   out_file_(file_path, file_format, gen_headers(fmt_fields, chromosome, is_temp), sample_ids, out_compression),
   emp_out_file_(emp_file_path.empty() ? nullptr : new savvy::writer(emp_file_path, file_format, gen_emp_headers(chromosome), sample_ids, out_compression)),
+  sites_out_file_(sites_file_path.empty() ? nullptr : new savvy::writer(sites_file_path, file_format, gen_headers({}, chromosome, false), {}, out_compression)),
   file_format_(file_format),
   fmt_fields_(fmt_fields),
   fmt_field_set_(fmt_fields.begin(), fmt_fields.end()),
@@ -234,6 +235,13 @@ bool dosage_writer::merge_temp_files(std::list<savvy::reader>& temp_files, std::
         }
       }
 
+      if (sites_out_file_)
+      {
+        savvy::variant site_var;
+        dynamic_cast<savvy::site_info&>(site_var) = out_var;
+        sites_out_file_->write(site_var);
+      }
+
       set_format_fields(out_var, pasted_hds);
       out_file_ << out_var;
     }
@@ -303,7 +311,6 @@ bool dosage_writer::write_dosages(const full_dosages_results& hmm_results, const
     {
       std::vector<std::int8_t> observed(tar_variants[tar_idx].gt.begin() + observed_range.first, tar_variants[tar_idx].gt.begin() + observed_range.second);
       set_info_fields(out_var, sparse_dosages, hmm_results.loo_dosages_[tar_idx], observed);
-      set_format_fields(out_var, sparse_dosages);
       if (emp_out_file_)
       {
         out_var_emp = savvy::site_info(ref_it->chrom, ref_it->pos, ref_it->ref, {ref_it->alt}, ""/*ref_var.id()*/);
@@ -316,9 +323,16 @@ bool dosage_writer::write_dosages(const full_dosages_results& hmm_results, const
     else
     {
       set_info_fields(out_var, sparse_dosages, {}, {});
-      set_format_fields(out_var, sparse_dosages);
     }
 
+    if (sites_out_file_)
+    {
+      savvy::variant site_var;
+      dynamic_cast<savvy::site_info&>(site_var) = out_var;
+      sites_out_file_->write(site_var);
+    }
+
+    set_format_fields(out_var, sparse_dosages);
     out_file_ << out_var;
   }
 
