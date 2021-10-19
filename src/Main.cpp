@@ -268,6 +268,7 @@ private:
   std::string tar_path_;
   std::string map_path_;
   std::string out_path_ = "/dev/stdout";
+  std::string prefix_; // deprecated
   std::string emp_out_path_;
   std::string sites_out_path_;
   savvy::file::format out_format_ = savvy::file::format::bcf;
@@ -275,9 +276,12 @@ private:
   std::vector<std::string> fmt_fields_ = {"GT","HDS","DS"};
   savvy::genomic_region reg_ = {""};
   std::size_t temp_buffer_ = 200;
-  std::int64_t overlap_;
+  std::int64_t chunk_size_ = 20000000;
+  std::int64_t overlap_ = 3000000;
   std::int16_t threads_ = 1;
   bool all_typed_sites_ = false;
+  bool pass_only_ = false;
+  bool meta_ = false; // deprecated
   bool help_ = false;
 
 public:
@@ -296,10 +300,12 @@ public:
   std::uint8_t out_compression() const { return out_compression_; }
   const std::vector<std::string>& fmt_fields() const { return fmt_fields_; }
   const savvy::genomic_region& region() const { return reg_; }
+  std::int64_t chunk_size() const { return chunk_size_; }
   std::int64_t overlap() const { return overlap_; }
   std::int16_t threads() const { return threads_; }
   std::size_t temp_buffer() const { return temp_buffer_ ; }
   bool all_typed_sites() const { return all_typed_sites_; }
+  bool pass_only() const { return pass_only_; }
 
   prog_args() :
     getopt_wrapper(
@@ -307,16 +313,33 @@ public:
       {
         {"all-typed-sites", no_argument, 0, 'a', "Include in the output sites that exist only in target VCF"},
         {"temp-buffer", required_argument, 0, 'b', "Number of samples to impute before writing to temporary files (default: 200)"},
+        {"chunk", required_argument, 0, 'c', "Maximum chunk length in base pairs to impute at once"}, // TODO
         {"empirical-output", required_argument, 0, 'e', "Output path for empirical dosages"},
         {"help", no_argument, 0, 'h', "Print usage"},
         {"format", required_argument, 0, 'f', "Comma-separated list of format fields to generate (GT, HDS, DS, GP, or SD; default: HDS)"},
         {"map", required_argument, 0, 'm', "Genetic map file"},
         {"output", required_argument, 0, 'o', "Output path (default: /dev/stdout)"},
         {"output-format", required_argument, 0, 'O', "Output file format (bcf, sav, vcf.gz, ubcf, usav, or vcf; default: bcf)"},
+        {"pass-only", no_argument, 0, 'p', "Only imports variants with FILTER column set to PASS"},
         {"region", required_argument, 0, 'r', "Genomic region to impute"},
         {"sites", required_argument, 0, 's', "Output path for sites-only file"},
         {"threads", required_argument, 0, 't', "Number of threads (default: 1)"},
-        {"overlap", required_argument, 0, 'w', "Size (in basepairs) of overlap before and after region to use as input to HMM (default: 1000000)"}
+        {"overlap", required_argument, 0, 'w', "Size (in base pairs) of overlap before and after impute region to use as input to HMM (default: 3000000)"},
+        // vvvv deprecated vvvv //
+        {"allTypedSites", no_argument, 0, '\x01', ""},
+        {"rsid", no_argument, 0, '\x01', ""},
+        {"passOnly", no_argument, 0, '\x01', ""},
+        {"meta", no_argument, 0, '\x01', ""},
+        {"haps", required_argument, 0, '\x02', ""},
+        {"refHaps", required_argument, 0, '\x02', ""},
+        {"prefix", required_argument, 0, '\x02', ""},
+        {"mapFile", required_argument, 0, '\x02', ""},
+        {"chr", required_argument, 0, '\x02', ""},
+        {"start", required_argument, 0, '\x02', ""},
+        {"end", required_argument, 0, '\x02', ""},
+        {"window", required_argument, 0, '\x02', ""},
+        {"ChunkOverlapMb", required_argument, 0, '\x02', ""},
+        {"cpus", required_argument, 0, '\x02', ""}
       })
   {
   }
@@ -335,6 +358,9 @@ public:
         break;
       case 'b':
         temp_buffer_ = std::size_t(std::atoll(optarg ? optarg : ""));
+        break;
+      case 'c':
+        chunk_size_ = std::atoll(optarg ? optarg : "");
         break;
       case 'e':
         emp_out_path_ = optarg ? optarg : "";
@@ -389,6 +415,9 @@ public:
           }
           break;
         }
+      case 'p':
+        pass_only_ = true;
+        break;
       case 'r':
         reg_ = string_to_region(optarg ? optarg : "");
         break;
@@ -402,11 +431,86 @@ public:
         overlap_ = std::atoll(optarg ? optarg : "");
         break;
       case '\x01':
-//        if (std::string(long_options_[long_index].name) =="all-typed-sites")
-//        {
-//          all_typed_sites_ = true;
-//          break;
-//        } // else pass through to default
+        if (std::string(long_options_[long_index].name) == "allTypedSites")
+        {
+          std::cerr << "Warning: --allTypedSites is deprecated in favor of --all-typed-sites\n";
+          all_typed_sites_ = true;
+          break;
+        }
+        else if (std::string(long_options_[long_index].name) == "rsid")
+        {
+          std::cerr << "Warning: --rsid is deprecated (on by default)\n";
+          break;
+        }
+        else if (std::string(long_options_[long_index].name) == "passOnly")
+        {
+          std::cerr << "Warning: --passOnly is deprecated in favor of --pass-only\n";
+          pass_only_ = true;
+          break;
+        }
+        else if (std::string(long_options_[long_index].name) == "meta")
+        {
+          std::cerr << "Warning: --meta is deprecated in favor of --empirical-output\n";
+          meta_ = true;
+          break;
+        }
+        // else pass through to default
+      case '\x02':
+        if (std::string(long_options_[long_index].name) == "haps")
+        {
+          std::cerr << "Warning: --haps is deprecated\n";
+          tar_path_ = optarg ? optarg : "";
+          break;
+        }
+        else if (std::string(long_options_[long_index].name) == "refHaps")
+        {
+          std::cerr << "Warning: --refHaps is deprecated\n";
+          ref_path_ = optarg ? optarg : "";
+          break;
+        }
+        else if (std::string(long_options_[long_index].name) == "chr")
+        {
+          std::cerr << "Warning: --chr is deprecated in favor of --region\n";
+          reg_ = savvy::genomic_region(optarg ? optarg : "", reg_.from(), reg_.to());
+          break;
+        }
+        else if (std::string(long_options_[long_index].name) == "start")
+        {
+          std::cerr << "Warning: --start is deprecated in favor of --region\n";
+          reg_ = savvy::genomic_region(reg_.chromosome(), std::atoll(optarg ? optarg : ""), reg_.to());
+          break;
+        }
+        else if (std::string(long_options_[long_index].name) == "end")
+        {
+          std::cerr << "Warning: --end is deprecated in favor of --region\n";
+          reg_ = savvy::genomic_region(reg_.chromosome(), reg_.from(), std::atoll(optarg ? optarg : ""));
+          break;
+        }
+        else if (std::string(long_options_[long_index].name) == "prefix")
+        {
+          std::cerr << "Warning: --prefix is deprecated in favor of --output, --empirical-output, and --sites\n";
+          prefix_ = optarg ? optarg : "";
+          break;
+        }
+        else if (std::string(long_options_[long_index].name) == "mapFile")
+        {
+          std::cerr << "Warning: --mapFile is deprecated in favor of --map\n";
+          map_path_ = optarg ? optarg : "";
+          break;
+        }
+        else if (std::string(long_options_[long_index].name) == "window")
+        {
+          std::cerr << "Warning: --window is deprecated in favor of --overlap\n";
+          overlap_ = std::atoll(optarg ? optarg : "");
+          break;
+        }
+        else if (std::string(long_options_[long_index].name) == "ChunkOverlapMb")
+        {
+          std::cerr << "Warning: --ChunkOverlapMb is deprecated in favor of --overlap\n";
+          overlap_ = std::atoll(optarg ? optarg : "") * 1000000;
+          break;
+        }
+        // else pass through to default
       default:
         return false;
       }
@@ -419,7 +523,24 @@ public:
       ref_path_ = argv[optind];
       tar_path_ = argv[optind + 1];
     }
-    else if (remaining_arg_count < 1)
+    else if (!prefix_.empty())
+    {
+      std::string suffix = "sav";
+      if (out_format_ == savvy::file::format::bcf)
+        suffix = "bcf";
+      else if (out_format_ == savvy::file::format::vcf)
+      {
+        suffix = "vcf";
+        if (out_compression_)
+          suffix += ".gz";
+      }
+
+      out_path_ = prefix_ + ".dose." + suffix;
+      out_path_ = prefix_ + ".sites." + suffix;
+      if (meta_)
+        emp_out_path_ = prefix_ + ".empiricalDose." + suffix;
+    }
+    else if (remaining_arg_count < 2)
     {
       std::cerr << "Too few arguments\n";
       return false;
@@ -483,32 +604,16 @@ private:
   }
 };
 
-int main(int argc, char** argv)
+bool impute_chunk(const savvy::region& impute_region, const prog_args& args, dosage_writer& output)
 {
-//  test_class t(test_class::file_ptr_t(fopen("","")));
-//  test_class t2(fopen("",""));
-
-  //return convert_old_m3vcf("../1000g-test/topmed.chr20.gtonly.filtered.rehdr.pass_only.phased.ligated.shuffled.m3vcf.gz", "../1000g-test/topmed.chr20.gtonly.filtered.rehdr.pass_only.phased.ligated.shuffled.m3bcf") ? 0 : 1;
-  prog_args args;
-  if (!args.parse(argc, argv))
-  {
-    args.print_usage(std::cerr);
-    return EXIT_FAILURE;
-  }
-
-  if (args.help_is_set())
-  {
-    args.print_usage(std::cout);
-
-    return EXIT_SUCCESS;
-  }
-
   savvy::region extended_region =
     {
-      args.region().chromosome(),
-      std::uint64_t(std::max(std::int64_t(1), std::int64_t(args.region().from()) - args.overlap())),
-      args.region().to() + args.overlap()
+      impute_region.chromosome(),
+      std::uint64_t(std::max(std::int64_t(1), std::int64_t(impute_region.from()) - args.overlap())),
+      impute_region.to() + args.overlap()
     };
+
+  std::cerr << "Imputing " << impute_region.chromosome() << ":" << impute_region.from() << "-" << impute_region.to() << std::endl;
 
   std::time_t start_time = std::time(nullptr);
   std::vector<std::string> sample_ids;
@@ -520,7 +625,7 @@ int main(int argc, char** argv)
 
   reduced_haplotypes typed_only_reference_data(16, 512);
   reduced_haplotypes full_reference_data;
-  load_reference_haplotypes(args.ref_path(), extended_region, args.region(), target_sites, typed_only_reference_data, full_reference_data);
+  load_reference_haplotypes(args.ref_path(), extended_region, impute_region, target_sites, typed_only_reference_data, full_reference_data);
   std::cerr << ("Loading reference haplotypes took " + std::to_string(std::difftime(std::time(nullptr), start_time)) + " seconds") << std::endl;
 
   start_time = std::time(nullptr);
@@ -530,14 +635,14 @@ int main(int argc, char** argv)
   std::cerr << ("Separating typed only variants took " + std::to_string(std::difftime(std::time(nullptr), start_time)) + " seconds") << std::endl;
 
   if (target_sites.empty())
-    return std::cerr << "Error: no target variants\n", EXIT_FAILURE;
+    return std::cerr << "Error: no target variants\n", false;
 
   target_sites.back().recom = 0.f; // Last recom prob must be zero so that the first step of backward traversal will have no recombination.
   if (args.map_path().size())
   {
     start_time = std::time(nullptr);
     if (!recombination::parse_map_file(args.map_path(), target_sites.begin(), target_sites.end()))
-      return std::cerr << "Error: parsing map file failed\n", EXIT_FAILURE;
+      return std::cerr << "Error: parsing map file failed\n", false;
     std::cerr << ("Loading switch probabilities took " + std::to_string(std::difftime(std::time(nullptr), start_time)) + " seconds") << std::endl;
   }
 
@@ -552,8 +657,8 @@ int main(int argc, char** argv)
   std::size_t haplotype_buffer_size = args.temp_buffer() * ploidy;
   assert(ploidy && target_sites[0].gt.size() % sample_ids.size() == 0);
 
-//  std::list<savvy::reader> temp_files;
-//  std::list<savvy::reader> temp_emp_files;
+  //  std::list<savvy::reader> temp_files;
+  //  std::list<savvy::reader> temp_emp_files;
   std::list<std::string> temp_files;
   std::list<std::string> temp_emp_files;
 
@@ -579,46 +684,40 @@ int main(int argc, char** argv)
       {
         hmms[ctx.thread_index].traverse_forward(typed_only_reference_data.blocks(), target_sites, i);
         hmms[ctx.thread_index].traverse_backward(typed_only_reference_data.blocks(), target_sites, i, i % haplotype_buffer_size, reverse_maps, hmm_results, full_reference_data);
-      }, tpool);
+      },
+      tpool);
     impute_time += std::difftime(std::time(nullptr), start_time);
 
     start_time = std::time(nullptr);
-    std::string out_path;
-    std::string out_emp_path;
+
     int tmp_fd = -1;
     int tmp_emp_fd = -1;
+
     if (use_temp_files)
     {
-      out_path =  "/tmp/m4_" + std::to_string(i / haplotype_buffer_size) + "_XXXXXX";
+      std::string out_emp_path;
+      std::string out_path = "/tmp/m4_" + std::to_string(i / haplotype_buffer_size) + "_XXXXXX";
       tmp_fd = mkstemp(&out_path[0]);
       if (tmp_fd < 0)
-        return std::cerr << "Error: could not open temp file (" << out_path << ")" << std::endl, EXIT_FAILURE;
+        return std::cerr << "Error: could not open temp file (" << out_path << ")" << std::endl, false;
 
       if (args.emp_out_path().size())
       {
-        out_emp_path =  "/tmp/m4_" + std::to_string(i / haplotype_buffer_size) + "_emp_XXXXXX";
+        out_emp_path = "/tmp/m4_" + std::to_string(i / haplotype_buffer_size) + "_emp_XXXXXX";
         tmp_emp_fd = mkstemp(&out_emp_path[0]);
         if (tmp_emp_fd < 0)
-          return std::cerr << "Error: could not open temp file (" << out_emp_path << ")" << std::endl, EXIT_FAILURE;
+          return std::cerr << "Error: could not open temp file (" << out_emp_path << ")" << std::endl, false;
       }
-    }
-    else
-    {
-      out_path = args.out_path();
-      out_emp_path = args.emp_out_path();
-    }
 
-    dosage_writer output(out_path, out_emp_path,
-      use_temp_files ? "" : args.sites_out_path(),
-      use_temp_files ? savvy::file::format::sav : args.out_format(),
-      use_temp_files ? std::min<std::uint8_t>(3, args.out_compression()) : args.out_compression(),
-      {sample_ids.begin() + (i / ploidy), sample_ids.begin() + (i + group_size) / ploidy},
-      use_temp_files ? std::vector<std::string>{"HDS"} : args.fmt_fields(),
-      target_sites.front().chrom,
-      use_temp_files);
+      dosage_writer temp_output(out_path, out_emp_path,
+        "", // sites path
+        savvy::file::format::sav,
+        std::min<std::uint8_t>(3, args.out_compression()),
+        {sample_ids.begin() + (i / ploidy), sample_ids.begin() + (i + group_size) / ploidy},
+        {"HDS"},
+        impute_region.chromosome(),
+        use_temp_files);
 
-    if (use_temp_files)
-    {
       temp_files.emplace_back(out_path);
       ::close(tmp_fd);
       // std::remove(out_path.c_str()); // TODO: update savvy to indices to use FILE*
@@ -631,11 +730,11 @@ int main(int argc, char** argv)
         // std::remove(out_emp_path.c_str()); // TODO: update savvy to indices to use FILE*
         assert(tmp_emp_fd > 0);
       }
-    }
 
-    if (!output.write_dosages(hmm_results, target_sites, target_only_sites, {i, i + group_size}, full_reference_data, args.region()))
-      return std::cerr << "Error: failed writing output\n", EXIT_FAILURE;
-    temp_write_time += std::difftime(std::time(nullptr), start_time);
+      if (!temp_output.write_dosages(hmm_results, target_sites, target_only_sites, {i, i + group_size}, full_reference_data, impute_region))
+        return std::cerr << "Error: failed writing output\n", false;
+      temp_write_time += std::difftime(std::time(nullptr), start_time);
+    }
   }
 
   std::cerr << ("Running HMM took " + std::to_string(impute_time) + " seconds") << std::endl;
@@ -645,18 +744,80 @@ int main(int argc, char** argv)
 
     std::cerr << "Merging temp files ... " << std::endl;
     start_time = std::time(nullptr);
-    dosage_writer output(args.out_path(), args.emp_out_path(), args.sites_out_path(), args.out_format(), args.out_compression(), sample_ids, args.fmt_fields(), target_sites.front().chrom, false);
+    //dosage_writer output(args.out_path(), args.emp_out_path(), args.sites_out_path(), args.out_format(), args.out_compression(), sample_ids, args.fmt_fields(), target_sites.front().chrom, false);
     if (!output.merge_temp_files(temp_files, temp_emp_files))
-      return std::cerr << "Error: failed merging temp files\n", EXIT_FAILURE;
+      return std::cerr << "Error: failed merging temp files\n", false;
     std::cerr << ("Merging temp files took " + std::to_string(std::difftime(std::time(nullptr), start_time)) + " seconds") << std::endl;
   }
   else
   {
-    std::cerr << ("Writing output took " + std::to_string(temp_write_time) + " seconds") << std::endl;
+    std::cerr << "Writing output ... " << std::endl;
+    start_time = std::time(nullptr);
+    if (!output.write_dosages(hmm_results, target_sites, target_only_sites, {0, target_sites[0].gt.size()}, full_reference_data, impute_region))
+      return std::cerr << "Error: failed writing output\n", false;
+    std::cerr << ("Writing output took " + std::to_string(std::difftime(std::time(nullptr), start_time)) + " seconds") << std::endl;
   }
 
+  return true;
+}
 
+int main(int argc, char** argv)
+{
+//  test_class t(test_class::file_ptr_t(fopen("","")));
+//  test_class t2(fopen("",""));
 
+  //return convert_old_m3vcf("../1000g-test/topmed.chr20.gtonly.filtered.rehdr.pass_only.phased.ligated.shuffled.m3vcf.gz", "../1000g-test/topmed.chr20.gtonly.filtered.rehdr.pass_only.phased.ligated.shuffled.m3bcf") ? 0 : 1;
+  prog_args args;
+  if (!args.parse(argc, argv))
+  {
+    args.print_usage(std::cerr);
+    return EXIT_FAILURE;
+  }
+
+  if (args.help_is_set())
+  {
+    args.print_usage(std::cout);
+
+    return EXIT_SUCCESS;
+  }
+
+  std::string chrom = args.region().chromosome();
+  std::vector<std::string> sample_ids;
+
+  {
+    savvy::reader temp_rdr(args.tar_path());
+    savvy::variant first_var;
+    if (!temp_rdr || !temp_rdr.read(first_var))
+      return std::cerr << "Error: could not open target file\n", EXIT_FAILURE;
+
+    sample_ids = temp_rdr.samples();
+    if (chrom.empty())
+      chrom = first_var.chromosome();
+  }
+
+  dosage_writer output(args.out_path(),
+    args.emp_out_path(),
+    args.sites_out_path(),
+    args.out_format(),
+    args.out_compression(),
+    sample_ids,
+    args.fmt_fields(),
+    chrom,
+    false);
+
+  for (std::uint64_t chunk_start_pos = std::max(std::uint64_t(1), args.region().from()); chunk_start_pos < args.region().to(); chunk_start_pos += args.chunk_size())
+  {
+    std::uint64_t chunk_end_pos = std::min(args.region().to(), chunk_start_pos + args.chunk_size() - 1ul);
+    savvy::region impute_region =
+      {
+        chrom,
+        chunk_start_pos,
+        chunk_end_pos
+      };
+
+    if (!impute_chunk(impute_region, args, output))
+      return EXIT_FAILURE;
+  }
 
   return EXIT_SUCCESS;
 }
