@@ -38,9 +38,8 @@ std::vector<std::pair<std::string, std::string>> dosage_writer::gen_headers(cons
       {"INFO","<ID=LOO_S_Y,Number=1,Type=Float,Description=\"Sum of observed genotypes\">"},
       {"INFO","<ID=LOO_S_YY,Number=1,Type=Float,Description=\"Sum of squared observed genotypes\">"},
       {"INFO","<ID=LOO_S_XY,Number=1,Type=Float,Description=\"Dot product of LOO dosages and observed genotypes\">"},
-      {"INFO","<ID=IMPUTED,Number=0,Type=Flag,Description=\"Marker was imputed but NOT genotyped\">"},
-      {"INFO","<ID=TYPED,Number=0,Type=Flag,Description=\"Marker was genotyped AND imputed\">"},
-      {"INFO","<ID=TYPED_ONLY,Number=0,Type=Flag,Description=\"Marker was genotyped but NOT imputed\">"}};
+      {"INFO","<ID=IMPUTED,Number=0,Type=Flag,Description=\"Marker was imputed\">"},
+      {"INFO","<ID=TYPED,Number=0,Type=Flag,Description=\"Marker was genotyped\">"}};
   }
   else
   {
@@ -55,9 +54,8 @@ std::vector<std::pair<std::string, std::string>> dosage_writer::gen_headers(cons
       {"INFO", "<ID=AVG_CS,Number=1,Type=Float,Description=\"Average Call Score\">"},
       {"INFO", "<ID=R2,Number=1,Type=Float,Description=\"Estimated Imputation Accuracy (R-square)\">"},
       {"INFO", "<ID=ER2,Number=1,Type=Float,Description=\"Empirical (Leave-One-Out) R-square (available only for genotyped variants)\">"},
-      {"INFO", "<ID=IMPUTED,Number=0,Type=Flag,Description=\"Marker was imputed but NOT genotyped\">"},
-      {"INFO", "<ID=TYPED,Number=0,Type=Flag,Description=\"Marker was genotyped AND imputed\">"},
-      {"INFO", "<ID=TYPED_ONLY,Number=0,Type=Flag,Description=\"Marker was genotyped but NOT imputed\">"}};
+      {"INFO", "<ID=IMPUTED,Number=0,Type=Flag,Description=\"Marker was imputed\">"},
+      {"INFO", "<ID=TYPED,Number=0,Type=Flag,Description=\"Marker was genotyped\">"}};
   }
 
   headers.reserve(headers.size() + 5);
@@ -93,9 +91,8 @@ std::vector<std::pair<std::string, std::string>> dosage_writer::gen_emp_headers(
     {"source", "Minimac v" + std::string(VERSION)},
     {"phasing", "full"},
     {"contig", "<ID=" + std::string(chromosome) + ">"},
-    {"INFO", "<ID=IMPUTED,Number=0,Type=Flag,Description=\"Marker was imputed but NOT genotyped\">"},
-    {"INFO", "<ID=TYPED,Number=0,Type=Flag,Description=\"Marker was genotyped AND imputed\">"},
-    {"INFO", "<ID=TYPED_ONLY,Number=0,Type=Flag,Description=\"Marker was genotyped but NOT imputed\">"},
+    {"INFO", "<ID=IMPUTED,Number=0,Type=Flag,Description=\"Marker was imputed\">"},
+    {"INFO", "<ID=TYPED,Number=0,Type=Flag,Description=\"Marker was genotyped\">"},
     {"FORMAT","<ID=GT,Number=1,Type=String,Description=\"Genotyped alleles from Array\">"},
     {"FORMAT","<ID=LDS,Number=2,Type=Float,Description=\"Leave-one-out Imputed Dosage : Estimated Haploid Alternate Allele Dosage assuming site was NOT genotyped\">"}};
 
@@ -327,11 +324,12 @@ bool dosage_writer::write_dosages(const full_dosages_results& hmm_results, const
     {
       std::vector<std::int8_t> observed(tar_it->gt.begin() + observed_range.first, tar_it->gt.begin() + observed_range.second);
       set_info_fields(out_var, sparse_dosages, hmm_results.loo_dosages_[tar_it - tar_variants.begin()], observed); // TODO: do not store loo_dosages outside impute region.
-      out_var_emp.set_info("TYPED", std::vector<std::int8_t>());
+
       if (emp_out_file_)
       {
         out_var_emp = savvy::site_info(ref_it->chrom, ref_it->pos, ref_it->ref, {ref_it->alt}, ""/*ref_var.id()*/);
         out_var_emp.set_info("TYPED", std::vector<std::int8_t>());
+        out_var_emp.set_info("IMPUTED", std::vector<std::int8_t>());
         out_var_emp.set_format("GT", observed);
         out_var_emp.set_format("LDS", hmm_results.loo_dosages_[tar_it - tar_variants.begin()]);
         emp_out_file_->write(out_var_emp);
@@ -445,15 +443,11 @@ void dosage_writer::set_info_fields(savvy::variant& out_var, const savvy::compre
     }
   }
 
-  std::string tag = "IMPUTED";
   if (observed.size())
-  {
-    if (loo_dosages.size())
-      tag = "TYPED";
-    else
-      tag = "TYPED_ONLY";
-  }
-  out_var.set_info(tag, std::vector<std::int8_t>());
+    out_var.set_info("TYPED", std::vector<std::int8_t>());
+
+  if (loo_dosages.size() || observed.empty())
+    out_var.set_info("IMPUTED", std::vector<std::int8_t>());
 }
 
 void dosage_writer::set_format_fields(savvy::variant& out_var, savvy::compressed_vector<float>& sparse_dosages)
