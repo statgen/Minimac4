@@ -277,6 +277,7 @@ private:
   std::size_t temp_buffer_ = 200;
   std::int64_t overlap_;
   std::int16_t threads_ = 1;
+  bool all_typed_sites_ = false;
   bool help_ = false;
 
 public:
@@ -298,11 +299,13 @@ public:
   std::int64_t overlap() const { return overlap_; }
   std::int16_t threads() const { return threads_; }
   std::size_t temp_buffer() const { return temp_buffer_ ; }
+  bool all_typed_sites() const { return all_typed_sites_; }
 
   prog_args() :
     getopt_wrapper(
       "Usage: minimac4 [opts ...] <reference.m3vcf.gz> <target.vcf.gz>",
       {
+        {"all-typed-sites", no_argument, 0, 'a', "Include in the output sites that exist only in target VCF"},
         {"temp-buffer", required_argument, 0, 'b', "Number of samples to impute before writing to temporary files (default: 200)"},
         {"empirical-output", required_argument, 0, 'e', "Output path for empirical dosages"},
         {"help", no_argument, 0, 'h', "Print usage"},
@@ -327,6 +330,9 @@ public:
       char copt = char(opt & 0xFF);
       switch (copt)
       {
+      case 'a':
+        all_typed_sites_ = true;
+        break;
       case 'b':
         temp_buffer_ = std::size_t(std::atoll(optarg ? optarg : ""));
         break;
@@ -396,10 +402,11 @@ public:
         overlap_ = std::atoll(optarg ? optarg : "");
         break;
       case '\x01':
-        if (false) //std::string(long_options_[long_index].name) =="long-option")
-        {
-          break;
-        } // else pass through to default
+//        if (std::string(long_options_[long_index].name) =="all-typed-sites")
+//        {
+//          all_typed_sites_ = true;
+//          break;
+//        } // else pass through to default
       default:
         return false;
       }
@@ -518,6 +525,8 @@ int main(int argc, char** argv)
 
   start_time = std::time(nullptr);
   std::vector<target_variant> target_only_sites = separate_target_only_variants(target_sites);
+  if (!args.all_typed_sites())
+    target_only_sites.clear();
   std::cerr << ("Separating typed only variants took " + std::to_string(std::difftime(std::time(nullptr), start_time)) + " seconds") << std::endl;
 
   if (target_sites.empty())
@@ -624,7 +633,7 @@ int main(int argc, char** argv)
       }
     }
 
-    if (!output.write_dosages(hmm_results, target_sites, {i, i + group_size}, full_reference_data))
+    if (!output.write_dosages(hmm_results, target_sites, target_only_sites, {i, i + group_size}, full_reference_data, args.region()))
       return std::cerr << "Error: failed writing output\n", EXIT_FAILURE;
     temp_write_time += std::difftime(std::time(nullptr), start_time);
   }

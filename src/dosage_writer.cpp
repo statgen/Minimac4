@@ -267,7 +267,7 @@ bool dosage_writer::merge_temp_files(std::list<savvy::reader>& temp_files, std::
   return true;
 }
 
-bool dosage_writer::write_dosages(const full_dosages_results& hmm_results, const std::vector<target_variant>& tar_variants, std::pair<std::size_t, std::size_t> observed_range, const reduced_haplotypes& full_reference_data)
+bool dosage_writer::write_dosages(const full_dosages_results& hmm_results, const std::vector<target_variant>& tar_variants, const std::vector<target_variant>& tar_only_variants, std::pair<std::size_t, std::size_t> observed_range, const reduced_haplotypes& full_reference_data, const savvy::region& impute_region)
 {
   assert(hmm_results.dimensions()[0] == full_reference_data.variant_size());
 
@@ -284,16 +284,32 @@ bool dosage_writer::write_dosages(const full_dosages_results& hmm_results, const
 
   assert(!is_temp_file_ || observed_range.first != 0 || observed_range.second != tar_variants[0].gt.size());
 
-  std::size_t tar_idx = 0;
+  auto tar_it = tar_variants.begin();
+  auto tar_only_it = tar_only_variants.begin();
   std::size_t i = 0;
+
+  while (tar_it != tar_variants.end() && tar_it->pos < impute_region.from())
+    ++tar_it;
+
+  while (tar_only_it != tar_only_variants.end() && tar_only_it->pos < impute_region.from())
+    ++tar_only_it;
 
   for (auto ref_it = full_reference_data.begin(); ref_it != full_reference_data.end(); ++ref_it,++i)
   {
     assert(i == ref_it.global_idx());
-    while (tar_idx < tar_variants.size() && tar_variants[tar_idx].pos < ref_it->pos)
-      ++tar_idx;
 
-    bool ref_matches_tar = tar_idx < tar_variants.size() && sites_match(tar_variants[tar_idx], *ref_it);
+    while(tar_only_it != tar_only_variants.end() && tar_only_it->pos <= ref_it->pos)
+    {
+      out_var = savvy::site_info(tar_only_it->chrom, tar_only_it->pos, tar_only_it->ref, {tar_only_it->alt}, ""/*ref_var.id()*/); // TODO: ID
+      std::vector<std::int8_t> observed(tar_only_it->gt.begin() + observed_range.first, tar_only_it->gt.begin() + observed_range.second);
+      sparse_dosages.assign(observed.begin(), observed.end());
+      set_info_fields(out_var, sparse_dosages, {}, observed);
+      set_format_fields(out_var, sparse_dosages);
+      out_file_ << out_var;
+      ++tar_only_it;
+    }
+
+    bool ref_matches_tar = tar_it != tar_variants.end() && sites_match(*tar_it, *ref_it);
     //      for (std::size_t j = 0; j < dosages.size(); ++j)
     //        dosages[j] = float(std::int16_t(hmm_results.dosage(i, j) * bin_scalar_ + 0.5f)) / bin_scalar_;
     //
@@ -305,24 +321,27 @@ bool dosage_writer::write_dosages(const full_dosages_results& hmm_results, const
 
 
 
-    out_var = savvy::site_info(ref_it->chrom, ref_it->pos, ref_it->ref, {ref_it->alt}, ""/*ref_var.id()*/);
+    out_var = savvy::site_info(ref_it->chrom, ref_it->pos, ref_it->ref, {ref_it->alt}, ""/*ref_var.id()*/); // TODO: ID
     sparse_dosages.assign(hmm_results.dosages_[i].begin(), hmm_results.dosages_[i].end());
     if (ref_matches_tar)
     {
-      std::vector<std::int8_t> observed(tar_variants[tar_idx].gt.begin() + observed_range.first, tar_variants[tar_idx].gt.begin() + observed_range.second);
-      set_info_fields(out_var, sparse_dosages, hmm_results.loo_dosages_[tar_idx], observed);
+      std::vector<std::int8_t> observed(tar_it->gt.begin() + observed_range.first, tar_it->gt.begin() + observed_range.second);
+      set_info_fields(out_var, sparse_dosages, hmm_results.loo_dosages_[tar_it - tar_variants.begin()], observed); // TODO: do not store loo_dosages outside impute region.
+      out_var_emp.set_info("TYPED", std::vector<std::int8_t>());
       if (emp_out_file_)
       {
         out_var_emp = savvy::site_info(ref_it->chrom, ref_it->pos, ref_it->ref, {ref_it->alt}, ""/*ref_var.id()*/);
         out_var_emp.set_info("TYPED", std::vector<std::int8_t>());
         out_var_emp.set_format("GT", observed);
-        out_var_emp.set_format("LDS", hmm_results.loo_dosages_[tar_idx]);
+        out_var_emp.set_format("LDS", hmm_results.loo_dosages_[tar_it - tar_variants.begin()]);
         emp_out_file_->write(out_var_emp);
       }
+      ++tar_it;
     }
     else
     {
       set_info_fields(out_var, sparse_dosages, {}, {});
+      out_var_emp.set_info("IMPUTED", std::vector<std::int8_t>());
     }
 
     if (sites_out_file_)
@@ -334,6 +353,19 @@ bool dosage_writer::write_dosages(const full_dosages_results& hmm_results, const
 
     set_format_fields(out_var, sparse_dosages);
     out_file_ << out_var;
+  }
+
+  assert(tar_it == tar_variants.end() || tar_it->pos > impute_region.to());
+
+  while(tar_only_it != tar_only_variants.end() && tar_only_it->pos <= impute_region.to())
+  {
+    out_var = savvy::site_info(tar_only_it->chrom, tar_only_it->pos, tar_only_it->ref, {tar_only_it->alt}, ""/*ref_var.id()*/); // TODO: ID
+    std::vector<std::int8_t> observed(tar_only_it->gt.begin() + observed_range.first, tar_only_it->gt.begin() + observed_range.second);
+    sparse_dosages.assign(observed.begin(), observed.end());
+    set_info_fields(out_var, sparse_dosages, {}, observed);
+    set_format_fields(out_var, sparse_dosages);
+    out_file_ << out_var;
+    ++tar_only_it;
   }
 
   return out_file_.good();
@@ -361,6 +393,7 @@ void dosage_writer::set_er2_info_field(savvy::variant& out_var, float s_x, float
 void dosage_writer::set_info_fields(savvy::variant& out_var, const savvy::compressed_vector<float>& sparse_dosages, const std::vector<float>& loo_dosages, const std::vector<std::int8_t>& observed)
 {
   std::size_t n = sparse_dosages.size();
+  assert(n);
 
   float s_x = std::accumulate(sparse_dosages.begin(), sparse_dosages.end(), 0.f);
   float s_xx = std::inner_product(sparse_dosages.begin(), sparse_dosages.end(), sparse_dosages.begin(), 0.f);
@@ -386,17 +419,17 @@ void dosage_writer::set_info_fields(savvy::variant& out_var, const savvy::compre
   if (observed.size())
   {
     assert(observed.size() == loo_dosages.size());
-    //sparse_loo_dosages.assign(loo_dosages.begin(), loo_dosages.end());
+    // sparse_loo_dosages.assign(loo_dosages.begin(), loo_dosages.end());
 
     s_x = std::accumulate(loo_dosages.begin(), loo_dosages.end(), 0.f);
     s_xx = std::inner_product(loo_dosages.begin(), loo_dosages.end(), loo_dosages.begin(), 0.f);
     float s_y = std::accumulate(observed.begin(), observed.end(), 0.f);
     // since observed can only be 0 or 1, s_yy is the same as s_y
-    float s_yy = s_y; //std::inner_product(sparse_gt.begin(), sparse_gt.end(), sparse_gt.begin(), 0.f); // TODO: allow for missing oberserved genotypes.
+    float s_yy = s_y; // std::inner_product(sparse_gt.begin(), sparse_gt.end(), sparse_gt.begin(), 0.f); // TODO: allow for missing oberserved genotypes.
     float s_xy = 0.f;
     s_xy = std::inner_product(loo_dosages.begin(), loo_dosages.end(), observed.begin(), s_xy);
-//    for (auto it = ctx.sparse_gt.begin(); it != ctx.sparse_gt.end(); ++it)
-//      s_xy += *it * loo_dosages[it.offset()];
+    //    for (auto it = ctx.sparse_gt.begin(); it != ctx.sparse_gt.end(); ++it)
+    //      s_xy += *it * loo_dosages[it.offset()];
 
     if (is_temp_file_)
     {
@@ -412,7 +445,15 @@ void dosage_writer::set_info_fields(savvy::variant& out_var, const savvy::compre
     }
   }
 
-  out_var.set_info(observed.size() ? "TYPED" : "IMPUTED", std::vector<std::int8_t>());
+  std::string tag = "IMPUTED";
+  if (observed.size())
+  {
+    if (loo_dosages.size())
+      tag = "TYPED";
+    else
+      tag = "TYPED_ONLY";
+  }
+  out_var.set_info(tag, std::vector<std::int8_t>());
 }
 
 void dosage_writer::set_format_fields(savvy::variant& out_var, savvy::compressed_vector<float>& sparse_dosages)
