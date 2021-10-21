@@ -669,28 +669,29 @@ bool impute_chunk(const savvy::region& impute_region, const prog_args& args, omp
   std::vector<std::string> sample_ids;
   std::vector<target_variant> target_sites;
   load_target_haplotypes(args.tar_path(), extended_region, args.error_param(), args.min_recom(), target_sites, sample_ids);
-  std::cerr << ("Loading target haplotypes took " + std::to_string(std::difftime(std::time(nullptr), start_time)) + " seconds") << std::endl;
+  std::cerr << "Loading target haplotypes took " << std::difftime(std::time(nullptr), start_time) << " seconds" << std::endl;
 
   std::cerr << "Loading reference haplotypes ..." << std::endl;
   start_time = std::time(nullptr);
   reduced_haplotypes typed_only_reference_data(16, 512);
   reduced_haplotypes full_reference_data;
   load_reference_haplotypes(args.ref_path(), extended_region, impute_region, target_sites, typed_only_reference_data, full_reference_data);
-  std::cerr << ("Loading reference haplotypes took " + std::to_string(std::difftime(std::time(nullptr), start_time)) + " seconds") << std::endl;
+  std::cerr << "Loading reference haplotypes took " << std::difftime(std::time(nullptr), start_time) << " seconds" << std::endl;
 
   std::cerr << "Separating typed only variants ..." << std::endl;
   start_time = std::time(nullptr);
   std::vector<target_variant> target_only_sites = separate_target_only_variants(target_sites);
-  std::cerr << ("Separating typed only variants took " + std::to_string(std::difftime(std::time(nullptr), start_time)) + " seconds") << std::endl;
+  std::cerr << "Separating typed only variants took " << std::difftime(std::time(nullptr), start_time) << " seconds" << std::endl;
 
-  float tar_ref_ratio = float(target_sites.size()) / float(typed_only_reference_data.variant_size());
-  std::cerr << (tar_ref_ratio * 100.f) << "% of reference variants were found in target file (" << target_sites.size() << "/" << typed_only_reference_data.variant_size() << ")\n";
+  float tar_ref_ratio = float(typed_only_reference_data.variant_size()) / float(full_reference_data.variant_size());
+  std::cerr << "Typed sites to imputed sites ratio: " << tar_ref_ratio << " (" << typed_only_reference_data.variant_size() << "/" << full_reference_data.variant_size() << ")\n";
   if (tar_ref_ratio < args.min_ratio())
     return std::cerr << "Error: not enough target variants are available to impute this chunk. The --min-ratio, --chunk, or --region options may need to be altered.\n", false;
 
   if (target_only_sites.size())
   {
-    std::cerr << target_only_sites.size() << " variants are exclusive to target file and will be ";
+    std::size_t cnt = std::count_if(target_only_sites.begin(), target_only_sites.end(), [impute_region](target_variant& v){ return v.pos >= impute_region.from() && v.pos <= impute_region.to(); });
+    std::cerr << cnt << " variants are exclusive to target file and will be ";
     if (args.all_typed_sites())
       std::cerr << "included in output\n";
     else
@@ -724,7 +725,7 @@ bool impute_chunk(const savvy::region& impute_region, const prog_args& args, omp
       start_time = std::time(nullptr);
       if (!recombination::parse_map_file(args.map_path(), target_sites.begin(), target_sites.end(), args.min_recom()))
         return std::cerr << "Error: parsing map file failed\n", false;
-      std::cerr << ("Loading switch probabilities took " + std::to_string(std::difftime(std::time(nullptr), start_time)) + " seconds") << std::endl;
+      std::cerr << "Loading switch probabilities took " << std::difftime(std::time(nullptr), start_time) << " seconds" << std::endl;
     }
 
     auto reverse_maps = generate_reverse_maps(typed_only_reference_data);
@@ -806,22 +807,24 @@ bool impute_chunk(const savvy::region& impute_region, const prog_args& args, omp
         if (!temp_output.write_dosages(hmm_results, target_sites, target_only_sites, {i, i + group_size}, full_reference_data, impute_region))
           return std::cerr << "Error: failed writing output\n", false;
         temp_write_time += std::difftime(std::time(nullptr), start_time);
+
+        std::cerr << "Completed " << (i + group_size) / ploidy << " of " << sample_ids.size() << " samples" << std::endl;
       }
     }
 
-    std::cerr << ("Running HMM took " + std::to_string(impute_time) + " seconds") << std::endl;
+    std::cerr << "Running HMM took " << impute_time << " seconds" << std::endl;
   }
 
   if (temp_files.size())
   {
-    std::cerr << ("Writing temp files took " + std::to_string(temp_write_time) + " seconds") << std::endl;
+    std::cerr << "Writing temp files took " << temp_write_time << " seconds" << std::endl;
 
     std::cerr << "Merging temp files ... " << std::endl;
     start_time = std::time(nullptr);
     //dosage_writer output(args.out_path(), args.emp_out_path(), args.sites_out_path(), args.out_format(), args.out_compression(), sample_ids, args.fmt_fields(), target_sites.front().chrom, false);
     if (!output.merge_temp_files(temp_files, temp_emp_files))
       return std::cerr << "Error: failed merging temp files\n", false;
-    std::cerr << ("Merging temp files took " + std::to_string(std::difftime(std::time(nullptr), start_time)) + " seconds") << std::endl;
+    std::cerr << "Merging temp files took " << std::difftime(std::time(nullptr), start_time) << " seconds" << std::endl;
   }
   else
   {
@@ -866,13 +869,10 @@ int main(int argc, char** argv)
     return EXIT_SUCCESS;
   }
 
-  std::uint64_t end_pos;
+  std::uint64_t end_pos = args.region().to();
   std::string chrom = args.region().chromosome();
   if (!stat_ref_panel(args.ref_path(), chrom, end_pos))
     return std::cerr << "Error: could not stat reference file\n", EXIT_FAILURE;
-
-  if (args.region().to() < end_pos)
-    end_pos = args.region().to();
 
   std::vector<std::string> sample_ids;
   if (!stat_tar_panel(args.tar_path(), sample_ids))

@@ -414,7 +414,7 @@ void dosage_writer::set_info_fields(savvy::variant& out_var, const savvy::compre
     set_r2_info_field(out_var, s_x, s_xx, n);
   }
 
-  if (observed.size())
+  if (loo_dosages.size())
   {
     assert(observed.size() == loo_dosages.size());
     // sparse_loo_dosages.assign(loo_dosages.begin(), loo_dosages.end());

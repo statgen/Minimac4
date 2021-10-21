@@ -14,7 +14,6 @@ bool stat_tar_panel(const std::string& tar_file_path, std::vector<std::string>& 
 
 bool stat_ref_panel(const std::string& ref_file_path, std::string& chrom, std::uint64_t& end_pos)
 {
-  end_pos = 0;
   std::vector<savvy::s1r::index_statistics> s1r_stats = savvy::s1r::stat_index(ref_file_path);
   if (s1r_stats.size())
   {
@@ -24,7 +23,7 @@ bool stat_ref_panel(const std::string& ref_file_path, std::string& chrom, std::u
       {
         if (it->contig == chrom)
         {
-          end_pos = it->max_position;
+          end_pos = std::min(end_pos, it->max_position);
           return true;
         }
       }
@@ -35,7 +34,7 @@ bool stat_ref_panel(const std::string& ref_file_path, std::string& chrom, std::u
     else if (s1r_stats.size() == 1)
     {
       chrom = s1r_stats.front().contig;
-      end_pos = s1r_stats.front().max_position;
+      end_pos = std::min(end_pos, s1r_stats.front().max_position);
       return true;
     }
 

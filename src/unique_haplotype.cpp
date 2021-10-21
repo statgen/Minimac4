@@ -189,11 +189,13 @@ int unique_haplotype_block::deserialize(savvy::reader& input_file, savvy::varian
 {
   clear();
 
+  if (!input_file.good() || !var.get_format("UHM", unique_map_))
+    return input_file.bad() ? -1 : 0;
+
   std::int64_t n_variants = 0;
   var.get_info("VARIANTS", n_variants);
   std::int64_t n_reps = 0;
   var.get_info("REPS", n_reps);
-  var.get_format("UHM", unique_map_);
 
   cardinalities_.resize(n_reps);
   for (auto it = unique_map_.begin(); it != unique_map_.end(); ++it)
@@ -217,12 +219,14 @@ int unique_haplotype_block::deserialize(savvy::reader& input_file, savvy::varian
     variants_.back().ac = std::inner_product(variants_.back().gt.begin(), variants_.back().gt.end(), cardinalities_.begin(), 0ull);
   }
 
-  if (input_file.good())
-    return variants_.size() + 1;
-  else if (input_file.bad())
+
+  if (input_file.bad())
     return -1;
   else
-    return 0;
+  {
+    assert(variants_.size());
+    return variants_.size() + 1;
+  }
 }
 
 bool unique_haplotype_block::deserialize(std::istream& is, int m3vcf_version, std::size_t n_haplotypes)
