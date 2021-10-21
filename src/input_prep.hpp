@@ -5,7 +5,11 @@
 
 #include <savvy/reader.hpp>
 
-bool load_target_haplotypes(const std::string& file_path, const savvy::genomic_region& reg, std::vector<target_variant>& target_sites, std::vector<std::string>& sample_ids);
+bool stat_tar_panel(const std::string& tar_file_path, std::vector<std::string>& sample_ids);
+
+bool stat_ref_panel(const std::string& ref_file_path, std::string& chrom, std::uint64_t& end_pos);
+
+bool load_target_haplotypes(const std::string& file_path, const savvy::genomic_region& reg, float error_param, float recom_min, std::vector<target_variant>& target_sites, std::vector<std::string>& sample_ids);
 
 bool load_reference_haplotypes(const std::string& file_path, const savvy::genomic_region& extended_reg, const savvy::genomic_region& impute_reg, std::vector<target_variant>& target_sites, reduced_haplotypes& typed_only_reference_data, reduced_haplotypes& full_reference_data);
 

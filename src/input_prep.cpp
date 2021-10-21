@@ -1,8 +1,55 @@
 #include "input_prep.hpp"
 #include "recombination.hpp"
 
+bool stat_tar_panel(const std::string& tar_file_path, std::vector<std::string>& sample_ids)
+{
+  savvy::reader temp_rdr(tar_file_path);
+  if (!temp_rdr)
+    return std::cerr << "Error: could not open target file\n", false;
 
-bool load_target_haplotypes(const std::string& file_path, const savvy::genomic_region& reg, std::vector<target_variant>& target_sites, std::vector<std::string>& sample_ids)
+  sample_ids = temp_rdr.samples();
+
+  return true;
+}
+
+bool stat_ref_panel(const std::string& ref_file_path, std::string& chrom, std::uint64_t& end_pos)
+{
+  end_pos = 0;
+  std::vector<savvy::s1r::index_statistics> s1r_stats = savvy::s1r::stat_index(ref_file_path);
+  if (s1r_stats.size())
+  {
+    if (chrom.size())
+    {
+      for (auto it = s1r_stats.begin(); it != s1r_stats.end(); ++it)
+      {
+        if (it->contig == chrom)
+        {
+          end_pos = it->max_position;
+          return true;
+        }
+      }
+
+      std::cerr << "Error: reference file does not contain chromosome " << chrom << "\n";
+      return false;
+    }
+    else if (s1r_stats.size() == 1)
+    {
+      chrom = s1r_stats.front().contig;
+      end_pos = s1r_stats.front().max_position;
+      return true;
+    }
+
+    std::cerr << "Error: reference file contains multiple chromosomes so --region is required\n";
+    return false;
+  }
+
+  // TODO: csi index check
+
+  std::cerr << "Error: could not load reference file index (reference must be indexed M3VCF v3)\n";
+  return false;
+}
+
+bool load_target_haplotypes(const std::string& file_path, const savvy::genomic_region& reg, float error_param, float recom_min, std::vector<target_variant>& target_sites, std::vector<std::string>& sample_ids)
 {
   savvy::reader input(file_path);
   sample_ids = input.samples();
@@ -15,7 +62,7 @@ bool load_target_haplotypes(const std::string& file_path, const savvy::genomic_r
     for (std::size_t i = 0; i < var.alts().size(); ++i)
     {
       std::size_t allele_idx = i + 1;
-      target_sites.push_back({var.chromosome(), var.position(), var.ref(), var.alts()[i], true, false, std::numeric_limits<float>::quiet_NaN(), 0.00999, recombination::recom_min, {}});
+      target_sites.push_back({var.chromosome(), var.position(), var.ref(), var.alts()[i], true, false, std::numeric_limits<float>::quiet_NaN(), error_param, recom_min, {}});
       if (var.alts().size() == 1)
         tmp_geno.swap(target_sites.back().gt);
       else
@@ -51,7 +98,7 @@ bool load_reference_haplotypes(const std::string& file_path, const savvy::genomi
 
     savvy::variant var;
     if (!input.read(var))
-      return std::cerr << "Error: no variant records in reference query region\n", false;
+      return std::cerr << "Notice: no variant records in reference query region (" << extended_reg.chromosome() << ":" << extended_reg.from() << "-" << extended_reg.to() << ")\n", true;
 
     std::vector<std::int8_t> tmp_geno;
     unique_haplotype_block block;
@@ -238,6 +285,7 @@ bool convert_old_m3vcf(const std::string& input_path, const std::string& output_
   shrinkwrap::gz::istream input_file(input_path);
   std::string line;
 
+  bool phasing_header_present = false;
   std::uint8_t m3vcf_version = 0;
   const std::string m3vcf_version_line = "##fileformat=M3VCF";
   const std::string vcf_version_line = "##fileformat=VCF";
@@ -262,6 +310,8 @@ bool convert_old_m3vcf(const std::string& input_path, const std::string& output_
       }
       else
       {
+        if (!phasing_header_present && key == "phasing")
+          phasing_header_present = true;
         headers.emplace_back(std::move(key), std::move(val));
       }
     }
@@ -280,18 +330,21 @@ bool convert_old_m3vcf(const std::string& input_path, const std::string& output_
 
   headers.insert(headers.begin(), {"subfileformat","M3VCFv3.0"});
   headers.insert(headers.begin(), {"fileformat","VCFv4.2"});
+  if (!phasing_header_present)
+    headers.emplace_back("phasing","full");
   headers.emplace_back("INFO","<ID=REPS,Number=1,Type=Integer,Description=\"Number of distinct haplotypes in block\">");
   headers.emplace_back("INFO","<ID=VARIANTS,Number=1,Type=Integer,Description=\"Number of variants in block\">");
   headers.emplace_back("INFO","<ID=END,Number=1,Type=Integer,Description=\"End position of record\">");
   headers.emplace_back("INFO","<ID=UHA,Number=.,Type=Integer,Description=\"Unique haplotype alleles\">");
   headers.emplace_back("FORMAT","<ID=UHM,Number=.,Type=Integer,Description=\"Unique haplotype mapping\">");
 
+
   //headers.emplace_back("ALT","<ID=DUP,Description=\"Duplication\">");
 
 
   std::size_t tab_cnt = 0;
   std::size_t last_pos = 0;
-  std::size_t tab_pos;
+  std::size_t tab_pos = 0;
   while ((tab_pos = line.find('\t', tab_pos)) != std::string::npos)
   {
     if (tab_cnt >= 9)
@@ -305,13 +358,16 @@ bool convert_old_m3vcf(const std::string& input_path, const std::string& output_
   ids.emplace_back(line.substr(last_pos, tab_pos - last_pos));
   std::size_t n_samples = ids.size();
 
-  savvy::writer output_file(output_path, savvy::file::format::bcf, headers, ids, 6);
+  std::string last_3;
+  if (output_path.size() >= 3)
+    last_3 = output_path.substr(output_path.size() - 3);
+  savvy::writer output_file(output_path, last_3 == "bcf" ? savvy::file::format::bcf : savvy::file::format::sav, headers, ids, 6);
 
 
   std::size_t block_cnt = 0;
   unique_haplotype_block block;
   std::vector<std::int8_t> tmp_geno;
-  while (block.deserialize(input_file, m3vcf_version, m3vcf_version == 1 ? n_samples : 2 * n_samples))
+  while (block_cnt < 101 && block.deserialize(input_file, m3vcf_version, m3vcf_version == 1 ? n_samples : 2 * n_samples))
   {
     if (block.variants().empty())
       break;

@@ -225,12 +225,11 @@ int unique_haplotype_block::deserialize(savvy::reader& input_file, savvy::varian
     return 0;
 }
 
-bool unique_haplotype_block::deserialize(std::istream& is, std::uint8_t m3vcf_version, std::size_t n_haplotypes)
+bool unique_haplotype_block::deserialize(std::istream& is, int m3vcf_version, std::size_t n_haplotypes)
 {
   clear();
-  is.peek();
-  if (!is)
-    return false;
+  if (is.peek() == EOF)
+    return is.get(), false;
 
 
   unique_map_.reserve(n_haplotypes);

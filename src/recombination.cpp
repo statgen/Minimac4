@@ -4,7 +4,6 @@
 #include <algorithm>
 #include <cmath>
 
-constexpr float recombination::recom_min;
 
 //bool recombination::parse_map_file(const std::string& map_file_path, std::vector<target_variant>& sites)
 //{

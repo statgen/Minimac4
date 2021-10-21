@@ -13,7 +13,7 @@
 class recombination
 {
 public:
-  static constexpr float recom_min = 1e-5f;
+  //static constexpr float recom_min = 1e-5f;
 private:
   struct map_file_line
   {
@@ -23,13 +23,13 @@ private:
   };
 public:
   template <typename VarIter>
-  static bool parse_map_file(const std::string& map_file_path, VarIter var_beg, VarIter var_end);
+  static bool parse_map_file(const std::string& map_file_path, VarIter var_beg, VarIter var_end, float recom_min);
 private:
   static bool read_entry(std::istream& ifs, map_file_line& entry, bool new_format);
 };
 
 template <typename VarIter>
-bool recombination::parse_map_file(const std::string& map_file_path, VarIter var_beg, VarIter var_end)
+bool recombination::parse_map_file(const std::string& map_file_path, VarIter var_beg, VarIter var_end, float recom_min)
 {
   if (var_beg == var_end)
     return false;
