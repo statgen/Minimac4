@@ -93,9 +93,8 @@ bool recombination::parse_map_file(const std::string& map_file_path, std::vector
       else
       {
         float delta = (var_it->recom - prev_var_it->recom);
-        prev_var_it->recom = std::max(0.01f * delta, recom_min);
-        //prev_var_it->recom = std::min(0.01f, std::max(delta, recom_min));
-        //prev_var_it->recom = std::max<float>((1. - std::exp(-delta/50.))/2., recom_min);
+        //prev_var_it->recom = std::max(0.01f * delta, recom_min);
+        prev_var_it->recom = std::max<float>((1. - std::exp(-delta/50.))/2., recom_min);
       }
     }
   }
