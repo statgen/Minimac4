@@ -723,7 +723,7 @@ bool impute_chunk(const savvy::region& impute_region, const prog_args& args, omp
     if (args.map_path().size())
     {
       start_time = std::time(nullptr);
-      if (!recombination::parse_map_file(args.map_path(), target_sites.begin(), target_sites.end(), args.min_recom()))
+      if (!recombination::parse_map_file(args.map_path(), target_sites, args.min_recom()))
         return std::cerr << "Error: parsing map file failed\n", false;
       std::cerr << "Loading switch probabilities took " << std::difftime(std::time(nullptr), start_time) << " seconds" << std::endl;
     }
