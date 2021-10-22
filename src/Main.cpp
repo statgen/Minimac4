@@ -274,6 +274,7 @@ private:
   savvy::file::format out_format_ = savvy::file::format::bcf;
   std::uint8_t out_compression_ = 6;
   std::vector<std::string> fmt_fields_ = {"GT","HDS","DS"};
+  std::unordered_set<std::string> sample_ids_;
   savvy::genomic_region reg_ = {""};
   std::size_t temp_buffer_ = 200;
   std::int64_t chunk_size_ = 20000000;
@@ -305,6 +306,7 @@ public:
   savvy::file::format out_format() const { return out_format_; }
   std::uint8_t out_compression() const { return out_compression_; }
   const std::vector<std::string>& fmt_fields() const { return fmt_fields_; }
+  const std::unordered_set<std::string>& sample_ids() const { return sample_ids_; }
   const savvy::genomic_region& region() const { return reg_; }
   std::int64_t chunk_size() const { return chunk_size_; }
   std::int64_t overlap() const { return overlap_; }
@@ -343,6 +345,8 @@ public:
         {"min-recom", required_argument, 0, '\x02', "Minimum recombination probability (default: 0.00001)"},
         {"prob-threshold", required_argument, 0, '\x02', "Probability threshold used for template selection"},
         {"diff-threshold", required_argument, 0, '\x02', "Probability diff threshold used in template selection"},
+        {"sample-ids", required_argument, 0, '\x02', "Comma-separated list of sample IDs to subset from reference panel"},
+        {"sample-ids-file", required_argument, 0, '\x02', "Text file containing sample IDs to subset from reference panel (one ID per line)"},
         // vvvv deprecated vvvv //
         {"allTypedSites", no_argument, 0, '\x01', nullptr},
         {"rsid", no_argument, 0, '\x01', nullptr},
@@ -505,6 +509,18 @@ public:
           else if (long_opt_str == "diff-threshold")
           {
             diff_threshold_ = std::max(0., std::atof(optarg ? optarg : ""));
+            break;
+          }
+          else if (long_opt_str == "sample-ids")
+          {
+            auto tmp_ids = split_string_to_vector(optarg ? optarg : "", ',');
+            sample_ids_.insert(tmp_ids.begin(), tmp_ids.end());
+            break;
+          }
+          else if (long_opt_str == "sample-ids-file")
+          {
+            std::ifstream ifs(optarg ? optarg : "");
+            sample_ids_.insert(std::istream_iterator<std::string>(ifs), std::istream_iterator<std::string>());
             break;
           }
           else if (long_opt_str == "haps")
@@ -683,7 +699,7 @@ bool impute_chunk(const savvy::region& impute_region, const prog_args& args, omp
   start_time = std::time(nullptr);
   reduced_haplotypes typed_only_reference_data(16, 512);
   reduced_haplotypes full_reference_data;
-  load_reference_haplotypes(args.ref_path(), extended_region, impute_region, target_sites, typed_only_reference_data, full_reference_data);
+  load_reference_haplotypes(args.ref_path(), extended_region, impute_region, args.sample_ids(), target_sites, typed_only_reference_data, full_reference_data);
   std::cerr << "Loading reference haplotypes took " << std::difftime(std::time(nullptr), start_time) << " seconds" << std::endl;
 
   std::cerr << "Separating typed only variants ..." << std::endl;

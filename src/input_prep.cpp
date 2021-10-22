@@ -77,13 +77,20 @@ bool load_target_haplotypes(const std::string& file_path, const savvy::genomic_r
   return !input.bad();
 }
 
-bool load_reference_haplotypes(const std::string& file_path, const savvy::genomic_region& extended_reg, const savvy::genomic_region& impute_reg, std::vector<target_variant>& target_sites, reduced_haplotypes& typed_only_reference_data, reduced_haplotypes& full_reference_data)
+bool load_reference_haplotypes(const std::string& file_path,
+  const savvy::genomic_region& extended_reg,
+  const savvy::genomic_region& impute_reg,
+  const std::unordered_set<std::string>& subset_ids,
+  std::vector<target_variant>& target_sites,
+  reduced_haplotypes& typed_only_reference_data,
+  reduced_haplotypes& full_reference_data)
 {
   savvy::reader input(file_path);
 
   if (input)
   {
-    input.reset_bounds(extended_reg, savvy::bounding_point::any);
+    if (!input.reset_bounds(extended_reg, savvy::bounding_point::any))
+      return std::cerr << "Error: reference file must be indexed MVCF\n", false;
 
     bool is_m3vcf_v3 = false;
     for (auto it = input.headers().begin(); !is_m3vcf_v3 && it != input.headers().end(); ++it)
@@ -93,11 +100,14 @@ bool load_reference_haplotypes(const std::string& file_path, const savvy::genomi
     }
 
     if (!is_m3vcf_v3)
-      return std::cerr << "Error: reference file must be an M3VCF\n", false;
+      return std::cerr << "Error: reference file must be an MVCF\n", false;
+
+    if (subset_ids.size() && input.subset_samples(subset_ids).empty())
+      return std::cerr << "Error: no reference samples overlap subset IDs\n", false;
 
     savvy::variant var;
     if (!input.read(var))
-      return std::cerr << "Notice: no variant records in reference query region (" << extended_reg.chromosome() << ":" << extended_reg.from() << "-" << extended_reg.to() << ")\n", true;
+      return std::cerr << "Notice: no variant records in reference query region (" << extended_reg.chromosome() << ":" << extended_reg.from() << "-" << extended_reg.to() << ")\n", input.bad() ? false : true;
 
     std::vector<std::int8_t> tmp_geno;
     unique_haplotype_block block;
