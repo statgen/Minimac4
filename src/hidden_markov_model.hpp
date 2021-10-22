@@ -36,6 +36,8 @@ private:
   std::deque<std::vector<std::vector<float>>> forward_norecom_probs_;
   std::vector<std::vector<float>> junction_prob_proportions_;
   std::vector<bool> precision_jumps_;
+  float prob_threshold_ = 0.01f;
+  float diff_threshold_ = 0.01f;
   float background_error_;
   static constexpr float jump_fix = 1e15f;
   static constexpr float jump_threshold = 1e-10f;
@@ -51,7 +53,7 @@ private:
   std::vector<float> best_s3_probs_;
 
 public:
-  hidden_markov_model(float background_error = 1e-5f);
+  hidden_markov_model(float prob_threshold = 0.01f, float diff_threshold = 0.01f, float background_error = 1e-5f);
 
   void traverse_forward(const std::deque<unique_haplotype_block>& ref_haps,
     const std::vector<target_variant>& tar_variant,

@@ -702,28 +702,8 @@ bool impute_chunk(const savvy::region& impute_region, const prog_args& args, omp
   load_reference_haplotypes(args.ref_path(), extended_region, impute_region, args.sample_ids(), target_sites, typed_only_reference_data, full_reference_data);
   std::cerr << "Loading reference haplotypes took " << std::difftime(std::time(nullptr), start_time) << " seconds" << std::endl;
 
-  std::cerr << "Separating typed only variants ..." << std::endl;
-  start_time = std::time(nullptr);
+
   std::vector<target_variant> target_only_sites = separate_target_only_variants(target_sites);
-  std::cerr << "Separating typed only variants took " << std::difftime(std::time(nullptr), start_time) << " seconds" << std::endl;
-
-  float tar_ref_ratio = float(typed_only_reference_data.variant_size()) / float(full_reference_data.variant_size());
-  std::cerr << "Typed sites to imputed sites ratio: " << tar_ref_ratio << " (" << typed_only_reference_data.variant_size() << "/" << full_reference_data.variant_size() << ")\n";
-  if (tar_ref_ratio < args.min_ratio())
-    return std::cerr << "Error: not enough target variants are available to impute this chunk. The --min-ratio, --chunk, or --region options may need to be altered.\n", false;
-
-  if (target_only_sites.size())
-  {
-    std::size_t cnt = std::count_if(target_only_sites.begin(), target_only_sites.end(), [impute_region](target_variant& v){ return v.pos >= impute_region.from() && v.pos <= impute_region.to(); });
-    std::cerr << cnt << " variants are exclusive to target file and will be ";
-    if (args.all_typed_sites())
-      std::cerr << "included in output\n";
-    else
-    {
-      std::cerr << "excluded from output\n";
-      target_only_sites.clear();
-    }
-  }
 
   double impute_time = 0.;
   double temp_write_time = 0.;
@@ -740,6 +720,24 @@ bool impute_chunk(const savvy::region& impute_region, const prog_args& args, omp
   }
   else
   {
+    float tar_ref_ratio = float(typed_only_reference_data.variant_size()) / float(full_reference_data.variant_size());
+    std::cerr << "Typed sites to imputed sites ratio: " << tar_ref_ratio << " (" << typed_only_reference_data.variant_size() << "/" << full_reference_data.variant_size() << ")\n";
+    if (tar_ref_ratio < args.min_ratio())
+      return std::cerr << "Error: not enough target variants are available to impute this chunk. The --min-ratio, --chunk, or --region options may need to be altered.\n", false;
+
+    if (target_only_sites.size())
+    {
+      std::size_t cnt = std::count_if(target_only_sites.begin(), target_only_sites.end(), [impute_region](target_variant& v){ return v.pos >= impute_region.from() && v.pos <= impute_region.to(); });
+      std::cerr << cnt << " variants are exclusive to target file and will be ";
+      if (args.all_typed_sites())
+        std::cerr << "included in output\n";
+      else
+      {
+        std::cerr << "excluded from output\n";
+        target_only_sites.clear();
+      }
+    }
+
     if (target_sites.empty())
       std::cerr << "Error: no target variants\n", false;
 
@@ -756,7 +754,7 @@ bool impute_chunk(const savvy::region& impute_region, const prog_args& args, omp
 
     std::cerr << "Running HMM with " << args.threads() << " threads ..." << std::endl;
     start_time = std::time(nullptr);
-    std::vector<hidden_markov_model> hmms(tpool.thread_count());
+    std::vector<hidden_markov_model> hmms(tpool.thread_count(), {args.prob_threshold(), args.diff_threshold()});
 
     std::size_t ploidy = target_sites[0].gt.size() / sample_ids.size();
     std::size_t haplotype_buffer_size = args.temp_buffer() * ploidy;
@@ -864,7 +862,7 @@ bool impute_chunk(const savvy::region& impute_region, const prog_args& args, omp
       start_time = std::time(nullptr);
       if (!output.write_dosages(hmm_results, target_sites, target_only_sites, {0, n_tar_haps}, full_reference_data, impute_region))
         return std::cerr << "Error: failed writing output\n", false;
-      std::cerr << ("Writing output took " + std::to_string(std::difftime(std::time(nullptr), start_time)) + " seconds") << std::endl;
+      std::cerr << "Writing output took " << std::difftime(std::time(nullptr), start_time) << " seconds" << std::endl;
     }
   }
 

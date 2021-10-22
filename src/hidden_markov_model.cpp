@@ -8,7 +8,9 @@
 constexpr float hidden_markov_model::jump_fix;
 constexpr float hidden_markov_model::jump_threshold;
 
-hidden_markov_model::hidden_markov_model(float background_error) :
+hidden_markov_model::hidden_markov_model(float prob_threshold, float diff_threshold, float background_error) :
+  prob_threshold_(prob_threshold),
+  diff_threshold_(diff_threshold),
   background_error_(background_error)
 {
 }
@@ -322,7 +324,6 @@ void hidden_markov_model::impute_typed_site(double& prob_sum, std::size_t& prev_
   std::vector<std::uint32_t>& best_unique_haps, std::vector<float>& best_unique_probs, float& dose, float& loo_dose)
 {
   assert(left_probs.size() == right_probs.size());
-  const float threshold = 0.01;
   float p_alt = 0.f;
 
 #ifndef NDEBUG
@@ -350,7 +351,7 @@ void hidden_markov_model::impute_typed_site(double& prob_sum, std::size_t& prev_
   float sum = prob_sum;
 #endif
 
-  float denorm_threshold = threshold * sum;
+  float denorm_threshold = prob_threshold_ * sum;
 
   if (prev_best_hap < constants.size())
   {
@@ -362,7 +363,7 @@ void hidden_markov_model::impute_typed_site(double& prob_sum, std::size_t& prev_
     // float fixed = constants[i] * left_probs_norecom[i] * right_probs_norecom[i] + ((left_probs_norecom[i] * rr + right_probs_norecom[i] * lr + (lr * rr) / n) / n);
     float fixed = broken;
     fixed /= sum;
-    if (fixed > (1.f - threshold))
+    if (fixed > (1.f - prob_threshold_))
     {
       best_unique_probs.push_back(fixed);
       best_unique_haps.push_back(i);
@@ -375,7 +376,7 @@ void hidden_markov_model::impute_typed_site(double& prob_sum, std::size_t& prev_
   {
     if (best_unique_haps.empty())
     {
-      float denorm_threshold_l = r == 0 ? threshold * sum : 0.f;
+      float denorm_threshold_l = r == 0 ? prob_threshold_ * sum : 0.f;
       float p_ref = 0.f;
       for (std::size_t i = 0; i < constants.size(); ++i)
       {
@@ -396,7 +397,7 @@ void hidden_markov_model::impute_typed_site(double& prob_sum, std::size_t& prev_
         {
           best_unique_probs.push_back(fixed / sum);
           best_unique_haps.push_back(i);
-          assert(fixed / sum > threshold); // TODO: remove since rounding error could make this assert fail.
+          assert(fixed / sum > prob_threshold_); // TODO: remove since rounding error could make this assert fail.
         }
       }
       prob_sum = sum = p_alt + p_ref;
@@ -584,7 +585,7 @@ void hidden_markov_model::impute(double& prob_sum, std::size_t& prev_best_typed_
 
   if (best_s3_haps_.empty()
     ||  best_typed_haps != best_s3_haps_
-    || std::inner_product(best_typed_probs.begin(), best_typed_probs.end(), best_s3_probs_.begin(), 0.f, std::plus<float>(), [](float l, float r) { return std::abs(l - r); }) > 0.01f)
+    || std::inner_product(best_typed_probs.begin(), best_typed_probs.end(), best_s3_probs_.begin(), 0.f, std::plus<float>(), [](float l, float r) { return std::abs(l - r); }) > diff_threshold_)
   {
     best_s3_haps_ = best_typed_haps;
     best_s3_probs_ = best_typed_probs;
