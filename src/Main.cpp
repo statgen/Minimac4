@@ -332,7 +332,7 @@ public:
         {"map", required_argument, 0, 'm', "Genetic map file"},
         {"output", required_argument, 0, 'o', "Output path (default: /dev/stdout)"},
         {"output-format", required_argument, 0, 'O', "Output file format (bcf, sav, vcf.gz, ubcf, usav, or vcf; default: bcf)"},
-        {"pass-only", no_argument, 0, 'p', "Only imports variants with FILTER column set to PASS"},
+        //{"pass-only", no_argument, 0, 'p', "Only imports variants with FILTER column set to PASS"},
         {"region", required_argument, 0, 'r', "Genomic region to impute"},
         {"sites", required_argument, 0, 's', "Output path for sites-only file"},
         {"threads", required_argument, 0, 't', "Number of threads (default: 1)"},
@@ -346,7 +346,7 @@ public:
         // vvvv deprecated vvvv //
         {"allTypedSites", no_argument, 0, '\x01', nullptr},
         {"rsid", no_argument, 0, '\x01', nullptr},
-        {"passOnly", no_argument, 0, '\x01', nullptr},
+        //{"passOnly", no_argument, 0, '\x01', nullptr},
         {"meta", no_argument, 0, '\x01', nullptr},
         {"haps", required_argument, 0, '\x02', nullptr},
         {"refHaps", required_argument, 0, '\x02', nullptr},
