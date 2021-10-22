@@ -20,6 +20,7 @@ private:
   std::vector<std::string> fmt_fields_;
   std::unordered_set<std::string> fmt_field_set_;
   std::size_t n_samples_ = 0;
+  float min_r2_ = -1.f;
   bool is_temp_file_;
 
   // buffers
@@ -34,7 +35,13 @@ private:
     std::vector<float> gp_vec;
   };
 public:
-  dosage_writer(const std::string& file_path, const std::string& emp_file_path, const std::string& sites_file_path, savvy::file::format file_format, std::uint8_t out_compression, const std::vector<std::string>& sample_ids, const std::vector<std::string>& fmt_fields, const std::string& chromosome, bool is_temp);
+  dosage_writer(const std::string& file_path, const std::string& emp_file_path, const std::string& sites_file_path,
+    savvy::file::format file_format,
+    std::uint8_t out_compression,
+    const std::vector<std::string>& sample_ids,
+    const std::vector<std::string>& fmt_fields,
+    const std::string& chromosome,
+    float min_r2, bool is_temp);
 
   bool merge_temp_files(std::list<savvy::reader>& temp_files, std::list<savvy::reader>& temp_emp_files);
   bool merge_temp_files(std::list<std::string>& temp_file_paths, std::list<std::string>& temp_emp_file_paths);
@@ -45,6 +52,7 @@ private:
   static std::vector<std::pair<std::string, std::string>> gen_emp_headers(const std::string& chromosome);
 
   static bool sites_match(const target_variant& t, const reference_site_info& r);
+  bool has_good_r2(savvy::site_info& site);
 
   void set_r2_info_field(savvy::variant& out_var, float s_x, float s_xx, std::size_t n);
   void set_er2_info_field(savvy::variant& out_var, float s_x, float s_xx, float s_y, float s_yy, float s_xy, std::size_t n);

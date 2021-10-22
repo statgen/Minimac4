@@ -279,11 +279,12 @@ private:
   std::int64_t chunk_size_ = 20000000;
   std::int64_t overlap_ = 3000000;
   std::int16_t threads_ = 1;
+  float min_r2_ = -1.f;
   float min_ratio_ = 1e-5f;
   float prob_threshold_ = 0.01f;
   float diff_threshold_ = 0.01f;
   float min_recom_ = 1e-5f;
-  float error_param_ = 0.00999f;
+  float error_param_ = 0.01f;
   bool all_typed_sites_ = false;
   bool pass_only_ = false;
   bool meta_ = false; // deprecated
@@ -309,6 +310,7 @@ public:
   std::int64_t overlap() const { return overlap_; }
   std::int16_t threads() const { return threads_; }
   std::size_t temp_buffer() const { return temp_buffer_ ; }
+  float min_r2() const { return min_r2_; }
   float min_ratio() const { return min_ratio_; }
   float prob_threshold() const { return prob_threshold_; }
   float diff_threshold() const { return diff_threshold_; }
@@ -323,7 +325,7 @@ public:
       {
         {"all-typed-sites", no_argument, 0, 'a', "Include in the output sites that exist only in target VCF"},
         {"temp-buffer", required_argument, 0, 'b', "Number of samples to impute before writing to temporary files (default: 200)"},
-        {"chunk", required_argument, 0, 'c', "Maximum chunk length in base pairs to impute at once"}, // TODO
+        {"chunk", required_argument, 0, 'c', "Maximum chunk length in base pairs to impute at once (default: 20000000"},
         {"empirical-output", required_argument, 0, 'e', "Output path for empirical dosages"},
         {"help", no_argument, 0, 'h', "Print usage"},
         {"format", required_argument, 0, 'f', "Comma-separated list of format fields to generate (GT, HDS, DS, GP, or SD; default: HDS)"},
@@ -335,8 +337,9 @@ public:
         {"sites", required_argument, 0, 's', "Output path for sites-only file"},
         {"threads", required_argument, 0, 't', "Number of threads (default: 1)"},
         {"overlap", required_argument, 0, 'w', "Size (in base pairs) of overlap before and after impute region to use as input to HMM (default: 3000000)"},
-        {"match-error", required_argument, 0, '\x02', "Error parameter for HMM match probabilities (default: 0.01)"},
+        {"min-r2", required_argument, 0, '\x02', "Minimum estimated r-square for output variants"},
         {"min-ratio", required_argument, 0, '\x02', "Minimum ratio of number of target sites to reference sites (default: 0.00001)"},
+        {"match-error", required_argument, 0, '\x02', "Error parameter for HMM match probabilities (default: 0.01)"},
         {"min-recom", required_argument, 0, '\x02', "Minimum recombination probability (default: 0.00001)"},
         {"prob-threshold", required_argument, 0, '\x02', "Probability threshold used for template selection"},
         {"diff-threshold", required_argument, 0, '\x02', "Probability diff threshold used in template selection"},
@@ -474,14 +477,19 @@ public:
       case '\x02':
         {
           std::string long_opt_str = std::string(long_options_[long_index].name);
-          if (long_opt_str == "match-error")
+          if (long_opt_str == "min-r2")
           {
-            error_param_ = std::min(0.5, std::max(0., std::atof(optarg ? optarg : "")));
+            min_r2_ = std::atof(optarg ? optarg : "");
             break;
           }
           else if (long_opt_str == "min-ratio")
           {
             min_ratio_ = std::min(1., std::max(0., std::atof(optarg ? optarg : "")));
+            break;
+          }
+          else if (long_opt_str == "match-error")
+          {
+            error_param_ = std::min(0.5, std::max(0., std::atof(optarg ? optarg : "")));
             break;
           }
           else if (long_opt_str == "min-recom")
@@ -789,7 +797,7 @@ bool impute_chunk(const savvy::region& impute_region, const prog_args& args, omp
           {sample_ids.begin() + (i / ploidy), sample_ids.begin() + (i + group_size) / ploidy},
           {"HDS"},
           impute_region.chromosome(),
-          true);
+          -1.f, true);
 
         temp_files.emplace_back(out_path);
         ::close(tmp_fd);
@@ -886,7 +894,7 @@ int main(int argc, char** argv)
     sample_ids,
     args.fmt_fields(),
     chrom,
-    false);
+    args.min_r2(), false);
 
   omp::internal::thread_pool2 tpool(args.threads());
 
