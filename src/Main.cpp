@@ -273,7 +273,7 @@ private:
   std::string sites_out_path_;
   savvy::file::format out_format_ = savvy::file::format::bcf;
   std::uint8_t out_compression_ = 6;
-  std::vector<std::string> fmt_fields_ = {"GT","HDS","DS"};
+  std::vector<std::string> fmt_fields_ = {"HDS"};
   std::unordered_set<std::string> sample_ids_;
   savvy::genomic_region reg_ = {""};
   std::size_t temp_buffer_ = 200;
@@ -287,6 +287,7 @@ private:
   float min_recom_ = 1e-5f;
   float error_param_ = 0.01f;
   bool all_typed_sites_ = false;
+  bool update_m3vcf_ = false;
   bool pass_only_ = false;
   bool meta_ = false; // deprecated
   bool help_ = false;
@@ -319,11 +320,12 @@ public:
   float min_recom() const { return min_recom_; }
   float error_param() const { return error_param_; }
   bool all_typed_sites() const { return all_typed_sites_; }
+  bool update_m3vcf() const { return update_m3vcf_; }
   bool pass_only() const { return pass_only_; }
 
   prog_args() :
     getopt_wrapper(
-      "Usage: minimac4 [opts ...] <reference.m3vcf.gz> <target.vcf.gz>",
+      "Usage: minimac4 [opts ...] <reference.msav> <target.{sav,bcf,vcf.gz}>",
       {
         {"all-typed-sites", no_argument, 0, 'a', "Include in the output sites that exist only in target VCF"},
         {"temp-buffer", required_argument, 0, 'b', "Number of samples to impute before writing to temporary files (default: 200)"},
@@ -347,6 +349,7 @@ public:
         {"diff-threshold", required_argument, 0, '\x02', "Probability diff threshold used in template selection"},
         {"sample-ids", required_argument, 0, '\x02', "Comma-separated list of sample IDs to subset from reference panel"},
         {"sample-ids-file", required_argument, 0, '\x02', "Text file containing sample IDs to subset from reference panel (one ID per line)"},
+        {"update-m3vcf", no_argument, 0, '\x01', nullptr},
         // vvvv deprecated vvvv //
         {"allTypedSites", no_argument, 0, '\x01', nullptr},
         {"rsid", no_argument, 0, '\x01', nullptr},
@@ -454,7 +457,12 @@ public:
         overlap_ = std::atoll(optarg ? optarg : "");
         break;
       case '\x01':
-        if (std::string(long_options_[long_index].name) == "allTypedSites")
+        if (std::string(long_options_[long_index].name) == "update-m3vcf")
+        {
+          update_m3vcf_ = true;
+          break;
+        }
+        else if (std::string(long_options_[long_index].name) == "allTypedSites")
         {
           std::cerr << "Warning: --allTypedSites is deprecated in favor of --all-typed-sites\n";
           all_typed_sites_ = true;
@@ -596,6 +604,10 @@ public:
     {
       ref_path_ = argv[optind];
       tar_path_ = argv[optind + 1];
+    }
+    else if (update_m3vcf_ && remaining_arg_count == 1)
+    {
+      ref_path_ = argv[optind];
     }
     else if (!prefix_.empty())
     {
@@ -875,8 +887,6 @@ int main(int argc, char** argv)
 {
 //  test_class t(test_class::file_ptr_t(fopen("","")));
 //  test_class t2(fopen("",""));
-
-  //return convert_old_m3vcf("../1000g-test/topmed.chr20.gtonly.filtered.rehdr.pass_only.phased.ligated.shuffled.m3vcf.gz", "../1000g-test/topmed.chr20.gtonly.filtered.rehdr.pass_only.phased.ligated.shuffled.trunc.m3sav") ? 0 : 1;
   prog_args args;
   if (!args.parse(argc, argv))
   {
@@ -890,6 +900,9 @@ int main(int argc, char** argv)
 
     return EXIT_SUCCESS;
   }
+
+  if (args.update_m3vcf())
+    return convert_old_m3vcf(args.ref_path(), args.out_path()) ? EXIT_SUCCESS : EXIT_FAILURE;
 
   std::uint64_t end_pos = args.region().to();
   std::string chrom = args.region().chromosome();

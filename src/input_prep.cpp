@@ -1,6 +1,8 @@
 #include "input_prep.hpp"
 #include "recombination.hpp"
 
+#include <sys/stat.h>
+
 bool stat_tar_panel(const std::string& tar_file_path, std::vector<std::string>& sample_ids)
 {
   savvy::reader temp_rdr(tar_file_path);
@@ -14,7 +16,9 @@ bool stat_tar_panel(const std::string& tar_file_path, std::vector<std::string>& 
 
 bool stat_ref_panel(const std::string& ref_file_path, std::string& chrom, std::uint64_t& end_pos)
 {
-  std::vector<savvy::s1r::index_statistics> s1r_stats = savvy::s1r::stat_index(ref_file_path);
+  std::string separate_s1r_path = ref_file_path + ".s1r";
+  struct stat st;
+  std::vector<savvy::s1r::index_statistics> s1r_stats = savvy::s1r::stat_index(stat(separate_s1r_path.c_str(), &st) == 0 ? separate_s1r_path : ref_file_path);
   if (s1r_stats.size())
   {
     if (chrom.size())
@@ -41,10 +45,41 @@ bool stat_ref_panel(const std::string& ref_file_path, std::string& chrom, std::u
     std::cerr << "Error: reference file contains multiple chromosomes so --region is required\n";
     return false;
   }
+  else if (stat((ref_file_path + ".csi").c_str(), &st) == 0 || stat((ref_file_path + ".tbi").c_str(), &st) == 0)
+  {
+    savvy::reader stat_rdr(ref_file_path);
+    if (chrom.empty())
+    {
+      savvy::variant var;
+      stat_rdr >> var;
+      chrom = var.chromosome();
+    }
 
-  // TODO: csi index check
+    if (chrom.size())
+    {
+      for (auto it = stat_rdr.headers().begin(); it != stat_rdr.headers().end(); ++it)
+      {
+        if (it->first == "contig" && chrom == savvy::parse_header_sub_field(it->second, "ID"))
+        {
+          std::string length_str = savvy::parse_header_sub_field(it->second, "length");
+          if (length_str.size())
+          {
+            end_pos = std::min(end_pos, std::uint64_t(std::atoll(length_str.c_str())));
+            return true;
+          }
+          break;
+        }
+      }
+      std::cerr << "Error: could not parse chromosome length from VCF/BCF header so --region is required" << std::endl;
+      return false;
+    }
 
-  std::cerr << "Error: could not load reference file index (reference must be indexed M3VCF v3)\n";
+    std::cerr << "Error: could not determine chromosome from reference" << std::endl;
+    return false;
+  }
+
+  std::cerr << "Error: could not load reference file index (reference must be an indexed MVCF)\n";
+  std::cerr << "Notice: M3VCF files must be updated to an MVCF encoded file. This can be done by running `minimac4 --update-m3vcf input.m3vcf.gz > output.msav`\n";
   return false;
 }
 
@@ -376,7 +411,7 @@ bool convert_old_m3vcf(const std::string& input_path, const std::string& output_
   std::size_t block_cnt = 0;
   unique_haplotype_block block;
   std::vector<std::int8_t> tmp_geno;
-  while (block_cnt < 101 && block.deserialize(input_file, m3vcf_version, m3vcf_version == 1 ? n_samples : 2 * n_samples))
+  while (block.deserialize(input_file, m3vcf_version, m3vcf_version == 1 ? n_samples : 2 * n_samples))
   {
     if (block.variants().empty())
       break;
