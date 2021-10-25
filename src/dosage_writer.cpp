@@ -38,6 +38,7 @@ std::vector<std::pair<std::string, std::string>> dosage_writer::gen_headers(cons
       {"source","Minimac v" + std::string(VERSION)},
       {"phasing","full"},
       {"contig","<ID=" + std::string(chromosome) + ">"},
+      {"INFO", "<ID=AN,Number=1,Type=Integer,Description=\"Total number of alleles\">"},
       {"INFO","<ID=S_X,Number=1,Type=Float,Description=\"Sum of dosages\">"},
       {"INFO","<ID=S_XX,Number=1,Type=Float,Description=\"Sum of squared dosages\">"},
       {"INFO","<ID=S_CS,Number=1,Type=Float,Description=\"Sum of call scores\">"},
@@ -148,6 +149,7 @@ bool dosage_writer::merge_temp_files(std::list<savvy::reader>& temp_files, std::
   while (good_count == temp_files.size())
   {
     float s_cs{}, s_x{}, s_xx{}, loo_s_x{}, loo_s_xx{}, loo_s_y{}, loo_s_yy{}, loo_s_xy{};
+    std::size_t n{};
     bool is_typed = false;
 
     pasted_hds.clear();
@@ -175,6 +177,9 @@ bool dosage_writer::merge_temp_files(std::list<savvy::reader>& temp_files, std::
         if (out_var.get_info("LOO_S_XY", tmp)) loo_s_xy += tmp;
         is_typed = true;
       }
+
+      std::int64_t tmp_int;
+      if (out_var.get_info("AN", tmp_int)) n += tmp_int;
     }
 
     loo_s_yy = loo_s_y;
@@ -187,8 +192,10 @@ bool dosage_writer::merge_temp_files(std::list<savvy::reader>& temp_files, std::
       out_var.remove_info("S_X");
       out_var.remove_info("S_XX");
       out_var.remove_info("S_CS");
+      out_var.remove_info("AN");
 
-      std::size_t n = pasted_hds.size();
+      //std::size_t n = pasted_hds.size() - std::count_if(pasted_hds.begin(), pasted_hds.end(), [](const float& v) { return std::isnan(v); });
+
 //      float s_x = std::accumulate(pasted_hds.begin(), pasted_hds.end(), 0.f);
 //      float s_xx = std::inner_product(pasted_hds.begin(), pasted_hds.end(), pasted_hds.begin(), 0.f);
 
@@ -426,16 +433,23 @@ void dosage_writer::set_info_fields(savvy::variant& out_var, const savvy::compre
 {
   std::size_t n = sparse_dosages.size();
   assert(n);
-
-  float s_x = std::accumulate(sparse_dosages.begin(), sparse_dosages.end(), 0.f);
-  float s_xx = std::inner_product(sparse_dosages.begin(), sparse_dosages.end(), sparse_dosages.begin(), 0.f);
-  float af = s_x / n;
+  
+  float s_x = std::accumulate(sparse_dosages.begin(), sparse_dosages.end(), 0.f, plus_ignore_missing<float>());
+  float s_xx = std::inner_product(sparse_dosages.begin(), sparse_dosages.end(), sparse_dosages.begin(), 0.f, plus_ignore_missing<float>(), std::multiplies<float>());
   float s_cs(sparse_dosages.size() - sparse_dosages.non_zero_size());
   for (auto it = sparse_dosages.begin(); it != sparse_dosages.end(); ++it)
-    s_cs += *it > 0.5f ? *it : 1.f - *it;
+  {
+    if (savvy::typed_value::is_end_of_vector(*it))
+      --n;
+    else
+      s_cs += *it > 0.5f ? *it : 1.f - *it;
+  }
+
+  float af = s_x / n;
 
   if (is_temp_file_)
   {
+    out_var.set_info("AN", std::int64_t(n));
     out_var.set_info("S_X", s_x);
     out_var.set_info("S_XX", s_xx);
     out_var.set_info("S_CS", s_cs);
@@ -453,13 +467,14 @@ void dosage_writer::set_info_fields(savvy::variant& out_var, const savvy::compre
     assert(observed.size() == loo_dosages.size());
     // sparse_loo_dosages.assign(loo_dosages.begin(), loo_dosages.end());
 
-    s_x = std::accumulate(loo_dosages.begin(), loo_dosages.end(), 0.f);
-    s_xx = std::inner_product(loo_dosages.begin(), loo_dosages.end(), loo_dosages.begin(), 0.f);
-    float s_y = std::accumulate(observed.begin(), observed.end(), 0.f);
+    s_x = std::accumulate(loo_dosages.begin(), loo_dosages.end(), 0.f, plus_ignore_missing<float>());
+    s_xx = std::inner_product(loo_dosages.begin(), loo_dosages.end(), loo_dosages.begin(), 0.f, plus_ignore_missing<float>(), std::multiplies<float>());
+    float s_y = std::accumulate(observed.begin(), observed.end(), 0.f, plus_ignore_missing<std::int8_t>());
     // since observed can only be 0 or 1, s_yy is the same as s_y
     float s_yy = s_y; // std::inner_product(sparse_gt.begin(), sparse_gt.end(), sparse_gt.begin(), 0.f); // TODO: allow for missing oberserved genotypes.
-    float s_xy = 0.f;
-    s_xy = std::inner_product(loo_dosages.begin(), loo_dosages.end(), observed.begin(), s_xy);
+
+    float s_xy = std::inner_product(loo_dosages.begin(), loo_dosages.end(), observed.begin(), 0.f, plus_ignore_missing<float>(), std::multiplies<float>());
+    //    float s_xy = 0.f;
     //    for (auto it = ctx.sparse_gt.begin(); it != ctx.sparse_gt.end(); ++it)
     //      s_xy += *it * loo_dosages[it.offset()];
 
@@ -602,7 +617,7 @@ void dosage_writer::set_format_fields(savvy::variant& out_var, savvy::compressed
 
   if (fmt_field_set_.find("DS") != fmt_field_set_.end())
   {
-    savvy::stride_reduce(sparse_dosages, sparse_dosages.size() / n_samples_);
+    savvy::stride_reduce(sparse_dosages, sparse_dosages.size() / n_samples_, savvy::plus_eov<float>());
     out_var.set_format("DS", sparse_dosages);
   }
 }

@@ -59,6 +59,19 @@ private:
   void set_info_fields(savvy::variant& out_var, const savvy::compressed_vector<float>& sparse_dosages, const std::vector<float>& loo_dosages, const std::vector<std::int8_t>& observed);
 
   void set_format_fields(savvy::variant& out_var, savvy::compressed_vector<float>& sparse_dosages);
+
+  template <typename T>
+  struct plus_ignore_missing
+  {
+    T operator()(const T& l, const T& r)
+    {
+      if (savvy::typed_value::is_special_value(r))
+        return l;
+      if (savvy::typed_value::is_special_value(l))
+        return r;
+      return l + r;
+    }
+  };
 };
 
 #endif // MINIMAC4_DOSAGE_WRITER_HPP

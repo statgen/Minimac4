@@ -1,3 +1,3 @@
-statgen/savvy@0adbbee8b10ab8d81148b8334613c6465bda8315
+statgen/savvy@a6f39a4884f3c21881a15a21735dee033e2b3d7b
 jonathonl/omp@275d6a4b69d6a3bdf54df6d32ad77bc3e2cd1297
 statgen/libStatGen --cmake dep/libstatgen.cmake

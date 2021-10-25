@@ -16,8 +16,8 @@ public:
 public:
   void resize(std::size_t n_rows, std::size_t n_loo_rows, std::size_t n_columns)
   {
-    dosages_.resize(n_rows, std::vector<float>(n_columns));
-    loo_dosages_.resize(n_loo_rows, std::vector<float>(n_columns));
+    dosages_.resize(n_rows, std::vector<float>(n_columns, savvy::typed_value::end_of_vector_value<float>()));
+    loo_dosages_.resize(n_loo_rows, std::vector<float>(n_columns, savvy::typed_value::end_of_vector_value<float>()));
   }
 
   std::array<std::size_t, 2> dimensions() const { return {dosages_.size(), dosages_.empty() ? 0 : dosages_[0].size()}; }

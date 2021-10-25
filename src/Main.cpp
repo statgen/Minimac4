@@ -789,6 +789,8 @@ bool impute_chunk(const savvy::region& impute_region, const prog_args& args, omp
       omp::parallel_for_exp(
         omp::static_schedule(), omp::sequence_iterator(i), omp::sequence_iterator(i + group_size), [&](int& i, const omp::iteration_context& ctx)
         {
+          if (savvy::typed_value::is_end_of_vector(target_sites[0].gt[i]))
+            return; // Sample has fewer haplotypes
           hmms[ctx.thread_index].traverse_forward(typed_only_reference_data.blocks(), target_sites, i);
           hmms[ctx.thread_index].traverse_backward(typed_only_reference_data.blocks(), target_sites, i, i % haplotype_buffer_size, reverse_maps, hmm_results, full_reference_data);
         },
