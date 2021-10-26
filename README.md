@@ -6,34 +6,11 @@ minimac/mininac2/minimac3.
 
 <<< SEE http://genome.sph.umich.edu/wiki/Minimac4 FOR DOCUMENTATION >>>
 
-Users should follow the following steps to compile Minimac4 
-
 ## Prerequisites
-
-Automatic installation of Minimac4 requires [cget](http://cget.readthedocs.io/en/latest/src/intro.html#installing-cget) and cmake v3.2. These prerequisites can be installed as follows:
-
-Ubuntu 16.04
-```
-sudo apt-get install cmake python-pip python-dev
-pip install cget
-```
-Ubuntu 14.04
-```
-sudo apt-get install software-properties-common
-sudo add-apt-repository ppa:george-edison55/cmake-3.x
-sudo apt-get update
-sudo apt-get install cmake python-pip python-dev
-pip install cget
-```
-MacOS
-```
-brew install cmake
-sudo easy-install pip
-pip install --user cget --ignore-installed six
-```
+Automatic installation of Minimac4 requires [cget](http://cget.readthedocs.io/en/latest/src/intro.html#installing-cget) and cmake >= v3.2.
 
 ## Installation
-The easiest way to install Minimac4 and its dependencies is to use cget as follows:
+The easiest way to install Minimac4 and its dependencies is to use cget:
 ```bash
 cget install --prefix <install_prefix> statgen/Minimac4
 ```
@@ -48,15 +25,14 @@ make                                                    # Build.
 make install                                            # Install
 ```
 
-
-
 ## Usage
+See `minimac4 --help` for detailed usage.
+
 A typical Minimac4 command line for imputation is as follows
 ```bash
-minimac4 --refHaps refPanel.m3vcf \
-         --haps targetStudy.vcf \
-         --prefix testRun
+minimac4 reference.msav target.bcf > imputed.bcf
 ```
-Here refPanel.m3vcf is the reference panel used in M3VCF format (e.g. 1000 Genomes), 
-targetStudy.vcf is the phased GWAS data in VCF format, 
-and testRun is the prefix for the output files.
+
+Here reference.msav is a reference panel (e.g. 1000 Genomes) compressed with MVCF encoding, 
+target.bcf is an indexed BCF containing phased genotype array data, 
+and imputed.bcf is the imputed output.

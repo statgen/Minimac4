@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.2)
-project(minimac4 VERSION 1.0.2)
+project(minimac4 VERSION 4.1.0)
 
 if(NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE "Release" CACHE STRING "Choose build type (Debug|Release|RelWithDebInfo|MinSizeRel)" FORCE)
@@ -21,10 +21,9 @@ set(CMAKE_FIND_LIBRARY_SUFFIXES ".a;${CMAKE_FIND_LIBRARY_SUFFIXES}") # Prefer li
 
 
 find_package(Threads)
-find_package(ZLIB REQUIRED)
-find_library(STATGEN_LIBRARY StatGen)
 find_library(OMPP_LIBRARY omp)
 find_package(savvy REQUIRED)
+
 add_executable(minimac4
         src/dosage_writer.cpp src/dosage_writer.hpp
         src/hidden_markov_model.cpp src/hidden_markov_model.hpp
@@ -54,7 +53,7 @@ add_executable(minimac4
 #        src/Estimation.cpp
 #        src/Estimation.h)
 
-target_link_libraries(minimac4 savvy ${OMPP_LIBRARY} ${STATGEN_LIBRARY} ${ZLIB_LIBRARIES} Threads::Threads)
+target_link_libraries(minimac4 savvy ${OMPP_LIBRARY} Threads::Threads)
 
 install(TARGETS minimac4 RUNTIME DESTINATION bin)
 

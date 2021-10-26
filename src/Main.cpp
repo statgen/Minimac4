@@ -5,11 +5,6 @@
 #include "recombination.hpp"
 #include "dosage_writer.hpp"
 
-#include "MyVariables.h"
-#include "Parameters.h"
-#include "StringBasics.h"
-#include "Analysis.h"
-
 #include <savvy/reader.hpp>
 #include <savvy/writer.hpp>
 #include <omp.hpp>
@@ -291,12 +286,11 @@ private:
   bool pass_only_ = false;
   bool meta_ = false; // deprecated
   bool help_ = false;
+  bool version_ = false;
 
 public:
-  bool help_is_set() const
-  {
-    return help_;
-  }
+  bool help_is_set() const { return help_; }
+  bool version_is_set() const { return version_; }
 
   const std::string& ref_path() const { return ref_path_; }
   const std::string& tar_path() const { return tar_path_; }
@@ -340,6 +334,7 @@ public:
         {"region", required_argument, 0, 'r', "Genomic region to impute"},
         {"sites", required_argument, 0, 's', "Output path for sites-only file"},
         {"threads", required_argument, 0, 't', "Number of threads (default: 1)"},
+        {"version", no_argument, 0, 'v', "Print version"},
         {"overlap", required_argument, 0, 'w', "Size (in base pairs) of overlap before and after impute region to use as input to HMM (default: 3000000)"},
         {"min-r2", required_argument, 0, '\x02', "Minimum estimated r-square for output variants"},
         {"min-ratio", required_argument, 0, '\x02', "Minimum ratio of number of target sites to reference sites (default: 0.00001)"},
@@ -454,6 +449,9 @@ public:
       case 't':
         threads_ = atoi(optarg ? optarg : "");
         break;
+      case 'v':
+        version_ = true;
+        return true;
       case 'w':
         overlap_ = std::atoll(optarg ? optarg : "");
         break;
@@ -917,6 +915,12 @@ int main(int argc, char** argv)
   {
     args.print_usage(std::cout);
 
+    return EXIT_SUCCESS;
+  }
+
+  if (args.version_is_set())
+  {
+    std::cout << "minimac v" << VERSION << std::endl;
     return EXIT_SUCCESS;
   }
 
