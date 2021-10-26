@@ -60,14 +60,23 @@ private:
 
   void set_format_fields(savvy::variant& out_var, savvy::compressed_vector<float>& sparse_dosages);
 
-  template <typename T>
+
   struct plus_ignore_missing
   {
-    T operator()(const T& l, const T& r)
+    float operator()(const float& l, const float& r)
     {
-      if (savvy::typed_value::is_special_value(r))
+      if (std::isnan(r))
         return l;
-      if (savvy::typed_value::is_special_value(l))
+      if (std::isnan(l))
+        return r;
+      return l + r;
+    }
+
+    std::int32_t operator()(const std::int32_t& l, const std::int32_t& r)
+    {
+      if (r < 0)
+        return l;
+      if (l < 0)
         return r;
       return l + r;
     }

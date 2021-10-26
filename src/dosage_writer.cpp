@@ -434,8 +434,8 @@ void dosage_writer::set_info_fields(savvy::variant& out_var, const savvy::compre
   std::size_t n = sparse_dosages.size();
   assert(n);
   
-  float s_x = std::accumulate(sparse_dosages.begin(), sparse_dosages.end(), 0.f, plus_ignore_missing<float>());
-  float s_xx = std::inner_product(sparse_dosages.begin(), sparse_dosages.end(), sparse_dosages.begin(), 0.f, plus_ignore_missing<float>(), std::multiplies<float>());
+  float s_x = std::accumulate(sparse_dosages.begin(), sparse_dosages.end(), 0.f, plus_ignore_missing());
+  float s_xx = std::inner_product(sparse_dosages.begin(), sparse_dosages.end(), sparse_dosages.begin(), 0.f, plus_ignore_missing(), std::multiplies<float>());
   float s_cs(sparse_dosages.size() - sparse_dosages.non_zero_size());
   for (auto it = sparse_dosages.begin(); it != sparse_dosages.end(); ++it)
   {
@@ -467,13 +467,13 @@ void dosage_writer::set_info_fields(savvy::variant& out_var, const savvy::compre
     assert(observed.size() == loo_dosages.size());
     // sparse_loo_dosages.assign(loo_dosages.begin(), loo_dosages.end());
 
-    s_x = std::accumulate(loo_dosages.begin(), loo_dosages.end(), 0.f, plus_ignore_missing<float>());
-    s_xx = std::inner_product(loo_dosages.begin(), loo_dosages.end(), loo_dosages.begin(), 0.f, plus_ignore_missing<float>(), std::multiplies<float>());
-    float s_y = std::accumulate(observed.begin(), observed.end(), 0.f, plus_ignore_missing<std::int8_t>());
+    s_x = std::accumulate(loo_dosages.begin(), loo_dosages.end(), 0.f, plus_ignore_missing());
+    s_xx = std::inner_product(loo_dosages.begin(), loo_dosages.end(), loo_dosages.begin(), 0.f, plus_ignore_missing(), std::multiplies<float>());
+    float s_y = (float)std::accumulate(observed.begin(), observed.end(), std::int32_t(0), plus_ignore_missing());
     // since observed can only be 0 or 1, s_yy is the same as s_y
     float s_yy = s_y; // std::inner_product(sparse_gt.begin(), sparse_gt.end(), sparse_gt.begin(), 0.f); // TODO: allow for missing oberserved genotypes.
 
-    float s_xy = std::inner_product(loo_dosages.begin(), loo_dosages.end(), observed.begin(), 0.f, plus_ignore_missing<float>(), std::multiplies<float>());
+    float s_xy = std::inner_product(loo_dosages.begin(), loo_dosages.end(), observed.begin(), 0.f, plus_ignore_missing(), std::multiplies<float>());
     //    float s_xy = 0.f;
     //    for (auto it = ctx.sparse_gt.begin(); it != ctx.sparse_gt.end(); ++it)
     //      s_xy += *it * loo_dosages[it.offset()];
