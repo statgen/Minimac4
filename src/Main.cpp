@@ -365,7 +365,8 @@ public:
         {"window", required_argument, 0, '\x02', nullptr},
         {"ChunkOverlapMb", required_argument, 0, '\x02', nullptr},
         {"ChunkLengthMb", required_argument, 0, '\x02', nullptr},
-        {"cpus", required_argument, 0, '\x02', nullptr}
+        {"cpus", required_argument, 0, '\x02', nullptr},
+        {"minRatio", no_argument, 0, '\x02', nullptr}
       })
   {
   }
@@ -591,6 +592,18 @@ public:
             overlap_ = std::atoll(optarg ? optarg : "") * 1000000;
             break;
           }
+          else if (long_opt_str == "cpus")
+          {
+            std::cerr << "Warning: --cpus is deprecated in favor of --threads\n";
+            threads_ = atoi(optarg ? optarg : "");
+            break;
+          }
+          else if (long_opt_str == "minRatio")
+          {
+            std::cerr << "Warning: --minRatio is deprecated in favor of --min-ratio\n";
+            min_ratio_ = std::atof(optarg ? optarg : "");
+            break;
+          }
           // else pass through to default
         }
       default:
@@ -609,7 +622,21 @@ public:
     {
       ref_path_ = argv[optind];
     }
-    else if (!prefix_.empty())
+    else if (remaining_arg_count < 2)
+    {
+      if (ref_path_.empty() || tar_path_.empty())
+      {
+        std::cerr << "Too few arguments\n";
+        return false;
+      }
+    }
+    else
+    {
+      std::cerr << "Too many arguments\n";
+      return false;
+    }
+
+    if (!prefix_.empty())
     {
       std::string suffix = "sav";
       if (out_format_ == savvy::file::format::bcf)
@@ -625,16 +652,6 @@ public:
       out_path_ = prefix_ + ".sites." + suffix;
       if (meta_)
         emp_out_path_ = prefix_ + ".empiricalDose." + suffix;
-    }
-    else if (remaining_arg_count < 2)
-    {
-      std::cerr << "Too few arguments\n";
-      return false;
-    }
-    else
-    {
-      std::cerr << "Too many arguments\n";
-      return false;
     }
 
     return true;
@@ -751,7 +768,7 @@ bool impute_chunk(const savvy::region& impute_region, const prog_args& args, omp
     }
 
     if (target_sites.empty())
-      std::cerr << "Error: no target variants\n", false;
+      return std::cerr << "Error: no target variants\n", false;
 
     target_sites.back().recom = 0.f; // Last recom prob must be zero so that the first step of backward traversal will have no recombination.
     if (args.map_path().size())
