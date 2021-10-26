@@ -87,8 +87,14 @@ bool stat_ref_panel(const std::string& ref_file_path, std::string& chrom, std::u
 bool load_target_haplotypes(const std::string& file_path, const savvy::genomic_region& reg, float error_param, float recom_min, std::vector<target_variant>& target_sites, std::vector<std::string>& sample_ids)
 {
   savvy::reader input(file_path);
+  if (!input)
+    return std::cerr << "Error: cannot open target file\n", false;
+
   sample_ids = input.samples();
   input.reset_bounds(reg);
+  if (!input)
+    return std::cerr << "Error: cannot query region (" << reg.chromosome() << ":" << reg.from() << "-" << reg.to() << ") from target file. Target file must be indexed.\n", false;
+
   savvy::variant var;
   std::vector<std::int8_t> tmp_geno;
   while (input >> var)
