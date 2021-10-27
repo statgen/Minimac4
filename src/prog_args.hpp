@@ -403,7 +403,7 @@ public:
       }
 
       out_path_ = prefix_ + ".dose." + suffix;
-      out_path_ = prefix_ + ".sites." + suffix;
+      sites_out_path_ = prefix_ + ".sites." + suffix;
       if (meta_)
         emp_out_path_ = prefix_ + ".empiricalDose." + suffix;
     }
