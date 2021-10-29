@@ -12,7 +12,7 @@ bool unique_haplotype_block::compress_variant(const reference_site_info& site_in
   if (alleles.empty())
     return false;
 
-  variants_.emplace_back(site_info.chrom, site_info.pos, site_info.ref, site_info.alt, 0, std::vector<std::int8_t>());
+  variants_.emplace_back(site_info.chrom, site_info.pos, site_info.ref, site_info.alt, site_info.err, site_info.cm, 0, std::vector<std::int8_t>());
 
   if (variants_.size() == 1)
   {

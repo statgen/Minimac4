@@ -175,7 +175,7 @@ bool load_reference_haplotypes(const std::string& file_path,
             for (std::size_t i = 0; i < tmp_geno.size(); ++i)
               tmp_geno[i] = ref_it->gt[block.unique_map()[i]];
 
-            typed_only_reference_data.compress_variant({it->chrom, it->pos, it->ref, it->alt}, tmp_geno);
+            typed_only_reference_data.compress_variant({ref_it->chrom, ref_it->pos, ref_it->ref, ref_it->alt, ref_it->err, ref_it->cm}, tmp_geno);
 
             it->af = std::accumulate(tmp_geno.begin(), tmp_geno.end(), 0.f) / tmp_geno.size();
             it->af = float((--typed_only_reference_data.end())->ac) / tmp_geno.size();
@@ -257,7 +257,7 @@ bool load_reference_haplotypes(const std::string& file_path,
             for (std::size_t i = 0; i < tmp_geno.size(); ++i)
               tmp_geno[i] = ref_it->gt[block.unique_map()[i]];
 
-            typed_only_reference_data.compress_variant({it->chrom, it->pos, it->ref, it->alt}, tmp_geno);
+            typed_only_reference_data.compress_variant({ref_it->chrom, ref_it->pos, ref_it->ref, ref_it->alt, ref_it->err, ref_it->cm}, tmp_geno);
 
             it->af = std::accumulate(tmp_geno.begin(), tmp_geno.end(), 0.f) / tmp_geno.size();
             it->af = float((--typed_only_reference_data.end())->ac) / tmp_geno.size();
