@@ -337,6 +337,7 @@ bool convert_old_m3vcf(const std::string& input_path, const std::string& output_
   std::string line;
 
   bool phasing_header_present = false;
+  bool contig_header_present = false;
   std::uint8_t m3vcf_version = 0;
   const std::string m3vcf_version_line = "##fileformat=M3VCF";
   const std::string vcf_version_line = "##fileformat=VCF";
@@ -359,10 +360,13 @@ bool convert_old_m3vcf(const std::string& input_path, const std::string& output_
             m3vcf_version = 1;
         }
       }
-      else
+      else if (key != "INFO" && key != "FORMAT")
       {
         if (!phasing_header_present && key == "phasing")
           phasing_header_present = true;
+        else if (!contig_header_present && key == "contig")
+          contig_header_present = true;
+
         headers.emplace_back(std::move(key), std::move(val));
       }
     }
@@ -383,8 +387,13 @@ bool convert_old_m3vcf(const std::string& input_path, const std::string& output_
   headers.insert(headers.begin(), {"fileformat","VCFv4.2"});
   if (!phasing_header_present)
     headers.emplace_back("phasing","full");
+  headers.emplace_back("INFO", "<ID=AC,Number=1,Type=Integer,Description=\"Total number of alternate alleles in called genotypes\">");
+  headers.emplace_back("INFO", "<ID=AN,Number=1,Type=Float,Description=\"Total number of alleles in called genotypes\">");
   headers.emplace_back("INFO","<ID=REPS,Number=1,Type=Integer,Description=\"Number of distinct haplotypes in block\">");
   headers.emplace_back("INFO","<ID=VARIANTS,Number=1,Type=Integer,Description=\"Number of variants in block\">");
+  headers.emplace_back("INFO","<ID=ERR,Number=1,Type=Integer,Description=\"Error parameter for HMM\">");
+//  headers.emplace_back("INFO","<ID=RECOM,Number=1,Type=Integer,Description=\"Recombination probability\">");
+  headers.emplace_back("INFO","<ID=CM,Number=1,Type=Integer,Description=\"Centimorgan\">");
   headers.emplace_back("INFO","<ID=END,Number=1,Type=Integer,Description=\"End position of record\">");
   headers.emplace_back("INFO","<ID=UHA,Number=.,Type=Integer,Description=\"Unique haplotype alleles\">");
   headers.emplace_back("FORMAT","<ID=UHM,Number=.,Type=Integer,Description=\"Unique haplotype mapping\">");
@@ -409,6 +418,11 @@ bool convert_old_m3vcf(const std::string& input_path, const std::string& output_
   ids.emplace_back(line.substr(last_pos, tab_pos - last_pos));
   std::size_t n_samples = ids.size();
 
+  unique_haplotype_block block;
+  block.deserialize(input_file, m3vcf_version, m3vcf_version == 1 ? n_samples : 2 * n_samples);
+  if (!contig_header_present && block.variants().size())
+    headers.emplace_back("contig","<ID=" + block.variants()[0].chrom + ">");
+
   std::string last_3;
   if (output_path.size() >= 3)
     last_3 = output_path.substr(output_path.size() - 3);
@@ -416,16 +430,17 @@ bool convert_old_m3vcf(const std::string& input_path, const std::string& output_
 
 
   std::size_t block_cnt = 0;
-  unique_haplotype_block block;
+
   std::vector<std::int8_t> tmp_geno;
-  while (block.deserialize(input_file, m3vcf_version, m3vcf_version == 1 ? n_samples : 2 * n_samples))
+  do
   {
     if (block.variants().empty())
       break;
 
-    block.serialize(output_file);
+    if (!block.serialize(output_file))
+      return false;
     ++block_cnt;
-  }
+  } while (block.deserialize(input_file, m3vcf_version, m3vcf_version == 1 ? n_samples : 2 * n_samples));
 
   return !input_file.bad() && output_file.good();
 }

@@ -169,11 +169,15 @@ bool unique_haplotype_block::serialize(savvy::writer& output_file)
     output_file << var;
     output_file.set_block_size(0); // Using set_block_size as a workaround to align zstd blocks with m3vcf blocks.
 
-    for (auto it = variants_.begin(); it != variants_.end(); ++it)
+    for (auto it = variants_.begin(); it != variants_.end() && output_file; ++it)
     {
       var = savvy::variant(it->chrom, it->pos, it->ref, {it->alt});
       var.set_info("AC", std::int32_t(it->ac));
       var.set_info("AN", std::int32_t(unique_map_.size()));
+      if (!std::isnan(it->err))
+        var.set_info("ERR", it->err);
+      if (!std::isnan(it->cm))
+        var.set_info("CM", it->cm);
       var.set_info("UHA", it->gt);
 
       output_file << var;
@@ -213,6 +217,8 @@ int unique_haplotype_block::deserialize(savvy::reader& input_file, savvy::varian
     variants_.back().pos = var.position();
     variants_.back().ref = var.ref();
     variants_.back().alt = var.alts().size() ? var.alts()[0] : "";
+    var.get_info("ERR", variants_.back().err);
+    var.get_info("CM", variants_.back().cm);
     var.get_info("UHA", variants_.back().gt);
     if (variants_.back().gt.size() != cardinalities_.size())
       return -1;
@@ -348,6 +354,15 @@ bool unique_haplotype_block::deserialize(std::istream& is, int m3vcf_version, st
     variants_[i].ref = cols[3];
     variants_[i].alt = cols[4];
 
+    std::vector<std::string> info_fields = split_string_to_vector(cols[7].c_str(), ';');
+    for (auto it = info_fields.begin(); it != info_fields.end(); ++it)
+    {
+      if (it->compare(0, 4, "ERR=") == 0 || it->compare(0, 4, "Err=") == 0)
+        variants_[i].err = std::atof(it->c_str() + 4);
+//      else if (it->compare(0, 6, "RECOM=") == 0 || it->compare(0, 6, "Recom=") == 0)
+//        variants_[i].recom = std::atof(it->c_str() + 6);
+    }
+
     if (m3vcf_version == 2)
     {
       variants_[i].gt.resize(n_reps);
@@ -374,14 +389,9 @@ bool unique_haplotype_block::deserialize(std::istream& is, int m3vcf_version, st
     else
     {
       variants_[i].gt.reserve(n_reps);
-      const char* p = cols[8].data();
-      char* p_end;
-      do
-      {
-        std::uint8_t val = std::strtoll(p, &p_end, 10);
-        variants_[i].gt.push_back(val);
-        p = p_end + 1;
-      } while (*p_end);
+      for (auto c = cols[8].begin(); c != cols[8].end(); ++c)
+        variants_[i].gt.emplace_back((*c) - '0');
+
       variants_[i].ac = std::inner_product(variants_[i].gt.begin(), variants_[i].gt.end(), cardinalities_.begin(), 0ull);
 
       if (variants_[i].gt.size() != n_reps)

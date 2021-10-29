@@ -243,7 +243,6 @@ int main(int argc, char** argv)
   if (args.help_is_set())
   {
     args.print_usage(std::cout);
-
     return EXIT_SUCCESS;
   }
 

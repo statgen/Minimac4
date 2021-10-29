@@ -25,7 +25,9 @@ struct reference_site_info
   std::uint32_t pos = 0;
   std::string ref;
   std::string alt;
-  //float recom = 0.f;
+  float err = std::numeric_limits<float>::quiet_NaN();
+  float cm = std::numeric_limits<float>::quiet_NaN();
+  //float recom = std::numeric_limits<float>::quiet_NaN();
 
   reference_site_info() {}
 
