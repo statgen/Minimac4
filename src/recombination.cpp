@@ -115,3 +115,85 @@ bool recombination::read_entry(std::istream& ifs, map_file_line& entry, bool new
     return false;
   return true;
 }
+
+genetic_map_file::genetic_map_file(const std::string& map_file_path, const std::string& chrom) :
+  ifs_(map_file_path),
+  target_chrom_(chrom),
+  good_(true),
+  new_format_(false)
+{
+  while (ifs_.peek() == '#') // skip header line
+  {
+    std::string line;
+    std::getline(ifs_, line);
+    if (std::count(line.begin(), line.end(), '\t') != 2)
+    {
+      std::cerr << "Error: invalid genetic map file" << std::endl;
+      good_ = false;
+      return;
+    }
+    new_format_ = true;
+  }
+
+  do
+  {
+    if (!read_record(prev_rec_))
+    {
+      std::cerr << "Error: target chromosome not found in genetic map file" << std::endl;
+      good_ = false;
+      return;
+    }
+  } while (prev_rec_.chrom != target_chrom_);
+
+  if (!read_record(cur_rec_) || cur_rec_.chrom != target_chrom_)
+  {
+    std::cerr << "Error: only one record in map file matches target chromosome" << std::endl;
+    good_ = false;
+  }
+}
+
+float genetic_map_file::interpolate_centimorgan(std::size_t variant_pos)
+{
+  if (good_)
+  {
+    if (variant_pos < prev_rec_.pos)
+    {
+      auto basepair_cm = prev_rec_.map_value / double(prev_rec_.pos);
+      return float(double(variant_pos) * basepair_cm);
+    }
+
+    record temp_rec;
+    while (variant_pos >= cur_rec_.pos && read_record(temp_rec) && temp_rec.chrom == target_chrom_)
+    {
+      prev_rec_ = cur_rec_;
+      cur_rec_ = temp_rec;
+    }
+
+    assert(cur_rec_.pos != prev_rec_.pos); //TODO: handle gracefully
+    assert(cur_rec_.pos - prev_rec_.pos < cur_rec_.pos); //TODO: handle gracefully
+    auto basepair_cm = (cur_rec_.map_value - prev_rec_.map_value) / double(cur_rec_.pos - prev_rec_.pos);
+
+    if (variant_pos < cur_rec_.pos)
+    {
+      assert(variant_pos - prev_rec_.pos < variant_pos); //TODO: handle gracefully
+      return float(prev_rec_.map_value + double(variant_pos - prev_rec_.pos) * basepair_cm);
+    }
+
+    return float(cur_rec_.map_value + double(variant_pos - cur_rec_.pos) * basepair_cm); // Should we assume that basepair_cm is zero?
+  }
+
+  return std::numeric_limits<float>::quiet_NaN();;
+}
+
+bool genetic_map_file::read_record(record& entry)
+{
+  std::string discard;
+  if (new_format_)
+    ifs_ >> entry.chrom >> entry.pos >> entry.map_value;
+  else
+    ifs_ >> entry.chrom >> discard >> entry.map_value >> entry.pos;
+
+  if (!ifs_ || entry.chrom.empty())
+    return false;
+  return true;
+}
