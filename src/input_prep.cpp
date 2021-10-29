@@ -84,7 +84,7 @@ bool stat_ref_panel(const std::string& ref_file_path, std::string& chrom, std::u
   return false;
 }
 
-bool load_target_haplotypes(const std::string& file_path, const savvy::genomic_region& reg, float error_param, float recom_min, std::vector<target_variant>& target_sites, std::vector<std::string>& sample_ids)
+bool load_target_haplotypes(const std::string& file_path, const savvy::genomic_region& reg, std::vector<target_variant>& target_sites, std::vector<std::string>& sample_ids)
 {
   savvy::reader input(file_path);
   if (!input)
@@ -95,6 +95,8 @@ bool load_target_haplotypes(const std::string& file_path, const savvy::genomic_r
   if (!input)
     return std::cerr << "Error: cannot query region (" << reg.chromosome() << ":" << reg.from() << "-" << reg.to() << ") from target file. Target file must be indexed.\n", false;
 
+  const auto nan = std::numeric_limits<float>::quiet_NaN();
+
   savvy::variant var;
   std::vector<std::int8_t> tmp_geno;
   while (input >> var)
@@ -103,7 +105,7 @@ bool load_target_haplotypes(const std::string& file_path, const savvy::genomic_r
     for (std::size_t i = 0; i < var.alts().size(); ++i)
     {
       std::size_t allele_idx = i + 1;
-      target_sites.push_back({var.chromosome(), var.position(), var.ref(), var.alts()[i], true, false, std::numeric_limits<float>::quiet_NaN(), error_param, recom_min, {}});
+      target_sites.push_back({var.chromosome(), var.position(), var.ref(), var.alts()[i], true, false, nan, nan, nan, {}});
       if (var.alts().size() == 1)
         tmp_geno.swap(target_sites.back().gt);
       else
@@ -302,6 +304,50 @@ std::vector<target_variant> separate_target_only_variants(std::vector<target_var
 
   target_sites.resize(shift_idx);
   return target_only_sites;
+}
+
+bool load_variant_hmm_params(std::vector<target_variant>& tar_variants, reduced_haplotypes& typed_only_reference_data, float default_error_param, float recom_min, const std::string& map_file_path)
+{
+  assert(tar_variants.size() == typed_only_reference_data.variant_size());
+  auto tar_var_it = tar_variants.begin();
+  auto tar_var_end = tar_variants.cend();
+  if (tar_var_it == tar_var_end)
+    return false;
+
+  if (!map_file_path.empty())
+  {
+    genetic_map_file map_file(map_file_path, tar_var_it->chrom);
+    if (!map_file)
+      return std::cerr << "Error: could not open genetic map file\n", false;
+
+    typed_only_reference_data.fill_cm(map_file);
+  }
+
+  const auto ref_var_end = typed_only_reference_data.end();
+  for (auto ref_var_it = typed_only_reference_data.begin(); ref_var_it != ref_var_end; )
+  {
+    tar_var_it->err = std::isnan(ref_var_it->err) ? default_error_param : ref_var_it->err;
+
+    auto prev_ref_var_it = ref_var_it++;
+    if (ref_var_it == ref_var_end)
+      (tar_var_it++)->recom = 0.f; // Last recom prob must be zero so that the first step of backward traversal will have no recombination.
+    else
+    {
+      if (ref_var_it->pos == prev_ref_var_it->pos)
+        (tar_var_it++)->recom = 0.f;
+      else
+      {
+        float delta = (ref_var_it->cm - prev_ref_var_it->cm);
+        //float recom = std::max(0.01f * delta, recom_min);
+        float recom = std::isnan(delta) ? recom_min : std::max<float>((1. - std::exp(-delta/50.))/2., recom_min);
+        (tar_var_it++)->recom = recom;
+      }
+    }
+  }
+
+  assert(tar_var_it == tar_var_end);
+
+  return true;
 }
 
 std::vector<std::vector<std::vector<std::size_t>>> generate_reverse_maps(const reduced_haplotypes& typed_only_reference_data)

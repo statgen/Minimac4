@@ -483,6 +483,12 @@ void reduced_haplotypes::append_block(const unique_haplotype_block& block)
   blocks_.push_back(block);
 }
 
+void reduced_haplotypes::fill_cm(genetic_map_file& map_file)
+{
+  for (auto it = blocks_.begin(); it != blocks_.end(); ++it)
+    it->fill_cm(map_file);
+}
+
 float reduced_haplotypes::compression_ratio() const
 {
   float num = 0.f, denom = 0.f;

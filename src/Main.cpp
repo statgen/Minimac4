@@ -46,7 +46,7 @@ public:
     std::time_t start_time = std::time(nullptr);
     std::vector<std::string> sample_ids;
     std::vector<target_variant> target_sites;
-    load_target_haplotypes(args.tar_path(), extended_region, args.error_param(), args.min_recom(), target_sites, sample_ids);
+    load_target_haplotypes(args.tar_path(), extended_region, target_sites, sample_ids);
     std::cerr << "Loading target haplotypes took " << record_input_time(std::difftime(std::time(nullptr), start_time)) << " seconds" << std::endl;
 
     std::cerr << "Loading reference haplotypes ..." << std::endl;
@@ -95,14 +95,11 @@ public:
       if (target_sites.empty())
         return std::cerr << "Error: no target variants\n", false;
 
-      target_sites.back().recom = 0.f; // Last recom prob must be zero so that the first step of backward traversal will have no recombination.
-      if (args.map_path().size())
-      {
-        start_time = std::time(nullptr);
-        if (!recombination::parse_map_file(args.map_path(), target_sites, args.min_recom()))
-          return std::cerr << "Error: parsing map file failed\n", false;
-        std::cerr << "Loading switch probabilities took " << record_input_time(std::difftime(std::time(nullptr), start_time)) << " seconds" << std::endl;
-      }
+      std::cerr << "Loading switch probabilities ..." << std::endl;
+      start_time = std::time(nullptr);
+      if (!load_variant_hmm_params(target_sites, typed_only_reference_data, args.error_param(), args.min_recom(), args.map_path()))
+        return std::cerr << "Error: parsing map file failed\n", false;
+      std::cerr << "Loading switch probabilities took " << record_input_time(std::difftime(std::time(nullptr), start_time)) << " seconds" << std::endl;
 
       auto reverse_maps = generate_reverse_maps(typed_only_reference_data);
 
