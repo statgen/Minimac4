@@ -146,6 +146,12 @@ void unique_haplotype_block::pop_variant()
   variants_.pop_back();
 }
 
+void unique_haplotype_block::fill_cm(genetic_map_file& map_file)
+{
+  for (auto it = variants_.begin(); it != variants_.end(); ++it)
+    it->cm = map_file.interpolate_centimorgan(it->pos);
+}
+
 bool unique_haplotype_block::serialize(savvy::writer& output_file)
 {
   savvy::variant var;

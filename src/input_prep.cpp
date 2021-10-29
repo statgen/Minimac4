@@ -328,7 +328,7 @@ std::vector<std::vector<std::vector<std::size_t>>> generate_reverse_maps(const r
   return reverse_maps;
 }
 
-bool convert_old_m3vcf(const std::string& input_path, const std::string& output_path)
+bool convert_old_m3vcf(const std::string& input_path, const std::string& output_path, const std::string& map_file_path)
 {
   std::vector<std::pair<std::string, std::string>> headers;
   std::vector<std::string> ids;
@@ -431,11 +431,22 @@ bool convert_old_m3vcf(const std::string& input_path, const std::string& output_
 
   std::size_t block_cnt = 0;
 
+  std::unique_ptr<genetic_map_file> map_file;
+  if (!map_file_path.empty() && !block.variants().empty())
+  {
+    map_file.reset(new genetic_map_file(map_file_path, block.variants()[0].chrom));
+    if (!map_file->good())
+      return std::cerr << "Error: could not open map file\n", false;
+  }
+
   std::vector<std::int8_t> tmp_geno;
   do
   {
     if (block.variants().empty())
       break;
+
+    if (map_file)
+      block.fill_cm(*map_file);
 
     if (!block.serialize(output_file))
       return false;

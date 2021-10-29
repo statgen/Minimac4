@@ -23,7 +23,7 @@ std::vector<target_variant> separate_target_only_variants(std::vector<target_var
 
 std::vector<std::vector<std::vector<std::size_t>>> generate_reverse_maps(const reduced_haplotypes& typed_only_reference_data);
 
-bool convert_old_m3vcf(const std::string& input_path, const std::string& output_path);
+bool convert_old_m3vcf(const std::string& input_path, const std::string& output_path, const std::string& map_file_path = "");
 
 
 #endif // MINIMAC4_INPUT_PREP_HPP
