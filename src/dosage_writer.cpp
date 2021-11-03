@@ -115,26 +115,26 @@ bool dosage_writer::sites_match(const target_variant& t, const reference_site_in
   return t.pos == r.pos && t.alt == r.alt && t.ref == r.ref;
 }
 
-bool dosage_writer::merge_temp_files(std::list<std::string>& temp_file_paths, std::list<std::string>& temp_emp_file_paths)
-{
-  std::list<savvy::reader> temp_files(temp_file_paths.begin(), temp_file_paths.end());
-  std::list<savvy::reader> temp_emp_files(temp_emp_file_paths.begin(), temp_emp_file_paths.end());
-  std::for_each(temp_file_paths.begin(), temp_file_paths.end(), [](std::string&s) { std::remove(s.c_str()); });
-  std::for_each(temp_emp_file_paths.begin(), temp_emp_file_paths.end(), [](std::string&s) { std::remove(s.c_str()); });
-  return merge_temp_files(temp_files, temp_emp_files);
-}
+//bool dosage_writer::merge_temp_files(std::list<std::string>& temp_file_paths, std::list<std::string>& temp_emp_file_paths)
+//{
+//  std::list<savvy::reader> temp_files(temp_file_paths.begin(), temp_file_paths.end());
+//  std::list<savvy::reader> temp_emp_files(temp_emp_file_paths.begin(), temp_emp_file_paths.end());
+//  std::for_each(temp_file_paths.begin(), temp_file_paths.end(), [](std::string&s) { std::remove(s.c_str()); });
+//  std::for_each(temp_emp_file_paths.begin(), temp_emp_file_paths.end(), [](std::string&s) { std::remove(s.c_str()); });
+//  return merge_temp_files(temp_files, temp_emp_files);
+//}
 
 bool dosage_writer::merge_temp_files(std::list<savvy::reader>& temp_files, std::list<savvy::reader>& temp_emp_files)
 {
   if (temp_files.empty())
     return false;
-#if 0 // For when temp file readers are created before fully written.
+
   for (auto it = temp_files.begin(); it != temp_files.end(); ++it)
     it->reset_bounds(savvy::slice_bounds(0));
 
   for (auto it = temp_emp_files.begin(); it != temp_emp_files.end(); ++it)
     it->reset_bounds(savvy::slice_bounds(0));
-#endif
+
   savvy::variant out_var;
   savvy::variant out_var_emp;
   savvy::compressed_vector<float> pasted_hds;

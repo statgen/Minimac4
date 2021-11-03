@@ -62,10 +62,10 @@ public:
     double impute_time = 0.;
     double temp_write_time = 0.;
 
-    //  std::list<savvy::reader> temp_files;
-    //  std::list<savvy::reader> temp_emp_files;
-    std::list<std::string> temp_files;
-    std::list<std::string> temp_emp_files;
+      std::list<savvy::reader> temp_files;
+      std::list<savvy::reader> temp_emp_files;
+//    std::list<std::string> temp_files;
+//    std::list<std::string> temp_emp_files;
     full_dosages_results hmm_results;
 
     if (full_reference_data.variant_size() == 0)
@@ -168,14 +168,14 @@ public:
 
           temp_files.emplace_back(out_path);
           ::close(tmp_fd);
-          // std::remove(out_path.c_str()); // TODO: update savvy to indices to use FILE*
+          std::remove(out_path.c_str());
           assert(tmp_fd > 0);
 
           if (out_emp_path.size())
           {
             temp_emp_files.emplace_back(out_emp_path);
             ::close(tmp_emp_fd);
-            // std::remove(out_emp_path.c_str()); // TODO: update savvy to indices to use FILE*
+            std::remove(out_emp_path.c_str());
             assert(tmp_emp_fd > 0);
           }
 
