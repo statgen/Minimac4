@@ -474,13 +474,17 @@ void reduced_haplotypes::append_block(const unique_haplotype_block& block)
       blocks_.back().pop_variant();
       --variant_count_;
       if (blocks_.back().variant_size() == 0)
+      {
         blocks_.pop_back();
+        block_offsets_.pop_back();
+      }
     }
   }
 
   block_offsets_.push_back(variant_count_);
   variant_count_ += block.variants().size();
   blocks_.push_back(block);
+  assert(blocks_.size() == block_offsets_.size());
 }
 
 void reduced_haplotypes::fill_cm(genetic_map_file& map_file)
