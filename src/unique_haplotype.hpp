@@ -48,6 +48,7 @@ private:
   std::size_t variant_count_ = 0;
   std::size_t min_block_size_ = 1;
   std::size_t max_block_size_ = std::numeric_limits<std::size_t>::max();
+  bool flush_block_ = true;
 public:
   class iterator
   {

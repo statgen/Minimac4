@@ -418,8 +418,6 @@ bool unique_haplotype_block::deserialize(std::istream& is, int m3vcf_version, st
 
 reduced_haplotypes::reduced_haplotypes(std::size_t min_block_size, std::size_t max_block_size)
 {
-  blocks_.emplace_back();
-  block_offsets_.emplace_back(0);
   min_block_size_ = std::max(std::size_t(1), min_block_size);
   max_block_size_ = std::max(std::size_t(1), max_block_size);
 }
@@ -431,12 +429,14 @@ bool reduced_haplotypes::compress_variant(const reference_site_info& site_info, 
       return float(b.expanded_haplotype_size() + b.unique_haplotype_size() * b.variant_size()) / float(b.expanded_haplotype_size() * b.variant_size());
     };
 
-  if (flush_block && variant_count_)
+  if (flush_block)
+    flush_block_ = true;
+
+  if (flush_block_)
   {
-    float cr = comp_ratio(blocks_.back());
-    block_offsets_.push_back(block_offsets_.back() + blocks_.back().variant_size());
+    flush_block_ = false;
+    block_offsets_.push_back(variant_count_);
     blocks_.emplace_back();
-    return blocks_.back().compress_variant(site_info, alleles);
   }
 
   float old_cr = comp_ratio(blocks_.back());
@@ -449,15 +449,8 @@ bool reduced_haplotypes::compress_variant(const reference_site_info& site_info, 
   {
     float new_cr = comp_ratio(blocks_.back());
     if (new_cr > old_cr)
-    {
-      blocks_.emplace_back();
-      block_offsets_.push_back(block_offsets_.back() + cnt);
-      //std::cerr << "compression old/new: " << old_cr << " / " << new_cr << std::endl;
-      return ret;
-    }
+      flush_block_ = true;
   }
-
-  //std::cerr << "compression old: " << old_cr << std::endl;
 
   return ret;
 }
