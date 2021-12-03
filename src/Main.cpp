@@ -46,14 +46,16 @@ public:
     std::time_t start_time = std::time(nullptr);
     std::vector<std::string> sample_ids;
     std::vector<target_variant> target_sites;
-    load_target_haplotypes(args.tar_path(), extended_region, target_sites, sample_ids);
+    if (!load_target_haplotypes(args.tar_path(), extended_region, target_sites, sample_ids))
+      return std::cerr << "Error: failed loading target haplotypes\n", false;
     std::cerr << "Loading target haplotypes took " << record_input_time(std::difftime(std::time(nullptr), start_time)) << " seconds" << std::endl;
 
     std::cerr << "Loading reference haplotypes ..." << std::endl;
     start_time = std::time(nullptr);
     reduced_haplotypes typed_only_reference_data(16, 512);
     reduced_haplotypes full_reference_data;
-    load_reference_haplotypes(args.ref_path(), extended_region, impute_region, args.sample_ids(), target_sites, typed_only_reference_data, full_reference_data);
+    if (!load_reference_haplotypes(args.ref_path(), extended_region, impute_region, args.sample_ids(), target_sites, typed_only_reference_data, full_reference_data))
+      return std::cerr << "Error: failed loading reference haplotypes\n", false;
     std::cerr << "Loading reference haplotypes took " << record_input_time(std::difftime(std::time(nullptr), start_time)) << " seconds" << std::endl;
 
 
