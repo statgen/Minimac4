@@ -1,2 +1,2 @@
-statgen/savvy@33ae0c1167de2f6f2f96d9f90641755c3f923af2
+statgen/savvy@bd0d77d90e0393e082a45bdcb919aca7d29cef45
 jonathonl/omp@275d6a4b69d6a3bdf54df6d32ad77bc3e2cd1297
