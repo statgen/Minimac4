@@ -336,6 +336,13 @@ bool dosage_writer::write_dosages(const full_dosages_results& hmm_results, const
       set_info_fields(out_var, sparse_dosages, {}, observed);
       if (has_good_r2(out_var))
       {
+        if (sites_out_file_)
+        {
+          savvy::variant site_var;
+          dynamic_cast<savvy::site_info&>(site_var) = out_var;
+          sites_out_file_->write(site_var);
+        }
+
         set_format_fields(out_var, sparse_dosages);
         out_file_ << out_var;
       }
@@ -401,6 +408,13 @@ bool dosage_writer::write_dosages(const full_dosages_results& hmm_results, const
     set_info_fields(out_var, sparse_dosages, {}, observed);
     if (has_good_r2(out_var))
     {
+      if (sites_out_file_)
+      {
+        savvy::variant site_var;
+        dynamic_cast<savvy::site_info&>(site_var) = out_var;
+        sites_out_file_->write(site_var);
+      }
+
       set_format_fields(out_var, sparse_dosages);
       out_file_ << out_var;
     }
