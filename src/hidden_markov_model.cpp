@@ -453,7 +453,7 @@ void hidden_markov_model::s3_to_s1_probs(
   best_s1_haps_.clear();
   best_s1_probs_.clear();
   std::size_t n_templates = left_junction_proportions.size();
-  float denorm_threshold = prob_sum * (1.f / n_templates);
+  float denorm_threshold = prob_sum * std::min(prob_threshold_, 1.f / n_templates);
   for (std::size_t i = 0; i < best_s3_haps_.size(); ++i)
   {
     std::size_t uniq_idx = best_s3_haps_[i];
