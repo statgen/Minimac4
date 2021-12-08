@@ -360,9 +360,11 @@ bool dosage_writer::write_dosages(const full_dosages_results& hmm_results, const
     //      }
 
     out_var = savvy::site_info(ref_it->chrom, ref_it->pos, ref_it->ref, {ref_it->alt}, ""/*ref_var.id()*/); // TODO: ID
+    assert(!std::isnan(hmm_results.dosages_[i][0]));
     sparse_dosages.assign(hmm_results.dosages_[i].begin(), hmm_results.dosages_[i].end());
     if (ref_matches_tar)
     {
+      assert(!std::isnan(hmm_results.loo_dosages_[tar_it - tar_variants.begin()][0]));
       std::vector<std::int8_t> observed(tar_it->gt.begin() + observed_range.first, tar_it->gt.begin() + observed_range.second);
       set_info_fields(out_var, sparse_dosages, hmm_results.loo_dosages_[tar_it - tar_variants.begin()], observed); // TODO: do not store loo_dosages outside impute region.
 

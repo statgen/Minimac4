@@ -664,4 +664,11 @@ void hidden_markov_model::impute(double& prob_sum, std::size_t& prev_best_typed_
       output.dosage(full_ref_ritr.global_idx(), out_column) = float(std::int16_t(p_alt * bin_scalar_ + 0.5f)) / bin_scalar_;
     }
   }
+
+  if (full_ref_ritr != full_ref_rend && sites_match(tar_variants[row], *full_ref_ritr))
+  {
+    output.dosage(full_ref_ritr.global_idx(), out_column) = typed_dose;
+    output.loo_dosage(row, out_column) = typed_loo_dose;
+    --full_ref_ritr;
+  }
 }
