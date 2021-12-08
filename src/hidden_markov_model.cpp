@@ -326,30 +326,7 @@ void hidden_markov_model::impute_typed_site(double& prob_sum, std::size_t& prev_
   assert(left_probs.size() == right_probs.size());
   float p_alt = 0.f;
 
-#ifndef NDEBUG
-  std::vector<float> probs(constants.size());
-  for (std::size_t i = 0; i < constants.size(); ++i)
-  {
-    float lr = left_probs[i] - left_probs_norecom[i];
-    float rr = right_probs[i] - right_probs_norecom[i];
-    std::size_t n = reverse_map[i].size();
-    float broken = constants[i] * left_probs_norecom[i] * right_probs_norecom[i] + (left_probs[i] * right_probs[i] - left_probs_norecom[i] * right_probs_norecom[i]) / reverse_map[i].size();
-    probs[i] = broken;
-    // assert(left_probs[i] * right_probs[i] - left_probs_norecom[i] * right_probs_norecom[i] >= 0.f);
-//    float fixed = constants[i] * left_probs_norecom[i] * right_probs_norecom[i] + ((left_probs_norecom[i] * rr + right_probs_norecom[i] * lr + (lr * rr) / n) / n);
-//    probs[i] = fixed;
-  }
-
-  float sum = std::accumulate(probs.begin(), probs.end(), 0.f);
-  float d = std::abs(sum - prob_sum);
-  if (d > 0.1)
-  {
-    auto a = 0;
-  }
-  sum = prob_sum;
-#else
   float sum = prob_sum;
-#endif
 
   float denorm_threshold = prob_threshold_ * sum;
 
@@ -359,16 +336,14 @@ void hidden_markov_model::impute_typed_site(double& prob_sum, std::size_t& prev_
     float lr = left_probs[i] - left_probs_norecom[i];
     float rr = right_probs[i] - right_probs_norecom[i];
     float n = reverse_map[i].size();
-    float broken = constants[i] * left_probs_norecom[i] * right_probs_norecom[i] + (left_probs[i] * right_probs[i] - left_probs_norecom[i] * right_probs_norecom[i]) / reverse_map[i].size();
-    // float fixed = constants[i] * left_probs_norecom[i] * right_probs_norecom[i] + ((left_probs_norecom[i] * rr + right_probs_norecom[i] * lr + (lr * rr) / n) / n);
-    float fixed = broken;
-    fixed /= sum;
-    if (fixed > (1.f - prob_threshold_))
+    float prob = constants[i] * left_probs_norecom[i] * right_probs_norecom[i] + (left_probs[i] * right_probs[i] - left_probs_norecom[i] * right_probs_norecom[i]) / reverse_map[i].size();
+    prob /= sum;
+    if (prob > (1.f - prob_threshold_))
     {
-      best_unique_probs.push_back(fixed);
+      best_unique_probs.push_back(prob);
       best_unique_haps.push_back(i);
       if (template_haps[i])
-        p_alt = std::min(1.f, std::max(0.f, fixed)); // TODO: + (1. - p_alt) * AF_other to support larger thresholds
+        p_alt = std::min(1.f, std::max(0.f, prob)); // TODO: + (1. - p_alt) * AF_other to support larger thresholds
     }
   }
 
@@ -383,21 +358,17 @@ void hidden_markov_model::impute_typed_site(double& prob_sum, std::size_t& prev_
         float lr = left_probs[i] - left_probs_norecom[i];
         float rr = right_probs[i] - right_probs_norecom[i];
         float n = reverse_map[i].size();
-        // double broken = double(constants[i]) * double(left_probs_norecom[i]) * double(right_probs_norecom[i]) + (double(left_probs[i]) * double(right_probs[i]) - double(left_probs_norecom[i]) * double(right_probs_norecom[i])) / reverse_map[i].size();
-        // assert(left_probs[i] * right_probs[i] - left_probs_norecom[i] * right_probs_norecom[i] >= 0.f);
-        float broken = constants[i] * left_probs_norecom[i] * right_probs_norecom[i] + (left_probs[i] * right_probs[i] - left_probs_norecom[i] * right_probs_norecom[i]) / reverse_map[i].size();
-        // float fixed = constants[i] * left_probs_norecom[i] * right_probs_norecom[i] + ((left_probs_norecom[i] * rr + right_probs_norecom[i] * lr + (lr * rr) / n) / n);
-        float fixed = broken;
+        float prob = constants[i] * left_probs_norecom[i] * right_probs_norecom[i] + (left_probs[i] * right_probs[i] - left_probs_norecom[i] * right_probs_norecom[i]) / n;
         if (template_haps[i])
-          p_alt += fixed;
+          p_alt += prob;
         else
-          p_ref += fixed;
+          p_ref += prob;
 
-        if (fixed > denorm_threshold_l)
+        if (prob > denorm_threshold_l)
         {
-          best_unique_probs.push_back(fixed / sum);
+          best_unique_probs.push_back(prob / sum);
           best_unique_haps.push_back(i);
-          assert(fixed / sum > prob_threshold_); // TODO: remove since rounding error could make this assert fail.
+          assert(prob / sum > prob_threshold_); // TODO: remove since rounding error could make this assert fail.
         }
       }
       prob_sum = sum = p_alt + p_ref;
