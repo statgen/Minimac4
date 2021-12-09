@@ -34,6 +34,7 @@ private:
   float min_r2_ = -1.f;
   float min_ratio_ = 1e-5f;
   float prob_threshold_ = 0.01f;
+  float prob_threshold_s1_ = -1.f;
   float diff_threshold_ = 0.01f;
   float min_recom_ = 1e-5f;
   float error_param_ = 0.01f;
@@ -66,6 +67,7 @@ public:
   float min_r2() const { return min_r2_; }
   float min_ratio() const { return min_ratio_; }
   float prob_threshold() const { return prob_threshold_; }
+  float prob_threshold_s1() const { return prob_threshold_s1_; }
   float diff_threshold() const { return diff_threshold_; }
   float min_recom() const { return min_recom_; }
   float error_param() const { return error_param_; }
@@ -97,6 +99,7 @@ public:
         {"match-error", required_argument, 0, '\x02', "Error parameter for HMM match probabilities (default: 0.01)"},
         {"min-recom", required_argument, 0, '\x02', "Minimum recombination probability (default: 0.00001)"},
         {"prob-threshold", required_argument, 0, '\x02', "Probability threshold used for template selection"},
+        {"prob-threshold-s1", required_argument, 0, '\x02', ""}, // "Probability threshold used for template selection in original state space"},
         {"diff-threshold", required_argument, 0, '\x02', "Probability diff threshold used in template selection"},
         {"sample-ids", required_argument, 0, '\x02', "Comma-separated list of sample IDs to subset from reference panel"},
         {"sample-ids-file", required_argument, 0, '\x02', "Text file containing sample IDs to subset from reference panel (one ID per line)"},
@@ -267,6 +270,11 @@ public:
           else if (long_opt_str == "prob-threshold")
           {
             prob_threshold_ = std::min(1., std::max(0., std::atof(optarg ? optarg : "")));
+            break;
+          }
+          else if (long_opt_str == "prob-threshold-s1")
+          {
+            prob_threshold_s1_ = std::min(1., std::atof(optarg ? optarg : ""));
             break;
           }
           else if (long_opt_str == "diff-threshold")

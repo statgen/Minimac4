@@ -8,8 +8,9 @@
 constexpr float hidden_markov_model::jump_fix;
 constexpr float hidden_markov_model::jump_threshold;
 
-hidden_markov_model::hidden_markov_model(float prob_threshold, float diff_threshold, float background_error) :
-  prob_threshold_(prob_threshold),
+hidden_markov_model::hidden_markov_model(float s3_prob_threshold, float s1_prob_threshold, float diff_threshold, float background_error) :
+  prob_threshold_(s3_prob_threshold),
+  s1_prob_threshold_(s1_prob_threshold),
   diff_threshold_(diff_threshold),
   background_error_(background_error)
 {
@@ -424,7 +425,7 @@ void hidden_markov_model::s3_to_s1_probs(
   best_s1_haps_.clear();
   best_s1_probs_.clear();
   std::size_t n_templates = left_junction_proportions.size();
-  float denorm_threshold = prob_sum * std::min(prob_threshold_, 1.f / n_templates);
+  float denorm_threshold = prob_sum * std::min(prob_threshold_, s1_prob_threshold_ < 0.f ? 1.f / n_templates : s1_prob_threshold_);
   for (std::size_t i = 0; i < best_s3_haps_.size(); ++i)
   {
     std::size_t uniq_idx = best_s3_haps_[i];
