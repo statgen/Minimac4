@@ -25,9 +25,9 @@ public:
 public:
   static bool parse_map_file(const std::string& map_file_path, std::vector<target_variant>& sites, float recom_min);
   static double haldane(double cm) { return (1. - std::exp(-cm/50.))/2.;}
-  static double modified_haldane(double cm) { return (1. - std::exp(-cm/100.))/1.;}
+  static double cm_to_switch_prob(double cm) { return 1. - std::exp(-cm/100.);}
   static double haldane_inverse(double recom_prob) { return 50. * std::log(1. / (1. - 2. * recom_prob)); }
-  static double modified_haldane_inverse(double recom_prob) { return 100. * std::log(1. / (1. - 1. * recom_prob)); }
+  static double switch_prob_to_cm(double recom_prob) { return 100. * std::log(1. / (1. - recom_prob)); }
 private:
   static bool read_entry(std::istream& ifs, map_file_line& entry, bool new_format);
 };

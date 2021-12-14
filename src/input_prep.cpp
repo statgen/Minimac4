@@ -153,6 +153,7 @@ bool load_reference_haplotypes(const std::string& file_path,
     if (!input.read(var))
       return std::cerr << "Notice: no variant records in reference query region (" << extended_reg.chromosome() << ":" << extended_reg.from() << "-" << extended_reg.to() << ")\n", input.bad() ? false : true;
 
+    double start_cm = 0.;
     std::vector<std::int8_t> tmp_geno;
     unique_haplotype_block block;
     auto tar_it = target_sites.begin();
@@ -161,6 +162,8 @@ bool load_reference_haplotypes(const std::string& file_path,
     {
       if (block.variants().empty() || block.variants().front().pos > extended_reg.to())
         break;
+
+      block.fill_cm_from_recom(start_cm);
 
       for (auto ref_it = block.variants().begin(); ref_it != block.variants().end(); ++ref_it)
       {
@@ -175,7 +178,7 @@ bool load_reference_haplotypes(const std::string& file_path,
             for (std::size_t i = 0; i < tmp_geno.size(); ++i)
               tmp_geno[i] = ref_it->gt[block.unique_map()[i]];
 
-            typed_only_reference_data.compress_variant({ref_it->chrom, ref_it->pos, ref_it->ref, ref_it->alt, ref_it->err, ref_it->cm}, tmp_geno);
+            typed_only_reference_data.compress_variant({ref_it->chrom, ref_it->pos, ref_it->ref, ref_it->alt, ref_it->err, ref_it->recom, ref_it->cm}, tmp_geno);
 
             it->af = std::accumulate(tmp_geno.begin(), tmp_geno.end(), 0.f) / tmp_geno.size();
             it->af = float((--typed_only_reference_data.end())->ac) / tmp_geno.size();
@@ -194,6 +197,202 @@ bool load_reference_haplotypes(const std::string& file_path,
       if (!block.variants().empty())
         full_reference_data.append_block(block);
     }
+
+    if (res < 0)
+      return false;
+
+
+    return !input.bad();
+  }
+  else
+  {
+    shrinkwrap::gz::istream input_file(file_path);
+    std::string line;
+
+    std::uint8_t m3vcf_version = 0;
+    const std::string m3vcf_version_line = "##fileformat=M3VCF";
+    while (std::getline(input_file, line))
+    {
+      if (line.substr(0, m3vcf_version_line.size()) == m3vcf_version_line)
+      {
+        if (line == "##fileformat=M3VCFv2.0")
+          m3vcf_version = 2;
+        else
+          m3vcf_version = 1;
+        break;
+      }
+
+      if (line.size() < 2 || line[1] != '#')
+      {
+        std::cerr << "Error: invalid reference file" << std::endl;
+        return false;
+      }
+    }
+
+    std::size_t n_samples = 0;
+    while (std::getline(input_file, line))
+    {
+      if (line.size() < 2 || line[1] != '#')
+      {
+        n_samples = std::count(line.begin(), line.end(), '\t') - 8;
+        break;
+      }
+    }
+
+    double start_cm = 0.;
+    auto tar_it = target_sites.begin();
+    unique_haplotype_block block;
+    std::vector<std::int8_t> tmp_geno;
+    while (block.deserialize(input_file, m3vcf_version, m3vcf_version == 1 ? n_samples : 2 * n_samples))
+    {
+      if (block.variants().empty() || block.variants().front().pos > extended_reg.to())
+        break;
+
+      block.fill_cm_from_recom(start_cm);
+
+      for (auto ref_it = block.variants().begin(); ref_it != block.variants().end(); ++ref_it)
+      {
+        while (tar_it != target_sites.end() && tar_it->pos < ref_it->pos)
+          ++tar_it;
+
+        for (auto it = tar_it; it != target_sites.end() && it->pos == ref_it->pos; ++it)
+        {
+          if (it->ref == ref_it->ref && it->alt == ref_it->alt)
+          {
+            tmp_geno.resize(block.unique_map().size());
+            for (std::size_t i = 0; i < tmp_geno.size(); ++i)
+              tmp_geno[i] = ref_it->gt[block.unique_map()[i]];
+
+            typed_only_reference_data.compress_variant({ref_it->chrom, ref_it->pos, ref_it->ref, ref_it->alt, ref_it->err, ref_it->recom, ref_it->cm}, tmp_geno);
+
+            it->af = std::accumulate(tmp_geno.begin(), tmp_geno.end(), 0.f) / tmp_geno.size();
+            it->af = float((--typed_only_reference_data.end())->ac) / tmp_geno.size();
+            it->in_ref = true;
+
+            if (it != tar_it)
+              std::swap(*it, *tar_it);
+
+            ++tar_it;
+            break;
+          }
+        }
+      }
+
+      block.trim(impute_reg.from(), impute_reg.to());
+      if (!block.variants().empty())
+        full_reference_data.append_block(block);
+    }
+  }
+
+  return !input.bad();
+}
+
+// Old approach to setting recombination probs.
+// saving this to compare with new appraoch.
+bool load_reference_haplotypes_old_recom_approach(const std::string& file_path,
+  const savvy::genomic_region& extended_reg,
+  const savvy::genomic_region& impute_reg,
+  const std::unordered_set<std::string>& subset_ids,
+  std::vector<target_variant>& target_sites,
+  reduced_haplotypes& typed_only_reference_data,
+  reduced_haplotypes& full_reference_data,
+  genetic_map_file* map_file)
+{
+  savvy::reader input(file_path);
+
+  if (input)
+  {
+    if (!input.reset_bounds(extended_reg, savvy::bounding_point::any))
+      return std::cerr << "Error: reference file must be indexed MVCF\n", false;
+
+    bool is_m3vcf_v3 = false;
+    for (auto it = input.headers().begin(); !is_m3vcf_v3 && it != input.headers().end(); ++it)
+    {
+      if (it->first == "subfileformat" && (it->second == "M3VCFv3.0" || it->second == "MVCFv3.0"))
+        is_m3vcf_v3 = true;
+    }
+
+    if (!is_m3vcf_v3)
+      return std::cerr << "Error: reference file must be an MVCF\n", false;
+
+    if (subset_ids.size() && input.subset_samples(subset_ids).empty())
+      return std::cerr << "Error: no reference samples overlap subset IDs\n", false;
+
+    savvy::variant var;
+    if (!input.read(var))
+      return std::cerr << "Notice: no variant records in reference query region (" << extended_reg.chromosome() << ":" << extended_reg.from() << "-" << extended_reg.to() << ")\n", input.bad() ? false : true;
+
+    std::size_t ref_read_cnt = 0;
+    float prev_recom = 0.f;
+    double prev_cm = 0.;
+    double no_recom_prob = 1.;
+    auto recom_it = target_sites.end();
+    std::vector<std::int8_t> tmp_geno;
+    unique_haplotype_block block;
+    auto tar_it = target_sites.begin();
+    int res;
+    while ((res = block.deserialize(input, var)) > 0)
+    {
+      if (block.variants().empty() || block.variants().front().pos > extended_reg.to())
+        break;
+
+      for (auto ref_it = block.variants().begin(); ref_it != block.variants().end(); ++ref_it)
+      {
+        while (tar_it != target_sites.end() && tar_it->pos < ref_it->pos)
+          ++tar_it;
+
+        for (auto it = tar_it; it != target_sites.end() && it->pos == ref_it->pos; ++it)
+        {
+          if (it->ref == ref_it->ref && it->alt == ref_it->alt)
+          {
+            if (recom_it != target_sites.end())
+            {
+              if (recom_it->pos != ref_it->pos)
+              {
+                recom_it->recom = std::max(1. - no_recom_prob, 1e-5);
+                no_recom_prob = 1.;
+              }
+            }
+
+            tmp_geno.resize(block.unique_map().size());
+            for (std::size_t i = 0; i < tmp_geno.size(); ++i)
+              tmp_geno[i] = ref_it->gt[block.unique_map()[i]];
+
+            typed_only_reference_data.compress_variant({ref_it->chrom, ref_it->pos, ref_it->ref, ref_it->alt, ref_it->err, ref_it->recom, ref_it->cm}, tmp_geno);
+
+            it->af = std::accumulate(tmp_geno.begin(), tmp_geno.end(), 0.f) / tmp_geno.size();
+            it->af = float((--typed_only_reference_data.end())->ac) / tmp_geno.size();
+            it->in_ref = true;
+
+            if (it != tar_it)
+              std::swap(*it, *tar_it);
+
+            no_recom_prob = 1.;
+            recom_it = tar_it;
+            ++tar_it;
+            break;
+          }
+        }
+
+        if (map_file)
+        {
+          double cm = map_file->interpolate_centimorgan(ref_it->pos);
+          prev_recom = recombination::cm_to_switch_prob(cm - prev_cm);
+          prev_cm = cm;
+        }
+        if (ref_read_cnt)
+          no_recom_prob *= 1. - prev_recom; //std::max(prev_recom, 1e-5f); // TODO: cm -> recom
+        prev_recom = ref_it->cm; // TODO: cm -> recom
+        ++ref_read_cnt;
+      }
+
+      block.trim(impute_reg.from(), impute_reg.to());
+      if (!block.variants().empty())
+        full_reference_data.append_block(block);
+    }
+
+    assert(recom_it != target_sites.end() && recom_it + 1 == target_sites.end());
+    recom_it->recom = 0.f;
 
     if (res < 0)
       return false;
@@ -257,7 +456,7 @@ bool load_reference_haplotypes(const std::string& file_path,
             for (std::size_t i = 0; i < tmp_geno.size(); ++i)
               tmp_geno[i] = ref_it->gt[block.unique_map()[i]];
 
-            typed_only_reference_data.compress_variant({ref_it->chrom, ref_it->pos, ref_it->ref, ref_it->alt, ref_it->err, ref_it->cm}, tmp_geno);
+            typed_only_reference_data.compress_variant({ref_it->chrom, ref_it->pos, ref_it->ref, ref_it->alt, ref_it->err, ref_it->recom, ref_it->cm}, tmp_geno);
 
             it->af = std::accumulate(tmp_geno.begin(), tmp_geno.end(), 0.f) / tmp_geno.size();
             it->af = float((--typed_only_reference_data.end())->ac) / tmp_geno.size();
@@ -327,6 +526,7 @@ bool load_variant_hmm_params(std::vector<target_variant>& tar_variants, reduced_
   for (auto ref_var_it = typed_only_reference_data.begin(); ref_var_it != ref_var_end; )
   {
     tar_var_it->err = std::isnan(ref_var_it->err) ? default_error_param : ref_var_it->err;
+//    ++tar_var_it; ++ref_var_it; continue;
 
     auto prev_ref_var_it = ref_var_it++;
     if (ref_var_it == ref_var_end)
@@ -339,7 +539,7 @@ bool load_variant_hmm_params(std::vector<target_variant>& tar_variants, reduced_
       {
         float delta = (ref_var_it->cm - prev_ref_var_it->cm);
         //float recom = std::max(0.01f * delta, recom_min);
-        float recom = std::isnan(delta) ? recom_min : std::max<float>((1. - std::exp(-delta/50.))/2., recom_min);
+        float recom = delta >= 0. ? std::max<float>(recombination::cm_to_switch_prob(delta), recom_min) : recom_min;
         (tar_var_it++)->recom = recom;
       }
     }
@@ -437,9 +637,10 @@ bool convert_old_m3vcf(const std::string& input_path, const std::string& output_
   headers.emplace_back("INFO", "<ID=AN,Number=1,Type=Float,Description=\"Total number of alleles in called genotypes\">");
   headers.emplace_back("INFO","<ID=REPS,Number=1,Type=Integer,Description=\"Number of distinct haplotypes in block\">");
   headers.emplace_back("INFO","<ID=VARIANTS,Number=1,Type=Integer,Description=\"Number of variants in block\">");
-  headers.emplace_back("INFO","<ID=ERR,Number=1,Type=Integer,Description=\"Error parameter for HMM\">");
-//  headers.emplace_back("INFO","<ID=RECOM,Number=1,Type=Integer,Description=\"Recombination probability\">");
-  headers.emplace_back("INFO","<ID=CM,Number=1,Type=Integer,Description=\"Centimorgan\">");
+  headers.emplace_back("INFO","<ID=ERR,Number=1,Type=Float,Description=\"Error parameter for HMM\">");
+  headers.emplace_back("INFO","<ID=RECOM,Number=1,Type=Float,Description=\"Recombination probability\">");
+  if (!map_file_path.empty())
+    headers.emplace_back("INFO","<ID=CM,Number=1,Type=Float,Description=\"Centimorgan\">");
   headers.emplace_back("INFO","<ID=END,Number=1,Type=Integer,Description=\"End position of record\">");
   headers.emplace_back("INFO","<ID=UHA,Number=.,Type=Integer,Description=\"Unique haplotype alleles\">");
   headers.emplace_back("FORMAT","<ID=UHM,Number=.,Type=Integer,Description=\"Unique haplotype mapping\">");

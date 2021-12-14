@@ -26,8 +26,9 @@ struct reference_site_info
   std::uint32_t pos = 0;
   std::string ref;
   std::string alt;
-  float cm = std::numeric_limits<float>::quiet_NaN();
   float err = std::numeric_limits<float>::quiet_NaN();
+  float recom = std::numeric_limits<float>::quiet_NaN();
+  double cm = std::numeric_limits<double>::quiet_NaN();
   //float recom = std::numeric_limits<float>::quiet_NaN();
 
   reference_site_info() {}
@@ -37,13 +38,15 @@ struct reference_site_info
     std::string _ref,
     std::string _alt,
     float _err,
-    float _cm)
+    float _recom,
+    double _cm)
     :
     chrom(std::move(_chrom)),
     pos(_pos),
     ref(std::move(_ref)),
     alt(std::move(_alt)),
     err(_err),
+    recom(_recom),
     cm(_cm)
   {
   }
@@ -58,11 +61,12 @@ struct reference_variant : public reference_site_info
     const std::string& _ref,
     const std::string& _alt,
     float _err,
-    float _cm,
+    float _recom,
+    double _cm,
     std::size_t _ac,
     std::vector<std::int8_t> _gt)
     :
-    reference_site_info(_chrom, _pos, _ref, _alt, _err, _cm),
+    reference_site_info(_chrom, _pos, _ref, _alt, _err, _recom, _cm),
     ac(_ac),
     gt(std::move(_gt))
   {
@@ -80,11 +84,12 @@ struct sparse_ref_variant : public reference_site_info
     const std::string& _ref,
     const std::string& _alt,
     float _err,
-    float _cm,
+    float _recom,
+    double _cm,
     std::size_t _ac,
     const std::size_t* off_it, const std::size_t* off_it_end)
     :
-    reference_site_info(_chrom, _pos, _ref, _alt, _err, _cm),
+    reference_site_info(_chrom, _pos, _ref, _alt, _err, _recom, _cm),
     ac(_ac),
     alt_allele_offsets(off_it, off_it_end)
   {

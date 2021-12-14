@@ -12,7 +12,7 @@ bool unique_haplotype_block::compress_variant(const reference_site_info& site_in
   if (alleles.empty())
     return false;
 
-  variants_.emplace_back(site_info.chrom, site_info.pos, site_info.ref, site_info.alt, site_info.err, site_info.cm, 0, std::vector<std::int8_t>());
+  variants_.emplace_back(site_info.chrom, site_info.pos, site_info.ref, site_info.alt, site_info.err, site_info.recom, site_info.cm, 0, std::vector<std::int8_t>());
 
   if (variants_.size() == 1)
   {
@@ -152,6 +152,19 @@ void unique_haplotype_block::fill_cm(genetic_map_file& map_file)
     it->cm = map_file.interpolate_centimorgan(it->pos);
 }
 
+void unique_haplotype_block::fill_cm_from_recom(double& start_cm)
+{
+  for (auto it = variants_.begin(); it != variants_.end(); ++it)
+  {
+    if (std::isnan(it->cm))
+    {
+      it->cm = start_cm;
+      if (!std::isnan(it->recom))
+        start_cm += recombination::switch_prob_to_cm(it->recom);
+    }
+  }
+}
+
 bool unique_haplotype_block::serialize(savvy::writer& output_file)
 {
   savvy::variant var;
@@ -182,8 +195,10 @@ bool unique_haplotype_block::serialize(savvy::writer& output_file)
       var.set_info("AN", std::int32_t(unique_map_.size()));
       if (!std::isnan(it->err))
         var.set_info("ERR", it->err);
+      if (!std::isnan(it->recom))
+        var.set_info("RECOM", it->recom);
       if (!std::isnan(it->cm))
-        var.set_info("CM", it->cm);
+        var.set_info("CM", float(it->cm));
       var.set_info("UHA", it->gt);
 
       output_file << var;
@@ -224,7 +239,10 @@ int unique_haplotype_block::deserialize(savvy::reader& input_file, savvy::varian
     variants_.back().ref = var.ref();
     variants_.back().alt = var.alts().size() ? var.alts()[0] : "";
     var.get_info("ERR", variants_.back().err);
-    var.get_info("CM", variants_.back().cm);
+    var.get_info("RECOM", variants_.back().recom);
+    float cm;
+    if (var.get_info("CM", cm))
+      variants_.back().cm = cm;
     var.get_info("UHA", variants_.back().gt);
     if (variants_.back().gt.size() != cardinalities_.size())
       return -1;
@@ -365,8 +383,8 @@ bool unique_haplotype_block::deserialize(std::istream& is, int m3vcf_version, st
     {
       if (it->compare(0, 4, "ERR=") == 0 || it->compare(0, 4, "Err=") == 0)
         variants_[i].err = std::atof(it->c_str() + 4);
-//      else if (it->compare(0, 6, "RECOM=") == 0 || it->compare(0, 6, "Recom=") == 0)
-//        variants_[i].recom = std::atof(it->c_str() + 6);
+      else if (it->compare(0, 6, "RECOM=") == 0 || it->compare(0, 6, "Recom=") == 0)
+        variants_[i].recom = std::atof(it->c_str() + 6);
     }
 
     if (m3vcf_version == 2)
