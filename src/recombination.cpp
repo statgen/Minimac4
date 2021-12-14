@@ -16,7 +16,7 @@ bool recombination::parse_map_file(const std::string& map_file_path, std::vector
   std::string target_chrom = var_beg->chrom;
 
   bool new_format = false;
-  shrinkwrap::gz::istream ifs(map_file_path);
+  shrinkwrap::istream ifs(map_file_path);
   while (ifs.peek() == '#') // skip header line
   {
     std::string line;
