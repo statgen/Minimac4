@@ -54,8 +54,8 @@ private:
   static bool sites_match(const target_variant& t, const reference_site_info& r);
   bool has_good_r2(savvy::site_info& site);
 
-  void set_r2_info_field(savvy::variant& out_var, float s_x, float s_xx, std::size_t n);
-  void set_er2_info_field(savvy::variant& out_var, float s_x, float s_xx, float s_y, float s_yy, float s_xy, std::size_t n);
+  void set_r2_info_field(savvy::variant& out_var, double s_x, double s_xx, std::size_t n);
+  void set_er2_info_field(savvy::variant& out_var, double s_x, double s_xx, double s_y, double s_yy, double s_xy, std::size_t n);
   void set_info_fields(savvy::variant& out_var, const savvy::compressed_vector<float>& sparse_dosages, const std::vector<float>& loo_dosages, const std::vector<std::int8_t>& observed);
 
   void set_format_fields(savvy::variant& out_var, savvy::compressed_vector<float>& sparse_dosages);

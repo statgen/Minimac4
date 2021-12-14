@@ -1,5 +1,7 @@
 #include "dosage_writer.hpp"
 
+#include <algorithm>
+
 dosage_writer::dosage_writer(const std::string& file_path, const std::string& emp_file_path, const std::string& sites_file_path,
   savvy::file::format file_format,
   std::uint8_t out_compression,
@@ -426,23 +428,33 @@ bool dosage_writer::write_dosages(const full_dosages_results& hmm_results, const
   return out_file_.good();
 }
 
-void dosage_writer::set_r2_info_field(savvy::variant& out_var, float s_x, float s_xx, std::size_t n)
+void dosage_writer::set_r2_info_field(savvy::variant& out_var, double s_x, double s_xx, std::size_t n)
 {
-  float af = s_x / float(n);
-  float r2 = savvy::typed_value::missing_value<float>();
-  if (af > 0.f && af < 1.f)
-    r2 = ((s_xx - s_x * s_x / n) / n) / (af * (1.f - af));
+  double af = s_x / n;
+  double denom = af * (1. - af);
+  float r2 = 0.f; //savvy::typed_value::missing_value<float>();
+  if (denom > 0.)
+    r2 = float((std::max(0., s_xx - s_x * s_x / n) / n) / denom);
 
   out_var.set_info("R2", r2);
 }
 
-void dosage_writer::set_er2_info_field(savvy::variant& out_var, float s_x, float s_xx, float s_y, float s_yy, float s_xy, std::size_t n)
+void dosage_writer::set_er2_info_field(savvy::variant& out_var, double s_x, double s_xx, double s_y, double s_yy, double s_xy, std::size_t n)
 {
   //                         n * Sum xy - Sum x * Sum y
   //  r = -------------------------------------------------------------------
   //      Sqrt(n * Sum xx - Sum x * Sum x) * Sqrt(n * Sum yy - Sum y * Sum y)
-  float emp_r = (n * s_xy - s_x * s_y) / (std::sqrt(n * s_xx - s_x * s_x) * std::sqrt(n * s_yy - s_y * s_y));
-  out_var.set_info("ER2", std::isnan(emp_r) ? savvy::typed_value::missing_value<float>() : emp_r * emp_r);
+  //float emp_r = (n * s_xy - s_x * s_y) / (std::sqrt(n * s_xx - s_x * s_x) * std::sqrt(n * s_yy - s_y * s_y));
+  //out_var.set_info("ER2", std::isnan(emp_r) ? savvy::typed_value::missing_value<float>() : emp_r * emp_r);
+  float emp_r2 = 0.f; //savvy::typed_value::missing_value<float>();
+  double denom = std::max(0., n * s_xx - s_x * s_x) * std::max(0., n * s_yy - s_y * s_y);
+  if (denom > 0.)
+  {
+    double num = (n * s_xy - s_x * s_y);
+    emp_r2 = float(num * num / denom);
+  }
+
+  out_var.set_info("ER2", emp_r2);
 }
 
 void dosage_writer::set_info_fields(savvy::variant& out_var, const savvy::compressed_vector<float>& sparse_dosages, const std::vector<float>& loo_dosages, const std::vector<std::int8_t>& observed)
