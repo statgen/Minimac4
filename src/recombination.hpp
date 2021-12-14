@@ -3,7 +3,7 @@
 
 #include "variant.hpp"
 
-#include <shrinkwrap/gz.hpp>
+#include <shrinkwrap/istream.hpp>
 
 #include <string>
 #include <vector>
@@ -42,7 +42,7 @@ public:
     double map_value = 0.;
   };
 private:
-  shrinkwrap::gz::istream ifs_;
+  shrinkwrap::istream ifs_;
   std::string target_chrom_;
   record prev_rec_;
   record cur_rec_;
