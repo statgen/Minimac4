@@ -530,7 +530,7 @@ void hidden_markov_model::impute(double& prob_sum, std::size_t& prev_best_typed_
 {
   assert(row == 0 || tar_variants[row].pos >= tar_variants[row - 1].pos);
   std::size_t mid_point = row == 0 ? 1 : std::max<std::int32_t>(1, std::int32_t(tar_variants[row].pos) - std::int32_t(tar_variants[row].pos - tar_variants[row - 1].pos) / 2);
-  if (full_ref_ritr == full_ref_rend || full_ref_ritr->pos <= mid_point) // TODO: stop traverse_backward at beginning of region.
+  if (full_ref_ritr == full_ref_rend || full_ref_ritr->pos < mid_point) // TODO: stop traverse_backward at beginning of region.
     return;
 
   float typed_dose = std::numeric_limits<float>::quiet_NaN();
@@ -577,12 +577,14 @@ void hidden_markov_model::impute(double& prob_sum, std::size_t& prev_best_typed_
   // vvvvvvvvvvvvvvvv TODO vvvvvvvvvvvvvvvv //
   float best_sum = std::accumulate(best_typed_probs.begin(), best_typed_probs.end(), 0.f);
   std::size_t n_templates = left_junction_proportions.size();
-  for ( ; full_ref_ritr != full_ref_rend && full_ref_ritr->pos > mid_point; --full_ref_ritr)
+  for ( ; full_ref_ritr != full_ref_rend && full_ref_ritr->pos >= mid_point; --full_ref_ritr)
   {
     if (sites_match(tar_variants[row], *full_ref_ritr))
     {
       output.dosage(full_ref_ritr.global_idx(), out_column) = typed_dose;
       output.loo_dosage(row, out_column) = typed_loo_dose;
+      if (tar_variants[row].pos == mid_point)
+        ++mid_point; // equivalent to breaking and decrementing full_ref_ritr
     }
     else
     {
@@ -635,12 +637,5 @@ void hidden_markov_model::impute(double& prob_sum, std::size_t& prev_best_typed_
       p_alt = std::max(0.f, std::min(1.f, p_alt));
       output.dosage(full_ref_ritr.global_idx(), out_column) = float(std::int16_t(p_alt * bin_scalar_ + 0.5f)) / bin_scalar_;
     }
-  }
-
-  if (full_ref_ritr != full_ref_rend && sites_match(tar_variants[row], *full_ref_ritr))
-  {
-    output.dosage(full_ref_ritr.global_idx(), out_column) = typed_dose;
-    output.loo_dosage(row, out_column) = typed_loo_dose;
-    --full_ref_ritr;
   }
 }
