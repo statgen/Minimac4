@@ -325,7 +325,6 @@ void hidden_markov_model::impute_typed_site(double& prob_sum, std::size_t& prev_
   std::vector<std::uint32_t>& best_unique_haps, std::vector<float>& best_unique_probs, float& dose, float& loo_dose)
 {
   assert(left_probs.size() == right_probs.size());
-  float p_alt = 0.f;
 
   float sum = prob_sum;
 
@@ -333,27 +332,35 @@ void hidden_markov_model::impute_typed_site(double& prob_sum, std::size_t& prev_
 
   if (prev_best_hap < constants.size())
   {
-    std::size_t i =  prev_best_hap;
+    std::size_t i = prev_best_hap;
     float lr = left_probs[i] - left_probs_norecom[i];
     float rr = right_probs[i] - right_probs_norecom[i];
     float n = reverse_map[i].size();
-    float prob = constants[i] * left_probs_norecom[i] * right_probs_norecom[i] + (left_probs[i] * right_probs[i] - left_probs_norecom[i] * right_probs_norecom[i]) / reverse_map[i].size();
+    float prob = constants[i] * left_probs_norecom[i] * right_probs_norecom[i] + (left_probs[i] * right_probs[i] - left_probs_norecom[i] * right_probs_norecom[i]) / n;
     prob /= sum;
     if (prob > (1.f - prob_threshold_))
     {
       best_unique_probs.push_back(prob);
       best_unique_haps.push_back(i);
+#if 0
       if (template_haps[i])
         p_alt = std::min(1.f, std::max(0.f, prob)); // TODO: + (1. - p_alt) * AF_other to support larger thresholds
+#else
+      dose = template_haps[i] ? 1.f : 0.f;
+      loo_dose = observed < 0 ? savvy::typed_value::missing_value<float>() : dose;
+      return;
+#endif
     }
   }
 
+  float p_ref = 0.f;
+  float p_alt = 0.f;
   for (std::size_t r = 0; r < 2; ++r)
   {
     if (best_unique_haps.empty())
     {
       float denorm_threshold_l = r == 0 ? prob_threshold_ * sum : 0.f;
-      float p_ref = 0.f;
+      p_ref = 0.f; p_alt = 0.f;
       for (std::size_t i = 0; i < constants.size(); ++i)
       {
         float lr = left_probs[i] - left_probs_norecom[i];
@@ -373,21 +380,20 @@ void hidden_markov_model::impute_typed_site(double& prob_sum, std::size_t& prev_
         }
       }
       prob_sum = sum = p_alt + p_ref;
-      p_alt = std::min(1.f, std::max(0.f, p_alt / sum));
+      dose = std::min(1.f, std::max(0.f, p_alt / sum));
+      dose = float(std::int16_t(dose * bin_scalar_ + 0.5f)) / bin_scalar_; // bin
     }
   }
 
-  dose = p_alt;
-  dose = float(std::int16_t(dose * bin_scalar_ + 0.5f)) / bin_scalar_; // bin
 
   if (observed < 0)
   {
-    loo_dose = dose; // savvy::typed_value::missing_value<float>();
+    loo_dose = savvy::typed_value::missing_value<float>();
   }
   else
   {
     float loo_p_alt = p_alt;
-    float loo_p_ref = 1.f - p_alt;
+    float loo_p_ref = p_ref;
 
     float fmismatch = err * (observed ? af : 1.f - af) + background_error_;
     float fmatch = 1.f - err + fmismatch;
