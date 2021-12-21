@@ -64,10 +64,6 @@ void hidden_markov_model::traverse_forward(const std::deque<unique_haplotype_blo
     {
       // Initialize likelihoods at first position
       initialize_likelihoods(forward_probs_[block_idx][0], forward_norecom_probs_[block_idx][0], junction_prob_proportions_[block_idx], ref_block);
-//      initialize_likelihoods(forward_probs_[block_idx][0], ref_block.cardinalities());
-//      forward_norecom_probs_[block_idx][0] = forward_probs_[block_idx][0];
-//      for (std::size_t i = 0; i < ref_block.expanded_haplotype_size(); ++i)
-//        junction_prob_proportions_[block_idx][i] =  1.f / ref_block.cardinalities()[ref_block.unique_map()[i]];
     }
     else
     {
@@ -88,7 +84,6 @@ void hidden_markov_model::traverse_forward(const std::deque<unique_haplotype_blo
         float p = prev_last_row_norecom[prev_uniq_idx] * prev_junction_proportions[i] + (prev_last_row[prev_uniq_idx] - prev_last_row_norecom[prev_uniq_idx]) / prev_ref_block.cardinalities()[prev_uniq_idx];
         junction_proportions[i] = p;
         temp_row[uniq_idx] += p;
-        //temp_row[uniq_idx] += prev_last_row[prev_uniq_idx] / prev_ref_block.cardinalities()[prev_uniq_idx];
         assert((prev_last_row[prev_uniq_idx] - prev_last_row_norecom[prev_uniq_idx]) >= 0.f);
       }
 
@@ -99,13 +94,7 @@ void hidden_markov_model::traverse_forward(const std::deque<unique_haplotype_blo
         junction_proportions[i] = junction_proportions[i] / temp_row[uniq_idx];
         assert(junction_proportions[i] >= 0.f);
         assert(junction_proportions[i] <= 1.f);
-        //temp_row[uniq_idx] += prev_last_row[prev_uniq_idx] / prev_ref_block.cardinalities()[prev_uniq_idx];
       }
-#ifndef NDEBUG
-      float s1 = std::accumulate(prev_last_row.begin(), prev_last_row.end(), 0.f);
-      float s2 = std::accumulate(temp_row.begin(), temp_row.end(), 0.f);
-      float sdiff = s2 - s1;
-#endif
 
       precision_jumps_[global_idx - 1] = transpose(temp_row, first_row, temp_row, first_row_norecom, ref_block.cardinalities(), tar_variants[global_idx - 1].recom, n_expanded_haplotypes);
     }
@@ -158,10 +147,6 @@ void hidden_markov_model::traverse_backward(const std::deque<unique_haplotype_bl
     {
       // Initialize likelihoods at first position
       initialize_likelihoods(backward, backward_norecom, junction_proportions_backward, ref_block);
-      //      backward_norecom = backward;
-      //      junction_proportions_backward.resize(ref_block.expanded_haplotype_size());
-      //      for (std::size_t i = 0; i < n_expanded_haplotypes; ++i)
-      //        junction_proportions_backward[i] =  1.f / ref_block.cardinalities()[ref_block.unique_map()[i]];
     }
     else
     {
@@ -176,7 +161,7 @@ void hidden_markov_model::traverse_backward(const std::deque<unique_haplotype_bl
         std::size_t prev_uniq_idx = prev_ref_block.unique_map()[i];
         float p = backward_norecom[prev_uniq_idx] * junction_proportions_backward[i] + (backward[prev_uniq_idx] - backward_norecom[prev_uniq_idx]) / prev_ref_block.cardinalities()[prev_uniq_idx];
         junction_proportions_backward[i] = p;
-        extra[uniq_idx] += p; //backward[prev_uniq_idx] / prev_ref_block.cardinalities()[prev_uniq_idx];
+        extra[uniq_idx] += p;
         assert((backward[prev_uniq_idx] - backward_norecom[prev_uniq_idx]) >= 0.f);
       }
 
@@ -186,19 +171,7 @@ void hidden_markov_model::traverse_backward(const std::deque<unique_haplotype_bl
         assert(extra[uniq_idx] > 0.f);
         junction_proportions_backward[i] /= extra[uniq_idx];
         assert(junction_proportions_backward[i] >= 0.f);
-        //        assert(junction_proportions_backward[i] <= 1.f);
-        //        if (junction_proportions_backward[i] > 1.f)
-        //        {
-        //          auto a = junction_proportions_backward[i];
-        //          auto a2 = a;
-        //        }
       }
-
-#ifndef NDEBUG
-      float s1 = std::accumulate(backward.begin(), backward.end(), 0.f);
-      float s2 = std::accumulate(extra.begin(), extra.end(), 0.f);
-      float sdiff = s2 - s1;
-#endif
 
       std::swap(backward, extra);
       backward_norecom = backward;
@@ -275,7 +248,6 @@ bool hidden_markov_model::transpose(const std::vector<float>& from, std::vector<
 
   sum *= (recom / n_templates);
 
-
   for (int i = 0; i < to.size(); i++)
   {
     to[i] = from[i] * complement + (uniq_cardinalities[i] * sum);
@@ -326,65 +298,51 @@ void hidden_markov_model::impute_typed_site(double& prob_sum, std::size_t& prev_
 {
   assert(left_probs.size() == right_probs.size());
 
-  float sum = prob_sum;
-
-  float denorm_threshold = prob_threshold_ * sum;
-
   if (prev_best_hap < constants.size())
   {
     std::size_t i = prev_best_hap;
-    float lr = left_probs[i] - left_probs_norecom[i];
-    float rr = right_probs[i] - right_probs_norecom[i];
-    float n = reverse_map[i].size();
-    float prob = constants[i] * left_probs_norecom[i] * right_probs_norecom[i] + (left_probs[i] * right_probs[i] - left_probs_norecom[i] * right_probs_norecom[i]) / n;
-    prob /= sum;
-    if (prob > (1.f - prob_threshold_))
+    double left_nr = left_probs_norecom[i];
+    double right_nr = right_probs_norecom[i];
+    double n = reverse_map[i].size();
+    double prob = constants[i] * left_nr * right_nr + (double(left_probs[i]) * double(right_probs[i]) - left_nr * right_nr) / n;
+    prob /= prob_sum;
+    if (prob > (1. - prob_threshold_))
     {
       best_unique_probs.push_back(prob);
       best_unique_haps.push_back(i);
-#if 0
-      if (template_haps[i])
-        p_alt = std::min(1.f, std::max(0.f, prob)); // TODO: + (1. - p_alt) * AF_other to support larger thresholds
-#else
+//      if (template_haps[i])
+//        p_alt = std::min(1.f, std::max(0.f, prob)); // TODO: + (1. - p_alt) * AF_other to support larger thresholds
       dose = template_haps[i] ? 1.f : 0.f;
       loo_dose = observed < 0 ? savvy::typed_value::missing_value<float>() : dose;
       return;
-#endif
     }
   }
 
-  float p_ref = 0.f;
-  float p_alt = 0.f;
-  for (std::size_t r = 0; r < 2; ++r)
+  assert(best_unique_haps.empty() && best_unique_probs.empty());
+  double p_ref = 0.;
+  double p_alt = 0.;
+  double denorm_threshold = prob_threshold_ * prob_sum;
+  for (std::size_t i = 0; i < constants.size(); ++i)
   {
-    if (best_unique_haps.empty())
-    {
-      float denorm_threshold_l = r == 0 ? prob_threshold_ * sum : 0.f;
-      p_ref = 0.f; p_alt = 0.f;
-      for (std::size_t i = 0; i < constants.size(); ++i)
-      {
-        float lr = left_probs[i] - left_probs_norecom[i];
-        float rr = right_probs[i] - right_probs_norecom[i];
-        float n = reverse_map[i].size();
-        float prob = constants[i] * left_probs_norecom[i] * right_probs_norecom[i] + (left_probs[i] * right_probs[i] - left_probs_norecom[i] * right_probs_norecom[i]) / n;
-        if (template_haps[i])
-          p_alt += prob;
-        else
-          p_ref += prob;
+    double left_nr = left_probs_norecom[i];
+    double right_nr = right_probs_norecom[i];
+    double n = reverse_map[i].size();
+    double prob = constants[i] * left_nr * right_nr + (double(left_probs[i]) * double(right_probs[i]) - left_nr * right_nr) / n;
+    if (template_haps[i])
+      p_alt += prob;
+    else
+      p_ref += prob;
 
-        if (prob > denorm_threshold_l)
-        {
-          best_unique_probs.push_back(prob / sum);
-          best_unique_haps.push_back(i);
-          assert(prob / sum > prob_threshold_); // TODO: remove since rounding error could make this assert fail.
-        }
-      }
-      prob_sum = sum = p_alt + p_ref;
-      dose = std::min(1.f, std::max(0.f, p_alt / sum));
-      dose = float(std::int16_t(dose * bin_scalar_ + 0.5f)) / bin_scalar_; // bin
+    if (prob > denorm_threshold)
+    {
+      best_unique_probs.push_back(prob / prob_sum);
+      best_unique_haps.push_back(i);
+      assert(prob / prob_sum > prob_threshold_); // TODO: remove since rounding error could make this assert fail.
     }
   }
-
+  prob_sum = p_alt + p_ref;
+  dose = std::min(1.f, std::max(0.f, float(p_alt / prob_sum)));
+  dose = float(std::int16_t(dose * bin_scalar_ + 0.5f)) / bin_scalar_; // bin
 
   if (observed < 0)
   {
@@ -392,8 +350,8 @@ void hidden_markov_model::impute_typed_site(double& prob_sum, std::size_t& prev_
   }
   else
   {
-    float loo_p_alt = p_alt;
-    float loo_p_ref = p_ref;
+    double loo_p_alt = p_alt;
+    double loo_p_ref = p_ref;
 
     float fmismatch = err * (observed ? af : 1.f - af) + background_error_;
     float fmatch = 1.f - err + fmismatch;
@@ -410,7 +368,7 @@ void hidden_markov_model::impute_typed_site(double& prob_sum, std::size_t& prev_
       loo_p_alt /= fmismatch;
     }
 
-    loo_dose = loo_p_alt / (loo_p_alt + loo_p_ref);
+    loo_dose = float(loo_p_alt / (loo_p_alt + loo_p_ref));
     loo_dose = float(std::int16_t(loo_dose * bin_scalar_ + 0.5f)) / bin_scalar_; // bin
   }
 
@@ -426,12 +384,12 @@ void hidden_markov_model::s3_to_s1_probs(
   const std::vector<float>& left_probs, const std::vector<float>& right_probs,
   const std::vector<float>& left_probs_norecom, const std::vector<float>& right_probs_norecom,
   const std::vector<float>& left_junction_proportions, const std::vector<float>& right_junction_proportions,
-  const std::vector<std::vector<std::size_t>>& s3_reverse_map, float prob_sum)
+  const std::vector<std::vector<std::size_t>>& s3_reverse_map, double prob_sum)
 {
   best_s1_haps_.clear();
   best_s1_probs_.clear();
   std::size_t n_templates = left_junction_proportions.size();
-  float denorm_threshold = prob_sum * std::min(prob_threshold_, s1_prob_threshold_ < 0.f ? 1.f / n_templates : s1_prob_threshold_);
+  double denorm_threshold = prob_sum * std::min(prob_threshold_, s1_prob_threshold_ < 0.f ? 1.f / n_templates : s1_prob_threshold_);
   for (std::size_t i = 0; i < best_s3_haps_.size(); ++i)
   {
     std::size_t uniq_idx = best_s3_haps_[i];
@@ -441,16 +399,14 @@ void hidden_markov_model::s3_to_s1_probs(
     assert(uniq_idx < right_probs.size());
     assert(uniq_idx < right_probs_norecom.size());
     std::size_t cardinality = s3_reverse_map[uniq_idx].size();
-    float left_full_prob = left_probs[uniq_idx];
-    float left_norecom_prob = left_probs_norecom[uniq_idx];
-    float left_recom_prob = (left_full_prob - left_norecom_prob) / cardinality;
+    double left_full_prob = left_probs[uniq_idx];
+    double left_norecom_prob = left_probs_norecom[uniq_idx];
+    double left_recom_prob = (left_full_prob - left_norecom_prob) / cardinality;
 
-    float right_full_prob = right_probs[uniq_idx];
-    float right_norecom_prob = right_probs_norecom[uniq_idx];
-    float right_recom_prob = (right_full_prob - right_norecom_prob) / cardinality;
+    double right_full_prob = right_probs[uniq_idx];
+    double right_norecom_prob = right_probs_norecom[uniq_idx];
+    double right_recom_prob = (right_full_prob - right_norecom_prob) / cardinality;
 
-    //float local_denorm_threshold = denorm_threshold * best_s3_probs_[i] *  (1.f / cardinality);
-    std::size_t old_size = best_s1_haps_.size();
     for (std::size_t j = 0; j < cardinality; ++j)
     {
       assert(uniq_idx < s3_reverse_map.size());
@@ -458,32 +414,18 @@ void hidden_markov_model::s3_to_s1_probs(
       std::size_t expanded_idx = s3_reverse_map[uniq_idx][j];
       assert(expanded_idx < left_junction_proportions.size());
       assert(expanded_idx < right_junction_proportions.size());
-      float orig_prob = (left_norecom_prob * left_junction_proportions[expanded_idx] + left_recom_prob) * (right_norecom_prob * right_junction_proportions[expanded_idx] + right_recom_prob);
+      double orig_prob = (left_norecom_prob * left_junction_proportions[expanded_idx] + left_recom_prob) * (right_norecom_prob * right_junction_proportions[expanded_idx] + right_recom_prob);
       if (orig_prob > denorm_threshold)
       {
-        best_s1_probs_.push_back(orig_prob / prob_sum);
+        best_s1_probs_.push_back(float(orig_prob / prob_sum));
         best_s1_haps_.push_back(expanded_idx);
       }
     }
-
-//    if (old_size == best_s1_haps_.size())
-//    {
-//      for (std::size_t j = 0; j < cardinality; ++j)
-//      {
-//        std::size_t expanded_idx = s3_reverse_map[uniq_idx][j];
-//        best_s1_haps_.push_back(expanded_idx);
-//        best_s1_probs_.push_back(
-//            (left_norecom_prob * left_junction_proportions[expanded_idx] + left_recom_prob) * (right_norecom_prob * right_junction_proportions[expanded_idx] + right_recom_prob)
-//          );
-//      }
-//    }
   }
 }
 
 void hidden_markov_model::s1_to_s2_probs(std::vector<std::size_t>& cardinalities, const std::vector<std::int64_t>& unique_map, std::size_t s2_size)
 {
-  //std::unordered_map<std::size_t, float> full_ref_prob_hash;
-  //full_ref_prob_hash.reserve(s2_size);
   cardinalities.clear();
   cardinalities.resize(s2_size);
   s2_probs_.clear();
@@ -495,26 +437,13 @@ void hidden_markov_model::s1_to_s2_probs(std::vector<std::size_t>& cardinalities
     //full_ref_prob_hash[s2_idx] += best_s1_probs_[i];
     s2_probs_[s2_idx] += best_s1_probs_[i];
   }
-#if 1
+
   best_s2_haps_.clear();
   for (std::size_t i = 0; i < cardinalities.size(); ++i)
   {
     if (cardinalities[i] > 0)
       best_s2_haps_.push_back(i);
   }
-#else
-  best_s2_probs_.resize(full_ref_prob_hash.size());
-  best_s2_haps_.resize(full_ref_prob_hash.size());
-
-  std::size_t i = 0;
-  for (auto it = full_ref_prob_hash.begin(); it != full_ref_prob_hash.end(); ++it, ++i)
-  {
-    assert(i < best_s2_haps_.size());
-    assert(i < best_s2_probs_.size());
-    best_s2_haps_[i] = it->first;
-    best_s2_probs_[i] = it->second / prob_sum;
-  }
-#endif
 }
 
 void hidden_markov_model::impute(double& prob_sum, std::size_t& prev_best_typed_hap,
@@ -581,7 +510,7 @@ void hidden_markov_model::impute(double& prob_sum, std::size_t& prev_best_typed_
   }
 
   // vvvvvvvvvvvvvvvv TODO vvvvvvvvvvvvvvvv //
-  float best_sum = std::accumulate(best_typed_probs.begin(), best_typed_probs.end(), 0.f);
+  double best_sum = std::accumulate(best_typed_probs.begin(), best_typed_probs.end(), 0.);
   std::size_t n_templates = left_junction_proportions.size();
   for ( ; full_ref_ritr != full_ref_rend && full_ref_ritr->pos >= mid_point; --full_ref_ritr)
   {
@@ -597,20 +526,10 @@ void hidden_markov_model::impute(double& prob_sum, std::size_t& prev_best_typed_
       if (full_ref_ritr.block_idx() != prev_block_idx)
       {
         s1_to_s2_probs(s2_cardinalities_, full_ref_ritr.unique_map(), full_ref_ritr.cardinalities().size());
-
-#ifndef NDEBUG
-        double s = std::accumulate(best_s2_probs_.begin(), best_s2_probs_.end(), 0.);
-#endif
-
         prev_block_idx = full_ref_ritr.block_idx();
       }
 
-      if (best_s2_haps_.empty())
-      {
-        auto a = 0;
-      }
-
-      float p_alt = 0;
+      double p_alt = 0;
       std::size_t ac = 0;
       std::size_t an = 0;
       for (std::size_t i = 0; i < best_s2_haps_.size(); ++i)
@@ -625,7 +544,7 @@ void hidden_markov_model::impute(double& prob_sum, std::size_t& prev_best_typed_
         an += card;
       }
 
-      if (p_alt > 1.0f)
+      if (p_alt > 1. || p_alt < 0.)
       {
         auto a = 0;
       }
@@ -640,7 +559,7 @@ void hidden_markov_model::impute(double& prob_sum, std::size_t& prev_best_typed_
         auto a = 0;
       }
 
-      p_alt = std::max(0.f, std::min(1.f, p_alt));
+      p_alt = std::max(0., std::min(1., p_alt));
       output.dosage(full_ref_ritr.global_idx(), out_column) = float(std::int16_t(p_alt * bin_scalar_ + 0.5f)) / bin_scalar_;
     }
   }

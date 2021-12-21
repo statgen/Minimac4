@@ -107,7 +107,7 @@ private:
     const std::vector<float>& left_probs, const std::vector<float>& right_probs,
     const std::vector<float>& left_probs_norecom, const std::vector<float>& right_probs_norecom,
     const std::vector<float>& left_junction_proportions, const std::vector<float>& right_junction_proportions,
-    const std::vector<std::vector<std::size_t>>& s3_reverse_map, float prob_sum);
+    const std::vector<std::vector<std::size_t>>& s3_reverse_map, double prob_sum);
   void s1_to_s2_probs(std::vector<std::size_t>& cardinalities, const std::vector<std::int64_t>& uniq_map, std::size_t s2_size);
 };
 
