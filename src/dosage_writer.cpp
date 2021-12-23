@@ -206,7 +206,7 @@ bool dosage_writer::merge_temp_files(std::list<savvy::reader>& temp_files, std::
       out_var.set_info("MAF", af > 0.5f ? 1.f - af : af);
       out_var.set_info("AVG_CS", s_cs / n);
 
-      set_r2_info_field(out_var, s_x, s_xx, n);
+      out_var.set_info("R2", calc_r2(s_x, s_xx, n));
 
       if (has_good_r2(out_var))
       {
@@ -220,7 +220,18 @@ bool dosage_writer::merge_temp_files(std::list<savvy::reader>& temp_files, std::
           out_var.remove_info("LOO_S_YY");
           out_var.remove_info("LOO_S_XY");
 
-          set_er2_info_field(out_var, loo_s_x, loo_s_xx, loo_s_y, loo_s_yy, loo_s_xy, n);
+          float er2 = calc_er2(loo_s_x, loo_s_xx, loo_s_y, loo_s_yy, loo_s_xy, n);
+          out_var.set_info("ER2", er2);
+
+          float gt_af = loo_s_y / n;
+          if (gt_af > 0.f && gt_af < 1.f)
+          {
+            int bin = std::max(0, static_cast<int>(-std::log10(gt_af > 0.5f ? 1.f - gt_af : gt_af)));
+            if (accuracy_stats_.size() <= bin)
+              accuracy_stats_.resize(bin + 1);
+            accuracy_stats_[bin].er2_sum += er2;
+            ++(accuracy_stats_[bin].n_var);
+          }
 
           if (emp_out_file_)
           {
@@ -428,24 +439,22 @@ bool dosage_writer::write_dosages(const full_dosages_results& hmm_results, const
   return out_file_.good();
 }
 
-void dosage_writer::set_r2_info_field(savvy::variant& out_var, double s_x, double s_xx, std::size_t n)
+float dosage_writer::calc_r2(double s_x, double s_xx, std::size_t n)
 {
   double af = s_x / n;
   double denom = af * (1. - af);
   float r2 = 0.f; //savvy::typed_value::missing_value<float>();
   if (denom > 0.)
     r2 = float((std::max(0., s_xx - s_x * s_x / n) / n) / denom);
-
-  out_var.set_info("R2", r2);
+  return r2;
 }
 
-void dosage_writer::set_er2_info_field(savvy::variant& out_var, double s_x, double s_xx, double s_y, double s_yy, double s_xy, std::size_t n)
+float dosage_writer::calc_er2(double s_x, double s_xx, double s_y, double s_yy, double s_xy, std::size_t n)
 {
-  //                         n * Sum xy - Sum x * Sum y
-  //  r = -------------------------------------------------------------------
-  //      Sqrt(n * Sum xx - Sum x * Sum x) * Sqrt(n * Sum yy - Sum y * Sum y)
-  //float emp_r = (n * s_xy - s_x * s_y) / (std::sqrt(n * s_xx - s_x * s_x) * std::sqrt(n * s_yy - s_y * s_y));
-  //out_var.set_info("ER2", std::isnan(emp_r) ? savvy::typed_value::missing_value<float>() : emp_r * emp_r);
+  //                        (n * Sum xy - Sum x * Sum y)^2
+  //  r^2 = -------------------------------------------------------------------
+  //           (n * Sum xx - Sum x * Sum x) * (n * Sum yy - Sum y * Sum y)
+
   float emp_r2 = 0.f; //savvy::typed_value::missing_value<float>();
   double denom = std::max(0., n * s_xx - s_x * s_x) * std::max(0., n * s_yy - s_y * s_y);
   if (denom > 0.)
@@ -453,8 +462,21 @@ void dosage_writer::set_er2_info_field(savvy::variant& out_var, double s_x, doub
     double num = (n * s_xy - s_x * s_y);
     emp_r2 = float(num * num / denom);
   }
+  return emp_r2;
+}
 
-  out_var.set_info("ER2", emp_r2);
+void dosage_writer::print_mean_er2(std::ostream& os) const
+{
+  os << "Mean ER2: ";
+  for (auto it = accuracy_stats_.begin(); it != accuracy_stats_.end(); ++it)
+  {
+    os << " ";
+    if (it->n_var)
+      os << (it->er2_sum / it->n_var);
+    else
+      os << ".";
+  }
+  os << std::endl;
 }
 
 void dosage_writer::set_info_fields(savvy::variant& out_var, const savvy::compressed_vector<float>& sparse_dosages, const std::vector<float>& loo_dosages, const std::vector<std::int8_t>& observed)
@@ -487,7 +509,7 @@ void dosage_writer::set_info_fields(savvy::variant& out_var, const savvy::compre
     out_var.set_info("AF", af);
     out_var.set_info("MAF", af > 0.5f ? 1.f - af : af);
     out_var.set_info("AVG_CS", s_cs / n);
-    set_r2_info_field(out_var, s_x, s_xx, n);
+    out_var.set_info("R2", calc_r2(s_x, s_xx, n));
   }
 
   if (loo_dosages.size())
@@ -516,7 +538,18 @@ void dosage_writer::set_info_fields(savvy::variant& out_var, const savvy::compre
     }
     else
     {
-      set_er2_info_field(out_var, s_x, s_xx, s_y, s_yy, s_xy, n);
+      float er2 = calc_er2(s_x, s_xx, s_y, s_yy, s_xy, n);
+      out_var.set_info("ER2", er2);
+
+      float gt_af = s_y / n;
+      if (gt_af > 0.f && gt_af < 1.f)
+      {
+        int bin = std::max(0, static_cast<int>(-std::log10(gt_af > 0.5f ? 1.f - gt_af : gt_af)));
+        if (accuracy_stats_.size() <= bin)
+          accuracy_stats_.resize(bin + 1);
+        accuracy_stats_[bin].er2_sum += er2;
+        ++(accuracy_stats_[bin].n_var);
+      }
     }
   }
 

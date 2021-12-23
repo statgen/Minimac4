@@ -13,12 +13,19 @@
 class dosage_writer
 {
 private:
+  struct accuracy_statistics
+  {
+    double er2_sum = 0.;
+    std::size_t n_var = 0;
+  };
+
   savvy::writer out_file_;
   std::unique_ptr<savvy::writer> emp_out_file_;
   std::unique_ptr<savvy::writer> sites_out_file_;
   savvy::file::format file_format_;
   std::vector<std::string> fmt_fields_;
   std::unordered_set<std::string> fmt_field_set_;
+  std::vector<accuracy_statistics> accuracy_stats_;
   std::size_t n_samples_ = 0;
   float min_r2_ = -1.f;
   bool is_temp_file_;
@@ -47,6 +54,8 @@ public:
   bool merge_temp_files(std::list<std::string>& temp_file_paths, std::list<std::string>& temp_emp_file_paths);
 
   bool write_dosages(const full_dosages_results& hmm_results, const std::vector<target_variant>& tar_variants, const std::vector<target_variant>& tar_only_variants, std::pair<std::size_t, std::size_t> observed_range, const reduced_haplotypes& full_reference_data, const savvy::region& impute_region);
+
+  void print_mean_er2(std::ostream& os) const;
 private:
   static std::vector<std::pair<std::string, std::string>> gen_headers(const std::vector<std::string>& fmt_fields, const std::string& chromosome, bool is_temp);
   static std::vector<std::pair<std::string, std::string>> gen_emp_headers(const std::string& chromosome);
@@ -54,10 +63,10 @@ private:
   static bool sites_match(const target_variant& t, const reference_site_info& r);
   bool has_good_r2(savvy::site_info& site);
 
-  void set_r2_info_field(savvy::variant& out_var, double s_x, double s_xx, std::size_t n);
-  void set_er2_info_field(savvy::variant& out_var, double s_x, double s_xx, double s_y, double s_yy, double s_xy, std::size_t n);
-  void set_info_fields(savvy::variant& out_var, const savvy::compressed_vector<float>& sparse_dosages, const std::vector<float>& loo_dosages, const std::vector<std::int8_t>& observed);
+  static float calc_er2(double s_x, double s_xx, double s_y, double s_yy, double s_xy, std::size_t n);
+  static float calc_r2(double s_x, double s_xx, std::size_t n);
 
+  void set_info_fields(savvy::variant& out_var, const savvy::compressed_vector<float>& sparse_dosages, const std::vector<float>& loo_dosages, const std::vector<std::int8_t>& observed);
   void set_format_fields(savvy::variant& out_var, savvy::compressed_vector<float>& sparse_dosages);
 
 

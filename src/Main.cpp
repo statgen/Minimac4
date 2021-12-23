@@ -291,7 +291,8 @@ int main(int argc, char** argv)
 
   auto total_time = long(std::difftime(std::time(nullptr), start_time));
 
-  std::cerr.flush();
+  output.print_mean_er2(std::cerr);
+  std::cerr << std::endl;
   std::fprintf(stderr, "Total time for parsing input: %ld seconds\n", imputer.total_input_time());
   std::fprintf(stderr, "Total time for HMM: %ld seconds\n", imputer.total_impute_time());
   std::fprintf(stderr, "Total time for writing output: %ld seconds\n", imputer.total_output_time());
