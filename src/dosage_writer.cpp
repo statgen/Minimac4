@@ -14,7 +14,6 @@ dosage_writer::dosage_writer(const std::string& file_path, const std::string& em
   emp_out_file_(emp_file_path.empty() ? nullptr : new savvy::writer(emp_file_path, file_format, gen_emp_headers(chromosome), sample_ids, out_compression)),
   sites_out_file_(sites_file_path.empty() ? nullptr : new savvy::writer(sites_file_path, file_format, gen_headers({}, chromosome, false), {}, out_compression)),
   file_format_(file_format),
-  fmt_fields_(fmt_fields),
   fmt_field_set_(fmt_fields.begin(), fmt_fields.end()),
   n_samples_(sample_ids.size()),
   min_r2_(min_r2),

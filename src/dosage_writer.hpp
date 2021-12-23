@@ -23,7 +23,6 @@ private:
   std::unique_ptr<savvy::writer> emp_out_file_;
   std::unique_ptr<savvy::writer> sites_out_file_;
   savvy::file::format file_format_;
-  std::vector<std::string> fmt_fields_;
   std::unordered_set<std::string> fmt_field_set_;
   std::vector<accuracy_statistics> accuracy_stats_;
   std::size_t n_samples_ = 0;

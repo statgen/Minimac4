@@ -416,6 +416,9 @@ public:
         emp_out_path_ = prefix_ + ".empiricalDose." + suffix;
     }
 
+    if (!emp_out_path_.empty() && std::find(fmt_fields_.begin(), fmt_fields_.end(), "HDS") == fmt_fields_.end())
+      fmt_fields_.emplace_back("HDS");
+
     return true;
   }
 private:
