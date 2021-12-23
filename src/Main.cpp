@@ -251,6 +251,8 @@ int main(int argc, char** argv)
     return EXIT_SUCCESS;
   }
 
+  std::cerr << "minimac v" << VERSION << "\n\n";
+
   if (args.update_m3vcf())
     return convert_old_m3vcf(args.ref_path(), args.out_path(), args.map_path()) ? EXIT_SUCCESS : EXIT_FAILURE;
 
