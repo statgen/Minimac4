@@ -1,3 +1,2 @@
-jonathonl/shrinkwrap@f25369a4bd78ecdd85e65345256442e8812c50d3
-statgen/savvy@a434e06a04a39cf3bfb3f08688eca2efae68c773
+statgen/savvy@af1bf44b5c9be693f38c8e62a24d4ea38f3ac4a7
 jonathonl/omp@522849581eb900a8bce9621a557ef1cadf600441
