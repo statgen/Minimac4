@@ -6,10 +6,8 @@ if(NOT CMAKE_BUILD_TYPE)
 endif()
 
 set(CMAKE_CXX_STANDARD 11)
-execute_process(COMMAND date OUTPUT_VARIABLE DATE OUTPUT_STRIP_TRAILING_WHITESPACE)
-execute_process(COMMAND whoami OUTPUT_VARIABLE USER OUTPUT_STRIP_TRAILING_WHITESPACE)
 
-add_definitions(-DVERSION="${PROJECT_VERSION}" -DUSER="${USER}" -DDATE="${DATE}")
+add_definitions(-DVERSION="${PROJECT_VERSION}")
 
 set(CMAKE_FIND_LIBRARY_SUFFIXES ".a;${CMAKE_FIND_LIBRARY_SUFFIXES}") # Prefer libz.a when both are available
 
@@ -31,27 +29,6 @@ add_executable(minimac4
         src/recombination.cpp src/recombination.hpp
         src/unique_haplotype.cpp src/unique_haplotype.hpp
         src/Main.cpp)
-#        src/Analysis.cpp
-#        src/Analysis.h
-#        src/AnalysisChunks.cpp
-#        src/DosageData.cpp
-#        src/DosageData.h
-#        src/HaplotypeSet.cpp
-#        src/HaplotypeSet.h
-#        src/Imputation.cpp
-#        src/Imputation.h
-#        src/ImputationStatistics.cpp
-#        src/ImputationStatistics.h
-#        src/Main.cpp
-#        src/MarkovModel.cpp
-#        src/MarkovModel.h
-#        src/MarkovParameters.cpp
-#        src/MarkovParameters.h
-#        src/MyVariables.h
-#        src/Unique.cpp
-#        src/Unique.h
-#        src/Estimation.cpp
-#        src/Estimation.h)
 
 target_link_libraries(minimac4 savvy ${OMPP_LIBRARY} Threads::Threads)
 
