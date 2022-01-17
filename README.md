@@ -30,9 +30,25 @@ See `minimac4 --help` for detailed usage.
 
 A typical Minimac4 command line for imputation is as follows
 ```bash
-minimac4 reference.msav target.bcf > imputed.bcf
+minimac4 reference.msav target.vcf.gz > imputed.sav
 ```
 
 Here reference.msav is a reference panel (e.g. 1000 Genomes) compressed with MVCF encoding, 
-target.bcf is an indexed BCF containing phased genotype array data, 
-and imputed.bcf is the imputed output.
+target.vcf.gz is an indexed VCF containing phased genotype array data, 
+and imputed.sav is the imputed output.
+
+The file formats VCF, [BCF](https://github.com/samtools/bcftools), and [SAV](https://github.com/statgen/savvy) are supported for both input and output:
+```bash
+minimac4 reference.msav target.bcf -o imputed.bcf
+minimac4 reference.msav target.vcf.gz -o imputed.vcf.gz
+```
+
+A sites-only file can be generated with:
+```bash
+minimac4 reference.msav target.bcf -o imputed.sav -s imputed.sites.vcf.gz
+```
+
+Meta-imputation with MetaMinimac2 requires `--empirical-output` (or `-e`) to be specified:
+```bash
+minimac4 reference.msav target.bcf -o imputed.dose.sav -e imputed.empirical_dose.sav
+```
