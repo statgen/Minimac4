@@ -22,7 +22,7 @@ private:
   std::string prefix_; // deprecated
   std::string emp_out_path_;
   std::string sites_out_path_;
-  savvy::file::format out_format_ = savvy::file::format::bcf;
+  savvy::file::format out_format_ = savvy::file::format::sav;
   std::uint8_t out_compression_ = 6;
   std::vector<std::string> fmt_fields_ = {"HDS"};
   std::unordered_set<std::string> sample_ids_;

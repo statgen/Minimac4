@@ -22,7 +22,6 @@ private:
   savvy::writer out_file_;
   std::unique_ptr<savvy::writer> emp_out_file_;
   std::unique_ptr<savvy::writer> sites_out_file_;
-  savvy::file::format file_format_;
   std::unordered_set<std::string> fmt_field_set_;
   std::vector<accuracy_statistics> accuracy_stats_;
   std::size_t n_samples_ = 0;
@@ -58,6 +57,8 @@ public:
 private:
   static std::vector<std::pair<std::string, std::string>> gen_headers(const std::vector<std::string>& fmt_fields, const std::string& chromosome, bool is_temp);
   static std::vector<std::pair<std::string, std::string>> gen_emp_headers(const std::string& chromosome);
+  static savvy::file::format format_from_filename(const std::string& filename, savvy::file::format default_format);
+  static int clevel_from_filename(const std::string& filename, int default_clevel);
 
   static bool sites_match(const target_variant& t, const reference_site_info& r);
   bool has_good_r2(savvy::site_info& site);

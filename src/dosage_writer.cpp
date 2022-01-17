@@ -10,10 +10,9 @@ dosage_writer::dosage_writer(const std::string& file_path, const std::string& em
   const std::string& chromosome,
   float min_r2, bool is_temp)
   :
-  out_file_(file_path, file_format, gen_headers(fmt_fields, chromosome, is_temp), sample_ids, out_compression),
-  emp_out_file_(emp_file_path.empty() ? nullptr : new savvy::writer(emp_file_path, file_format, gen_emp_headers(chromosome), sample_ids, out_compression)),
-  sites_out_file_(sites_file_path.empty() ? nullptr : new savvy::writer(sites_file_path, file_format, gen_headers({}, chromosome, false), {}, out_compression)),
-  file_format_(file_format),
+  out_file_(file_path, format_from_filename(file_path, file_format), gen_headers(fmt_fields, chromosome, is_temp), sample_ids, clevel_from_filename(file_path, out_compression)),
+  emp_out_file_(emp_file_path.empty() ? nullptr : new savvy::writer(emp_file_path, format_from_filename(emp_file_path, file_format), gen_emp_headers(chromosome), sample_ids, clevel_from_filename(emp_file_path, out_compression))),
+  sites_out_file_(sites_file_path.empty() ? nullptr : new savvy::writer(sites_file_path, format_from_filename(sites_file_path, file_format), gen_headers({}, chromosome, false), {}, clevel_from_filename(sites_file_path, out_compression))),
   fmt_field_set_(fmt_fields.begin(), fmt_fields.end()),
   n_samples_(sample_ids.size()),
   min_r2_(min_r2),
@@ -109,6 +108,43 @@ std::vector<std::pair<std::string, std::string>> dosage_writer::gen_emp_headers(
   // TODO: command string
 
   return headers;
+}
+
+savvy::file::format dosage_writer::format_from_filename(const std::string& filename, savvy::file::format default_format)
+{
+  if (filename.size() >= 3)
+  {
+    const std::string ext = filename.substr(filename.size() - 3);
+    if (ext == "sav")
+      return savvy::file::format::sav;
+    else if (ext == "bcf")
+      return savvy::file::format::bcf;
+    else if (ext == "vcf")
+      return savvy::file::format::vcf;
+  }
+
+  if (filename.size() >= 6)
+  {
+    const std::string ext = filename.substr(filename.size() - 6);
+    if (ext == "vcf.gz")
+      return savvy::file::format::vcf;
+  }
+
+  return default_format;
+}
+
+int dosage_writer::clevel_from_filename(const std::string& filename, int default_clevel)
+{
+  if (filename.size() >= 4)
+  {
+    const std::string ext = filename.substr(filename.size() - 4);
+    if (ext == ".sav" || ext == ".bcf" || ext == "f.gz")
+      return 6;
+    else if (ext == "usav" || ext == "ubcf" || ext == ".vcf")
+      return 0;
+  }
+
+  return default_clevel;
 }
 
 bool dosage_writer::sites_match(const target_variant& t, const reference_site_info& r)
