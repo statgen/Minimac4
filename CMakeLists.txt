@@ -28,7 +28,7 @@ add_executable(minimac4
         src/input_prep.cpp src/input_prep.hpp
         src/recombination.cpp src/recombination.hpp
         src/unique_haplotype.cpp src/unique_haplotype.hpp
-        src/Main.cpp)
+        src/main.cpp)
 
 target_link_libraries(minimac4 savvy ${OMPP_LIBRARY} Threads::Threads)
 
