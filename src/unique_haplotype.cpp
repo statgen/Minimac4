@@ -174,12 +174,11 @@ bool unique_haplotype_block::serialize(savvy::writer& output_file)
       variants_.front().pos,
       variants_.front().ref, {"<BLOCK>"});
 
+    std::int32_t end_pos = variants_.front().pos;
+    for (auto it = variants_.begin(); it != variants_.end(); ++it)
+      end_pos = std::max(end_pos, std::int32_t(it->pos + std::max(it->ref.size(), it->alt.size()) - 1));
 
-//    std::int32_t last_end_val;
-//    if (variants_.back().get_info("END", last_end_val))
-//      var.set_info("END", last_end_val);
-//    else
-    var.set_info("END", std::int32_t(variants_.back().pos + std::max(variants_.back().ref.size(), variants_.back().alt.size()) - 1));
+    var.set_info("END", end_pos);
     var.set_info("VARIANTS", std::int32_t(variants_.size()));
     var.set_info("REPS", std::int32_t(cardinalities_.size()));
 
@@ -214,8 +213,11 @@ int unique_haplotype_block::deserialize(savvy::reader& input_file, savvy::varian
 {
   clear();
 
-  if (!input_file.good() || !var.get_format("UHM", unique_map_))
+  if (!input_file.good())
     return input_file.bad() ? -1 : 0;
+
+  if (!var.get_format("UHM", unique_map_))
+    return -1;
 
   std::int64_t n_variants = 0;
   var.get_info("VARIANTS", n_variants);
