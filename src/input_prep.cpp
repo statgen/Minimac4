@@ -84,6 +84,36 @@ bool stat_ref_panel(const std::string& ref_file_path, std::string& chrom, std::u
   return false;
 }
 
+void init_ploidies(std::vector<std::uint8_t>& ploidies, const std::vector<std::int8_t>& gt_vec)
+{
+  std::uint8_t max_ploidy = gt_vec.size() / ploidies.size();
+  std::fill(ploidies.begin(), ploidies.end(), max_ploidy);
+  for (std::size_t i = 0; i < gt_vec.size(); ++i)
+  {
+    if (gt_vec[i] < 0)
+      --ploidies[i / max_ploidy];
+  }
+}
+
+std::int64_t check_ploidies(const std::vector<std::uint8_t>& ploidies, const std::vector<std::int8_t>& gt_vec)
+{
+  std::uint8_t max_ploidy = gt_vec.size() / ploidies.size();
+  for (std::size_t i = 0; i < ploidies.size(); ++i)
+  {
+    std::uint8_t p = max_ploidy;
+    for (std::size_t j = 0; j < max_ploidy; ++j)
+    {
+      if (gt_vec[i * max_ploidy + j] < 0)
+        --p;
+    }
+
+    if (p != ploidies[i])
+      return std::int64_t(i);
+  }
+
+  return -1;
+}
+
 bool load_target_haplotypes(const std::string& file_path, const savvy::genomic_region& reg, std::vector<target_variant>& target_sites, std::vector<std::string>& sample_ids)
 {
   savvy::reader input(file_path);
@@ -96,12 +126,27 @@ bool load_target_haplotypes(const std::string& file_path, const savvy::genomic_r
     return std::cerr << "Error: cannot query region (" << reg.chromosome() << ":" << reg.from() << "-" << reg.to() << ") from target file. Target file must be indexed.\n", false;
 
   const auto nan = std::numeric_limits<float>::quiet_NaN();
-
+  std::vector<std::uint8_t> ploidies(sample_ids.size());
   savvy::variant var;
   std::vector<std::int8_t> tmp_geno;
   while (input >> var)
   {
     var.get_format("GT", tmp_geno);
+
+    std::int64_t ploidy_res = -1;
+    if (ploidies[0] == 0)
+      init_ploidies(ploidies, tmp_geno);
+    else
+      ploidy_res = check_ploidies(ploidies, tmp_geno);
+
+    if (ploidy_res >= 0)
+    {
+      std::cerr << "Error: Sample " << sample_ids[ploidy_res] << " changes ploidy at " << var.chrom() << ":" << var.pos() << "\n";
+      if (var.chrom() == "X" || var.chrom() == "chrX")
+        std::cerr << "Notice: PAR and non-PAR regions on chromosome X should be imputed separately\n";
+      return false;
+    }
+
     for (std::size_t i = 0; i < var.alts().size(); ++i)
     {
       std::size_t allele_idx = i + 1;
