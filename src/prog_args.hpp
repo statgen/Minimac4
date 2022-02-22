@@ -150,8 +150,16 @@ public:
         help_ = true;
         return true;
       case 'f':
-        fmt_fields_ = split_string_to_vector(optarg ? optarg : "", ',');
-        break;
+        {
+          fmt_fields_ = split_string_to_vector(optarg ? optarg : "", ',');
+          std::unordered_set<std::string> allowed = {"GT", "GP", "DS", "HDS", "SD"};
+          for (auto it = fmt_fields_.begin(); it != fmt_fields_.end(); ++it)
+          {
+            if (allowed.find(*it) == allowed.end())
+              return std::cerr << "Error: Invalid --format option (" << *it << ")\n", false;
+          }
+          break;
+        }
       case 'm':
         map_path_ = optarg ? optarg : "";
         break;
