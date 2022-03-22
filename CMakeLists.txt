@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.2)
-project(minimac4 VERSION 1.0.2)
+project(minimac4 VERSION 1.0.3)
 
 if(NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE "Release" CACHE STRING "Choose build type (Debug|Release|RelWithDebInfo|MinSizeRel)" FORCE)
@@ -19,7 +19,7 @@ if (OPENMP_FOUND)
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
 endif()
 
-
+message(NOTICE "${STATGEN_LIBRARY} ${ZLIB_LIBRARIES}")
 
 find_package(ZLIB REQUIRED)
 find_library(STATGEN_LIBRARY StatGen)
