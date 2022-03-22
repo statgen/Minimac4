@@ -336,6 +336,8 @@ public:
           {
             std::cerr << "Warning: --prefix is deprecated in favor of --output, --empirical-output, and --sites\n";
             prefix_ = optarg ? optarg : "";
+            out_format_ = savvy::file::format::vcf; // Default to VCF when --prefix is used in order to be consistent with previous behavior.
+            out_compression_ = 6;
             break;
           }
           else if (long_opt_str == "mapFile")
