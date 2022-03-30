@@ -40,6 +40,7 @@ private:
   float error_param_ = 0.01f;
   bool all_typed_sites_ = false;
   bool update_m3vcf_ = false;
+  bool compress_reference_ = false;
   bool pass_only_ = false;
   bool meta_ = false; // deprecated
   bool help_ = false;
@@ -73,6 +74,7 @@ public:
   float error_param() const { return error_param_; }
   bool all_typed_sites() const { return all_typed_sites_; }
   bool update_m3vcf() const { return update_m3vcf_; }
+  bool compress_reference() const { return compress_reference_; }
   bool pass_only() const { return pass_only_; }
 
   prog_args() :
@@ -104,6 +106,7 @@ public:
         {"sample-ids", required_argument, 0, '\x02', "Comma-separated list of sample IDs to subset from reference panel"},
         {"sample-ids-file", required_argument, 0, '\x02', "Text file containing sample IDs to subset from reference panel (one ID per line)"},
         {"update-m3vcf", no_argument, 0, '\x01', nullptr},
+        {"compress-reference", no_argument, 0, '\x01', nullptr},
         // vvvv deprecated vvvv //
         {"allTypedSites", no_argument, 0, '\x01', nullptr},
         {"rsid", no_argument, 0, '\x01', nullptr},
@@ -226,6 +229,11 @@ public:
         if (std::string(long_options_[long_index].name) == "update-m3vcf")
         {
           update_m3vcf_ = true;
+          break;
+        }
+        else if (std::string(long_options_[long_index].name) == "compress-reference")
+        {
+          compress_reference_ = true;
           break;
         }
         else if (std::string(long_options_[long_index].name) == "allTypedSites")
@@ -390,7 +398,7 @@ public:
       ref_path_ = argv[optind];
       tar_path_ = argv[optind + 1];
     }
-    else if (update_m3vcf_ && remaining_arg_count == 1)
+    else if ((update_m3vcf_ || compress_reference_) && remaining_arg_count == 1)
     {
       ref_path_ = argv[optind];
     }

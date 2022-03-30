@@ -256,6 +256,9 @@ int main(int argc, char** argv)
   if (args.update_m3vcf())
     return convert_old_m3vcf(args.ref_path(), args.out_path(), args.map_path()) ? EXIT_SUCCESS : EXIT_FAILURE;
 
+  if (args.compress_reference())
+    return compress_reference_panel(args.ref_path(), args.out_path(), args.map_path()) ? EXIT_SUCCESS : EXIT_FAILURE;
+
   std::uint64_t end_pos = args.region().to();
   std::string chrom = args.region().chromosome();
   if (!stat_ref_panel(args.ref_path(), chrom, end_pos))

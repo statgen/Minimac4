@@ -185,7 +185,7 @@ bool unique_haplotype_block::serialize(savvy::writer& output_file)
     var.set_format("UHM", unique_map_);
 
     output_file << var;
-    output_file.set_block_size(0); // Using set_block_size as a workaround to align zstd blocks with m3vcf blocks.
+    output_file.set_block_size(0x10000); // Using set_block_size as a workaround to align zstd blocks with m3vcf blocks.
 
     for (auto it = variants_.begin(); it != variants_.end() && output_file; ++it)
     {
@@ -202,7 +202,9 @@ bool unique_haplotype_block::serialize(savvy::writer& output_file)
 
       output_file << var;
     }
-    output_file.set_block_size(1 + variants_.size());
+    std::size_t m = (1 + variants_.size()) % 0x10000;
+    if (m > 0)
+      output_file.set_block_size(m); // setting block size to 1 here should have the same effect.
     return output_file.good();
   }
 

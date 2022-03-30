@@ -674,7 +674,7 @@ bool convert_old_m3vcf(const std::string& input_path, const std::string& output_
     return false;
   }
 
-  headers.insert(headers.begin(), {"subfileformat","M3VCFv3.0"});
+  headers.insert(headers.begin(), {"subfileformat","MVCFv3.0"});
   headers.insert(headers.begin(), {"fileformat","VCFv4.2"});
   if (!phasing_header_present)
     headers.emplace_back("phasing","full");
@@ -744,6 +744,116 @@ bool convert_old_m3vcf(const std::string& input_path, const std::string& output_
       return false;
     ++block_cnt;
   } while (block.deserialize(input_file, m3vcf_version, m3vcf_version == 1 ? n_samples : 2 * n_samples));
+
+  return !input_file.bad() && output_file.good();
+}
+
+bool compress_reference_panel(const std::string& input_path, const std::string& output_path, const std::string& map_file_path)
+{
+  savvy::reader input_file(input_path);
+  savvy::variant var;
+  std::vector<std::int8_t> gts;
+
+  std::vector<std::pair<std::string, std::string>> headers = {
+    {"subfileformat","MVCFv3.0"},
+    {"fileformat","VCFv4.2"},
+    {"phasing","full"},
+    {"INFO", "<ID=AC,Number=1,Type=Integer,Description=\"Total number of alternate alleles in called genotypes\">"},
+    {"INFO", "<ID=AN,Number=1,Type=Float,Description=\"Total number of alleles in called genotypes\">"},
+    {"INFO","<ID=REPS,Number=1,Type=Integer,Description=\"Number of distinct haplotypes in block\">"},
+    {"INFO","<ID=VARIANTS,Number=1,Type=Integer,Description=\"Number of variants in block\">"},
+    {"INFO","<ID=ERR,Number=1,Type=Float,Description=\"Error parameter for HMM\">"},
+    {"INFO","<ID=RECOM,Number=1,Type=Float,Description=\"Recombination probability\">"},
+    /*{"INFO","<ID=CM,Number=1,Type=Float,Description=\"Centimorgan\">"},*/
+    {"INFO","<ID=END,Number=1,Type=Integer,Description=\"End position of record\">"},
+    {"INFO","<ID=UHA,Number=.,Type=Integer,Description=\"Unique haplotype alleles\">"},
+    {"FORMAT","<ID=UHM,Number=.,Type=Integer,Description=\"Unique haplotype mapping\">"},
+  };
+
+  std::unordered_set<std::string> header_contigs;
+  for (auto it = input_file.headers().begin(); it != input_file.headers().end(); ++it)
+  {
+    if (it->first == "phasing")
+    {
+      if (it->second == "none" || it->second == "partial")
+        return std::cerr << "Error: phased genotypes are required (phasing header status is '" << it->second << "')\n", false;
+      continue;
+    }
+
+    if (it->first == "contig")
+      header_contigs.insert(savvy::parse_header_sub_field(it->second, "ID"));
+
+    if (it->first != "fileformat" && it->first != "subfileformat" && it->first != "INFO" && it->first != "FORMAT")
+      headers.emplace_back(it->first, it->second);
+  }
+
+  if (!input_file.read(var) || !var.get_format("GT", gts))
+    return std::cerr << "Error: could not read GT from first variant record in input file\n", false;
+
+  if (header_contigs.find(var.chrom()) == header_contigs.end())
+    headers.emplace_back("contig", "<ID=" + var.chrom() + ">");
+
+  float flt_nan = std::numeric_limits<float>::quiet_NaN();
+  unique_haplotype_block block;
+  block.compress_variant(reference_site_info(var.chrom(), var.pos(), var.ref(), var.alts().size() ? var.alts()[0] : "", flt_nan, flt_nan, std::numeric_limits<double>::quiet_NaN()), gts);
+  std::size_t variant_cnt = 1;
+  std::size_t block_cnt = 0;
+
+  std::string last_3;
+  if (output_path.size() >= 3)
+    last_3 = output_path.substr(output_path.size() - 3);
+  savvy::writer output_file(output_path, last_3 == "bcf" ? savvy::file::format::bcf : savvy::file::format::sav, headers, input_file.samples(), 6);
+
+  auto comp_ratio = [](const unique_haplotype_block& b)
+  {
+    return float(b.expanded_haplotype_size() + b.unique_haplotype_size() * b.variant_size()) / float(b.expanded_haplotype_size() * b.variant_size());
+  };
+
+  const std::size_t min_block_size = 10;
+  const std::size_t max_block_size = 0xFFFF; // max s1r block size minus 1 partition record
+
+  bool flush_block = false;
+  while (input_file >> var)
+  {
+    float old_cr = comp_ratio(block);
+
+    if (!var.get_format("GT", gts))
+      return std::cerr << "Error: could not read GT from variant record\n", false;
+
+    bool ret = block.compress_variant(
+      reference_site_info(var.chrom(), var.pos(), var.ref(), var.alts().size() ? var.alts()[0] : "", flt_nan, flt_nan, std::numeric_limits<double>::quiet_NaN()),
+      gts);
+
+    if (!ret)
+      return std::cerr << "Error: compressing variant failed\n", false;
+
+    ++variant_cnt;
+
+    std::size_t cnt = block.variant_size();
+    if (cnt >= min_block_size)
+    {
+      float new_cr = comp_ratio(block);
+      if (new_cr > old_cr || cnt >= max_block_size)
+      {
+        // CM INFO field would need to be a double in order to have enough precision
+        // if (map_file)
+        //  block.fill_cm(*map_file);
+
+        if (!block.serialize(output_file))
+          return std::cerr << "Error: serializing block failed\n", false;
+        block.clear();
+        ++block_cnt;
+      }
+    }
+  }
+
+  // CM INFO field would need to be a double in order to have enough precision
+  // if (map_file)
+  //  block.fill_cm(*map_file);
+
+  if (!block.serialize(output_file))
+    return std::cerr << "Error: serializing final block failed\n", false;
+  ++block_cnt;
 
   return !input_file.bad() && output_file.good();
 }
