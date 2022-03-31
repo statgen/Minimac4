@@ -484,7 +484,7 @@ void reduced_haplotypes::append_block(const unique_haplotype_block& block)
   {
     const auto& last_var_prev_block = blocks_.back().variants().back();
     const auto& first_var_new_block = block.variants().front();
-    if (last_var_prev_block.pos == first_var_new_block.pos && last_var_prev_block.alt == first_var_new_block.alt)
+    if (last_var_prev_block.pos == first_var_new_block.pos && last_var_prev_block.ref == first_var_new_block.ref && last_var_prev_block.alt == first_var_new_block.alt)
     {
       blocks_.back().pop_variant();
       --variant_count_;
