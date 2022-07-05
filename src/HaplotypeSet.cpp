@@ -1180,7 +1180,7 @@ bool HaplotypeSet::ScaffoldGWAStoReference(HaplotypeSet &rHap, AllVariable& MyAl
 	{
 
 		cout << "\n ERROR !!! \n No overlap between Target and Reference markers !!!\n";
-		cout << " Please check for consistent marker identifer in reference and target input files..\n";
+		cout << " Please check for consistent marker identifier in reference and target input files..\n";
 		cout << "\n Program Exiting ... \n\n";
         return false;
 
