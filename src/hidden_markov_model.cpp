@@ -313,7 +313,7 @@ void hidden_markov_model::impute_typed_site(double& prob_sum, std::size_t& prev_
 //      if (template_haps[i])
 //        p_alt = std::min(1.f, std::max(0.f, prob)); // TODO: + (1. - p_alt) * AF_other to support larger thresholds
       dose = template_haps[i] ? 1.f : 0.f;
-      loo_dose = observed < 0 ? savvy::typed_value::missing_value<float>() : dose;
+      loo_dose = savvy::typed_value::is_end_of_vector(observed) ? savvy::typed_value::end_of_vector_value<float>() : dose;
       return;
     }
   }
@@ -344,9 +344,9 @@ void hidden_markov_model::impute_typed_site(double& prob_sum, std::size_t& prev_
   dose = std::min(1.f, std::max(0.f, float(p_alt / prob_sum)));
   dose = float(std::int16_t(dose * bin_scalar_ + 0.5f)) / bin_scalar_; // bin
 
-  if (observed < 0)
+  if (savvy::typed_value::is_end_of_vector(observed))
   {
-    loo_dose = savvy::typed_value::missing_value<float>();
+    loo_dose = savvy::typed_value::end_of_vector_value<float>();
   }
   else
   {

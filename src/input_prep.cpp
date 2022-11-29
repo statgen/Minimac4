@@ -90,7 +90,7 @@ void init_ploidies(std::vector<std::uint8_t>& ploidies, const std::vector<std::i
   std::fill(ploidies.begin(), ploidies.end(), max_ploidy);
   for (std::size_t i = 0; i < gt_vec.size(); ++i)
   {
-    if (gt_vec[i] < 0)
+    if (savvy::typed_value::is_end_of_vector(gt_vec[i]))
       --ploidies[i / max_ploidy];
   }
 }
@@ -103,7 +103,7 @@ std::int64_t check_ploidies(const std::vector<std::uint8_t>& ploidies, const std
     std::uint8_t p = max_ploidy;
     for (std::size_t j = 0; j < max_ploidy; ++j)
     {
-      if (gt_vec[i * max_ploidy + j] < 0)
+      if (savvy::typed_value::is_end_of_vector(gt_vec[i * max_ploidy + j]))
         --p;
     }
 
