@@ -12,7 +12,7 @@ bool unique_haplotype_block::compress_variant(const reference_site_info& site_in
   if (alleles.empty())
     return false;
 
-  variants_.emplace_back(site_info.chrom, site_info.pos, site_info.ref, site_info.alt, site_info.err, site_info.recom, site_info.cm, 0, std::vector<std::int8_t>());
+  variants_.emplace_back(site_info.chrom, site_info.pos, site_info.id, site_info.ref, site_info.alt, site_info.err, site_info.recom, site_info.cm, 0, std::vector<std::int8_t>());
 
   if (variants_.size() == 1)
   {
@@ -172,7 +172,7 @@ bool unique_haplotype_block::serialize(savvy::writer& output_file)
   {
     var = savvy::site_info(variants_.front().chrom,
       variants_.front().pos,
-      variants_.front().ref, {"<BLOCK>"});
+      variants_.front().ref, {"<BLOCK>"}, variants_.front().id);
 
     std::int32_t end_pos = variants_.front().pos;
     for (auto it = variants_.begin(); it != variants_.end(); ++it)
@@ -189,7 +189,7 @@ bool unique_haplotype_block::serialize(savvy::writer& output_file)
 
     for (auto it = variants_.begin(); it != variants_.end() && output_file; ++it)
     {
-      var = savvy::variant(it->chrom, it->pos, it->ref, {it->alt});
+      var = savvy::variant(it->chrom, it->pos, it->ref, {it->alt}, it->id);
       var.set_info("AC", std::int32_t(it->ac));
       var.set_info("AN", std::int32_t(unique_map_.size()));
       if (!std::isnan(it->err))
@@ -240,6 +240,7 @@ int unique_haplotype_block::deserialize(savvy::reader& input_file, savvy::varian
 
     variants_.back().chrom = var.chrom();
     variants_.back().pos = var.position();
+    variants_.back().id = var.id();
     variants_.back().ref = var.ref();
     variants_.back().alt = var.alts().size() ? var.alts()[0] : "";
     var.get_info("ERR", variants_.back().err);
@@ -379,6 +380,7 @@ bool unique_haplotype_block::deserialize(std::istream& is, int m3vcf_version, st
 
     variants_[i].chrom = cols[0];
     variants_[i].pos = std::atoll(cols[1].c_str());
+    variants_[i].id = cols[2];
     variants_[i].ref = cols[3];
     variants_[i].alt = cols[4];
 

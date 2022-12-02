@@ -150,7 +150,7 @@ bool load_target_haplotypes(const std::string& file_path, const savvy::genomic_r
     for (std::size_t i = 0; i < var.alts().size(); ++i)
     {
       std::size_t allele_idx = i + 1;
-      target_sites.push_back({var.chromosome(), var.position(), var.ref(), var.alts()[i], true, false, nan, nan, nan, {}});
+      target_sites.push_back({var.chromosome(), var.position(), var.id(), var.ref(), var.alts()[i], true, false, nan, nan, nan, {}});
       if (var.alts().size() == 1)
         tmp_geno.swap(target_sites.back().gt);
       else
@@ -223,7 +223,7 @@ bool load_reference_haplotypes(const std::string& file_path,
             for (std::size_t i = 0; i < tmp_geno.size(); ++i)
               tmp_geno[i] = ref_it->gt[block.unique_map()[i]];
 
-            typed_only_reference_data.compress_variant({ref_it->chrom, ref_it->pos, ref_it->ref, ref_it->alt, ref_it->err, ref_it->recom, ref_it->cm}, tmp_geno);
+            typed_only_reference_data.compress_variant({ref_it->chrom, ref_it->pos, ref_it->id, ref_it->ref, ref_it->alt, ref_it->err, ref_it->recom, ref_it->cm}, tmp_geno);
 
             it->af = std::accumulate(tmp_geno.begin(), tmp_geno.end(), 0.f) / tmp_geno.size();
             it->af = float((--typed_only_reference_data.end())->ac) / tmp_geno.size();
@@ -308,7 +308,7 @@ bool load_reference_haplotypes(const std::string& file_path,
             for (std::size_t i = 0; i < tmp_geno.size(); ++i)
               tmp_geno[i] = ref_it->gt[block.unique_map()[i]];
 
-            typed_only_reference_data.compress_variant({ref_it->chrom, ref_it->pos, ref_it->ref, ref_it->alt, ref_it->err, ref_it->recom, ref_it->cm}, tmp_geno);
+            typed_only_reference_data.compress_variant({ref_it->chrom, ref_it->pos, ref_it->id, ref_it->ref, ref_it->alt, ref_it->err, ref_it->recom, ref_it->cm}, tmp_geno);
 
             it->af = std::accumulate(tmp_geno.begin(), tmp_geno.end(), 0.f) / tmp_geno.size();
             it->af = float((--typed_only_reference_data.end())->ac) / tmp_geno.size();
@@ -403,7 +403,7 @@ bool load_reference_haplotypes_old_recom_approach(const std::string& file_path,
             for (std::size_t i = 0; i < tmp_geno.size(); ++i)
               tmp_geno[i] = ref_it->gt[block.unique_map()[i]];
 
-            typed_only_reference_data.compress_variant({ref_it->chrom, ref_it->pos, ref_it->ref, ref_it->alt, ref_it->err, ref_it->recom, ref_it->cm}, tmp_geno);
+            typed_only_reference_data.compress_variant({ref_it->chrom, ref_it->pos, ref_it->id, ref_it->ref, ref_it->alt, ref_it->err, ref_it->recom, ref_it->cm}, tmp_geno);
 
             it->af = std::accumulate(tmp_geno.begin(), tmp_geno.end(), 0.f) / tmp_geno.size();
             it->af = float((--typed_only_reference_data.end())->ac) / tmp_geno.size();
@@ -501,7 +501,7 @@ bool load_reference_haplotypes_old_recom_approach(const std::string& file_path,
             for (std::size_t i = 0; i < tmp_geno.size(); ++i)
               tmp_geno[i] = ref_it->gt[block.unique_map()[i]];
 
-            typed_only_reference_data.compress_variant({ref_it->chrom, ref_it->pos, ref_it->ref, ref_it->alt, ref_it->err, ref_it->recom, ref_it->cm}, tmp_geno);
+            typed_only_reference_data.compress_variant({ref_it->chrom, ref_it->pos, ref_it->id, ref_it->ref, ref_it->alt, ref_it->err, ref_it->recom, ref_it->cm}, tmp_geno);
 
             it->af = std::accumulate(tmp_geno.begin(), tmp_geno.end(), 0.f) / tmp_geno.size();
             it->af = float((--typed_only_reference_data.end())->ac) / tmp_geno.size();
@@ -795,7 +795,7 @@ bool compress_reference_panel(const std::string& input_path, const std::string& 
 
   float flt_nan = std::numeric_limits<float>::quiet_NaN();
   unique_haplotype_block block;
-  block.compress_variant(reference_site_info(var.chrom(), var.pos(), var.ref(), var.alts().size() ? var.alts()[0] : "", flt_nan, flt_nan, std::numeric_limits<double>::quiet_NaN()), gts);
+  block.compress_variant(reference_site_info(var.chrom(), var.pos(), var.id(), var.ref(), var.alts().size() ? var.alts()[0] : "", flt_nan, flt_nan, std::numeric_limits<double>::quiet_NaN()), gts);
   std::size_t variant_cnt = 1;
   std::size_t block_cnt = 0;
 
@@ -821,7 +821,7 @@ bool compress_reference_panel(const std::string& input_path, const std::string& 
       return std::cerr << "Error: could not read GT from variant record\n", false;
 
     bool ret = block.compress_variant(
-      reference_site_info(var.chrom(), var.pos(), var.ref(), var.alts().size() ? var.alts()[0] : "", flt_nan, flt_nan, std::numeric_limits<double>::quiet_NaN()),
+      reference_site_info(var.chrom(), var.pos(), var.id(), var.ref(), var.alts().size() ? var.alts()[0] : "", flt_nan, flt_nan, std::numeric_limits<double>::quiet_NaN()),
       gts);
 
     if (!ret)

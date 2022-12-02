@@ -378,7 +378,7 @@ bool dosage_writer::write_dosages(const full_dosages_results& hmm_results, const
 
     while(tar_only_it != tar_only_variants.end() && tar_only_it->pos <= ref_it->pos)
     {
-      out_var = savvy::site_info(tar_only_it->chrom, tar_only_it->pos, tar_only_it->ref, {tar_only_it->alt}, ""/*ref_var.id()*/); // TODO: ID
+      out_var = savvy::site_info(tar_only_it->chrom, tar_only_it->pos, tar_only_it->ref, {tar_only_it->alt}, tar_only_it->id);
       std::vector<std::int8_t> observed(tar_only_it->gt.begin() + observed_range.first, tar_only_it->gt.begin() + observed_range.second);
       sparse_dosages.assign(observed.begin(), observed.end());
       set_info_fields(out_var, sparse_dosages, {}, observed);
@@ -407,7 +407,7 @@ bool dosage_writer::write_dosages(const full_dosages_results& hmm_results, const
     //          loo_dosages[j] = float(std::int16_t(hmm_results.loo_dosage(tar_idx, j) * bin_scalar_ + 0.5f)) / bin_scalar_;
     //      }
 
-    out_var = savvy::site_info(ref_it->chrom, ref_it->pos, ref_it->ref, {ref_it->alt}, ""/*ref_var.id()*/); // TODO: ID
+    out_var = savvy::site_info(ref_it->chrom, ref_it->pos, ref_it->ref, {ref_it->alt}, ref_it->id);
     assert(!std::isnan(hmm_results.dosages_[i][0]));
     sparse_dosages.assign(hmm_results.dosages_[i].begin(), hmm_results.dosages_[i].end());
     if (ref_matches_tar)
@@ -418,7 +418,7 @@ bool dosage_writer::write_dosages(const full_dosages_results& hmm_results, const
 
       if (emp_out_file_ && has_good_r2(out_var))
       {
-        out_var_emp = savvy::site_info(ref_it->chrom, ref_it->pos, ref_it->ref, {ref_it->alt}, ""/*ref_var.id()*/);
+        out_var_emp = savvy::site_info(ref_it->chrom, ref_it->pos, ref_it->ref, {ref_it->alt}, ref_it->id);
         out_var_emp.set_info("TYPED", std::vector<std::int8_t>());
         out_var_emp.set_info("IMPUTED", std::vector<std::int8_t>());
         out_var_emp.set_format("GT", observed);
@@ -452,7 +452,7 @@ bool dosage_writer::write_dosages(const full_dosages_results& hmm_results, const
 
   while(tar_only_it != tar_only_variants.end() && tar_only_it->pos <= impute_region.to())
   {
-    out_var = savvy::site_info(tar_only_it->chrom, tar_only_it->pos, tar_only_it->ref, {tar_only_it->alt}, ""/*ref_var.id()*/); // TODO: ID
+    out_var = savvy::site_info(tar_only_it->chrom, tar_only_it->pos, tar_only_it->ref, {tar_only_it->alt}, tar_only_it->id);
     std::vector<std::int8_t> observed(tar_only_it->gt.begin() + observed_range.first, tar_only_it->gt.begin() + observed_range.second);
     sparse_dosages.assign(observed.begin(), observed.end());
     set_info_fields(out_var, sparse_dosages, {}, observed);
