@@ -345,6 +345,32 @@ bool dosage_writer::has_good_r2(savvy::site_info& site)
   return true;
 }
 
+bool dosage_writer::mean_impute(savvy::compressed_vector<float>& sparse_dosages)
+{
+  std::int64_t n = sparse_dosages.size();
+  float s = 0.f;
+  for (auto it = sparse_dosages.begin(); it != sparse_dosages.end(); ++it)
+  {
+    if (savvy::typed_value::is_special_value(*it))
+      --n;
+    else
+      s += *it;
+  }
+
+  if (n > 0)
+  {
+    float mean = s / n;
+    for (auto it = sparse_dosages.begin(); it != sparse_dosages.end(); ++it)
+    {
+      if (savvy::typed_value::is_missing(*it))
+        *it = mean;
+    }
+    return true;
+  }
+
+  return false;
+}
+
 bool dosage_writer::write_dosages(const full_dosages_results& hmm_results, const std::vector<target_variant>& tar_variants, const std::vector<target_variant>& tar_only_variants, std::pair<std::size_t, std::size_t> observed_range, const reduced_haplotypes& full_reference_data, const savvy::region& impute_region)
 {
   assert(hmm_results.dimensions()[0] == full_reference_data.variant_size());
@@ -382,26 +408,8 @@ bool dosage_writer::write_dosages(const full_dosages_results& hmm_results, const
       std::vector<std::int8_t> observed(tar_only_it->gt.begin() + observed_range.first, tar_only_it->gt.begin() + observed_range.second);
       sparse_dosages.assign(observed.begin(), observed.end(), savvy::typed_value::reserved_transformation_functor<float>());
 
-      // Mean impute
-      std::int64_t n = sparse_dosages.size();
-      float s = 0.f;
-      for (auto it = sparse_dosages.begin(); it != sparse_dosages.end(); ++it)
+      if (mean_impute(sparse_dosages))
       {
-        if (savvy::typed_value::is_special_value(*it))
-          --n;
-        else
-          s += *it;
-      }
-
-      if (n > 0)
-      {
-        float mean = s / n;
-        for (auto it = sparse_dosages.begin(); it != sparse_dosages.end(); ++it)
-        {
-          if (savvy::typed_value::is_missing(*it))
-            *it = mean;
-        }
-
         set_info_fields(out_var, sparse_dosages, {}, observed);
         if (has_good_r2(out_var))
         {
@@ -476,19 +484,23 @@ bool dosage_writer::write_dosages(const full_dosages_results& hmm_results, const
   {
     out_var = savvy::site_info(tar_only_it->chrom, tar_only_it->pos, tar_only_it->ref, {tar_only_it->alt}, tar_only_it->id);
     std::vector<std::int8_t> observed(tar_only_it->gt.begin() + observed_range.first, tar_only_it->gt.begin() + observed_range.second);
-    sparse_dosages.assign(observed.begin(), observed.end());
-    set_info_fields(out_var, sparse_dosages, {}, observed);
-    if (has_good_r2(out_var))
-    {
-      if (sites_out_file_)
-      {
-        savvy::variant site_var;
-        dynamic_cast<savvy::site_info&>(site_var) = out_var;
-        sites_out_file_->write(site_var);
-      }
+    sparse_dosages.assign(observed.begin(), observed.end(), savvy::typed_value::reserved_transformation_functor<float>());
 
-      set_format_fields(out_var, sparse_dosages);
-      out_file_ << out_var;
+    if (mean_impute(sparse_dosages))
+    {
+      set_info_fields(out_var, sparse_dosages, {}, observed);
+      if (has_good_r2(out_var))
+      {
+        if (sites_out_file_)
+        {
+          savvy::variant site_var;
+          dynamic_cast<savvy::site_info&>(site_var) = out_var;
+          sites_out_file_->write(site_var);
+        }
+
+        set_format_fields(out_var, sparse_dosages);
+        out_file_ << out_var;
+      }
     }
     ++tar_only_it;
   }

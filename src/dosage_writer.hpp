@@ -55,6 +55,7 @@ public:
 
   void print_mean_er2(std::ostream& os) const;
 private:
+  static bool mean_impute(savvy::compressed_vector<float>& sparse_dosages);
   static std::vector<std::pair<std::string, std::string>> gen_headers(const std::vector<std::string>& fmt_fields, const std::string& chromosome, bool is_temp);
   static std::vector<std::pair<std::string, std::string>> gen_emp_headers(const std::string& chromosome);
   static savvy::file::format format_from_filename(const std::string& filename, savvy::file::format default_format);
