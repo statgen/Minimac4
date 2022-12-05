@@ -112,6 +112,8 @@ public:
         {"rsid", no_argument, 0, '\x01', nullptr},
         //{"passOnly", no_argument, 0, '\x01', nullptr},
         {"meta", no_argument, 0, '\x01', nullptr},
+        {"noPhoneHome", no_argument, 0, '\x01', nullptr},
+        {"referenceEstimates", no_argument, 0, '\x01', nullptr},
         {"haps", required_argument, 0, '\x02', nullptr},
         {"refHaps", required_argument, 0, '\x02', nullptr},
         {"prefix", required_argument, 0, '\x02', nullptr},
@@ -123,7 +125,7 @@ public:
         {"ChunkOverlapMb", required_argument, 0, '\x02', nullptr},
         {"ChunkLengthMb", required_argument, 0, '\x02', nullptr},
         {"cpus", required_argument, 0, '\x02', nullptr},
-        {"minRatio", no_argument, 0, '\x02', nullptr}
+        {"minRatio", required_argument, 0, '\x02', nullptr}
       })
   {
   }
@@ -257,6 +259,16 @@ public:
         {
           std::cerr << "Warning: --meta is deprecated in favor of --empirical-output\n";
           meta_ = true;
+          break;
+        }
+        else if (std::string(long_options_[long_index].name) == "noPhoneHome")
+        {
+          std::cerr << "Warning: --noPhoneHome is deprecated and ignored\n";
+          break;
+        }
+        else if (std::string(long_options_[long_index].name) == "referenceEstimates")
+        {
+          std::cerr << "Warning: --referenceEstimates is deprecated and ignored\n";
           break;
         }
         // else pass through to default
