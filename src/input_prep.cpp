@@ -851,9 +851,12 @@ bool compress_reference_panel(const std::string& input_path, const std::string& 
   // if (map_file)
   //  block.fill_cm(*map_file);
 
-  if (!block.serialize(output_file))
-    return std::cerr << "Error: serializing final block failed\n", false;
-  ++block_cnt;
+  if (block.variants().size())
+  {
+    if (!block.serialize(output_file))
+      return std::cerr << "Error: serializing final block failed\n", false;
+    ++block_cnt;
+  }
 
   return !input_file.bad() && output_file.good();
 }
