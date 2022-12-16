@@ -12,6 +12,7 @@ cd ${build_dir}
 
 export CFLAGS="-fPIC"
 export CXXFLAGS="-fPIC"
+cget ignore xz
 cget install zlib,http://zlib.net/fossils/zlib-1.2.11.tar.gz
 rm cget/lib/libz.so
 cget install -f ${src_dir}/requirements.txt

@@ -1,2 +1,2 @@
 statgen/savvy@v2.1.0
-jonathonl/omp@522849581eb900a8bce9621a557ef1cadf600441
+jonathonl/omp@v1.0.0
