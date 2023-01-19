@@ -10,7 +10,7 @@ ref_msav=$d/$(basename $2 .vcf).msav
 tar_vcf=$d/$(basename $3).gz
 imputed_vcf=$d/imputed.vcf.gz
 
-`which bcftools` || echo "Error: bcftools is required to run tests. On debian run `apt install bcftools`" > /dev/stderr
+which bcftools || (>&2 echo "Error: bcftools is required to run tests. On debian run 'apt install bcftools'"; exit 1)
 
 bcftools view $2 -Oz -o $ref_vcf
 bcftools index $ref_vcf
