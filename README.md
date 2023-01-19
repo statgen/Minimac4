@@ -25,6 +25,15 @@ make                                                    # Build.
 make install                                            # Install
 ```
 
+To build and run tests from build directory:
+```bash
+# bcftools is required to run tests
+cmake -DCMAKE_TOOLCHAIN_FILE=../cget/cget/cget.cmake -DBUILD_TESTS=ON ..
+make
+make CTEST_OUTPUT_ON_FAILURE=1 test
+```
+
+
 ## Usage
 See `minimac4 --help` for detailed usage.
 
