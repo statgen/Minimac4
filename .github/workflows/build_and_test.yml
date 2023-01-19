@@ -1,0 +1,27 @@
+name: build and run tests
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+jobs:
+  build:
+    runs-on: ubuntu-20.04
+    steps:
+    - uses: actions/checkout@v2
+    - name: build and test
+      shell: bash
+      run: |
+        set -euo pipefail
+        sudo apt update
+        sudo apt install -y build-essential bcftools cmake git gzip python3-dev python3-pip python3-setuptools
+        pip3 --version
+        pip3 install wheel
+        pip3 install cget
+        cget ignore xz
+        cget install -f ./requirements.txt
+        cmake --version
+        mkdir build && cd build
+        cmake -DBUILD_TESTS=1 -DCMAKE_TOOLCHAIN_FILE=../cget/cget/cget.cmake -DCMAKE_BUILD_TYPE=Debug ..
+        make
+        make CTEST_OUTPUT_ON_FAILURE=1 test
