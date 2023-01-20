@@ -115,7 +115,7 @@ bool unique_haplotype_block::compress_variant(const reference_site_info& site_in
       variants_.back().ac += cardinalities_[i];
   }
 
-  assert(std::accumulate(cardinalities_.begin(), cardinalities_.end(), std::size_t(0)) == unique_map_.size());
+  assert(std::accumulate(cardinalities_.begin(), cardinalities_.end(), std::size_t(0)) == unique_map_.size() - std::count(unique_map_.begin(), unique_map_.end(), savvy::typed_value::end_of_vector_value<decltype(unique_map_)::value_type>()));
 
   return true;
 }
