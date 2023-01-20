@@ -205,6 +205,7 @@ bool load_reference_haplotypes(const std::string& file_path,
     int res;
     while ((res = block.deserialize(input, var)) > 0)
     {
+      block.remove_eov();
       if (block.variants().empty() || block.variants().front().pos > extended_reg.to())
         break;
 
@@ -378,6 +379,7 @@ bool load_reference_haplotypes_old_recom_approach(const std::string& file_path,
     int res;
     while ((res = block.deserialize(input, var)) > 0)
     {
+      block.remove_eov();
       if (block.variants().empty() || block.variants().front().pos > extended_reg.to())
         break;
 

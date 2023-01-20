@@ -39,6 +39,9 @@ public:
   bool deserialize(std::istream& is, int m3vcf_version, std::size_t n_haplotypes);
   int deserialize(savvy::reader& input_file, savvy::variant& var); // return <0 is error, 0 is EOF, >0 good
   bool serialize(savvy::writer& output_file);
+
+  // removes end_of_vector values from unique_map. Can cause serialization errors if not handled properly.
+  void remove_eov();
 };
 
 class reduced_haplotypes

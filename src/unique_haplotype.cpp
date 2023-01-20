@@ -23,6 +23,12 @@ bool unique_haplotype_block::compress_variant(const reference_site_info& site_in
 
     for (std::size_t i = 1; i < alleles.size(); ++i)
     {
+      if (savvy::typed_value::is_end_of_vector(alleles[i]))
+      {
+        unique_map_[i] = savvy::typed_value::end_of_vector_value<decltype(unique_map_)::value_type>();
+        continue;
+      }
+
       std::size_t j = 0;
       for (; j < variants_[0].gt.size(); ++j)
       {
@@ -49,6 +55,13 @@ bool unique_haplotype_block::compress_variant(const reference_site_info& site_in
 
     for (std::size_t i = 0; i < alleles.size(); ++i)
     {
+      if (savvy::typed_value::is_end_of_vector(alleles[i]))
+      {
+        if (!savvy::typed_value::is_end_of_vector(unique_map_[i]))
+          return std::cerr << "Error: sample ploidy is not consistent", false;
+        continue;
+      }
+
       std::size_t original_hap_idx = unique_map_[i];
       if (variants_.back().gt[original_hap_idx] != alleles[i])
       {
@@ -228,7 +241,10 @@ int unique_haplotype_block::deserialize(savvy::reader& input_file, savvy::varian
 
   cardinalities_.resize(n_reps);
   for (auto it = unique_map_.begin(); it != unique_map_.end(); ++it)
-    ++cardinalities_[*it];
+  {
+    if (*it >= 0)
+      ++cardinalities_[*it];
+  }
 
   variants_.reserve(n_variants);
   while (input_file >> var)
@@ -261,6 +277,17 @@ int unique_haplotype_block::deserialize(savvy::reader& input_file, savvy::varian
   {
     assert(variants_.size());
     return variants_.size() + 1;
+  }
+}
+
+void unique_haplotype_block::remove_eov()
+{
+  for (auto it = unique_map_.begin(); it != unique_map_.end(); )
+  {
+    if (savvy::typed_value::is_end_of_vector(*it))
+      it = unique_map_.erase(it);
+    else
+      ++it;
   }
 }
 

@@ -34,7 +34,8 @@ target_link_libraries(minimac4 savvy ${OMPP_LIBRARY} Threads::Threads)
 
 if(BUILD_TESTS)
     enable_testing()
-    add_test(simple_test ${CMAKE_SOURCE_DIR}/test/simple-test.sh ${CMAKE_BINARY_DIR}/minimac4 ${CMAKE_SOURCE_DIR}/test/input/ref_panel.vcf ${CMAKE_SOURCE_DIR}/test/input/tar_panel.vcf)
+    add_test(simple_test ${CMAKE_SOURCE_DIR}/test/simple-test.sh ${CMAKE_BINARY_DIR}/minimac4 m4_simple_test_output ${CMAKE_SOURCE_DIR}/test/input/ref_panel.vcf ${CMAKE_SOURCE_DIR}/test/input/tar_panel.vcf)
+    add_test(haploid_and_diploid_test ${CMAKE_SOURCE_DIR}/test/simple-test.sh ${CMAKE_BINARY_DIR}/minimac4 m4_haploid_and_diploid_test_output ${CMAKE_SOURCE_DIR}/test/input/ref_panel_with_haploid_sample.vcf ${CMAKE_SOURCE_DIR}/test/input/tar_panel_with_haploid_sample.vcf)
 endif()
 
 install(TARGETS minimac4 RUNTIME DESTINATION bin)
