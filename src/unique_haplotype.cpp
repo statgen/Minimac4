@@ -58,7 +58,7 @@ bool unique_haplotype_block::compress_variant(const reference_site_info& site_in
       if (savvy::typed_value::is_end_of_vector(alleles[i]))
       {
         if (!savvy::typed_value::is_end_of_vector(unique_map_[i]))
-          return std::cerr << "Error: sample ploidy is not consistent", false;
+          return std::cerr << "Error: sample ploidy is not consistent\n", false;
         continue;
       }
 
