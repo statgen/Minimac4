@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.2)
-project(minimac4 VERSION 4.1.1)
+project(minimac4 VERSION 4.1.2)
 
 if(NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE "Release" CACHE STRING "Choose build type (Debug|Release|RelWithDebInfo|MinSizeRel)" FORCE)
