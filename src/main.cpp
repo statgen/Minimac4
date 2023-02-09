@@ -146,14 +146,14 @@ public:
         if (target_sites[0].gt.size() > haplotype_buffer_size)
         {
           std::string out_emp_path;
-          std::string out_path = "/tmp/m4_" + std::to_string(i / haplotype_buffer_size) + "_XXXXXX";
+          std::string out_path = args.temp_prefix() + std::to_string(i / haplotype_buffer_size) + "_XXXXXX";
           tmp_fd = mkstemp(&out_path[0]);
           if (tmp_fd < 0)
             return std::cerr << "Error: could not open temp file (" << out_path << ")" << std::endl, false;
 
           if (args.emp_out_path().size())
           {
-            out_emp_path = "/tmp/m4_" + std::to_string(i / haplotype_buffer_size) + "_emp_XXXXXX";
+            out_emp_path =  args.temp_prefix() + std::to_string(i / haplotype_buffer_size) + "_emp_XXXXXX";
             tmp_emp_fd = mkstemp(&out_emp_path[0]);
             if (tmp_emp_fd < 0)
               return std::cerr << "Error: could not open temp file (" << out_emp_path << ")" << std::endl, false;

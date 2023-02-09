@@ -9,6 +9,7 @@
 #include <vector>
 #include <unordered_set>
 #include <cstdint>
+#include <cstdlib>
 #include <fstream>
 #include <iterator>
 
@@ -19,6 +20,7 @@ private:
   std::string tar_path_;
   std::string map_path_;
   std::string out_path_ = "/dev/stdout";
+  std::string temp_prefix_;
   std::string prefix_; // deprecated
   std::string emp_out_path_;
   std::string sites_out_path_;
@@ -56,6 +58,7 @@ public:
   const std::string& out_path() const { return out_path_; }
   const std::string& emp_out_path() const { return emp_out_path_; }
   const std::string& sites_out_path() const { return sites_out_path_; }
+  const std::string& temp_prefix() const { return temp_prefix_; }
   savvy::file::format out_format() const { return out_format_; }
   std::uint8_t out_compression() const { return out_compression_; }
   const std::vector<std::string>& fmt_fields() const { return fmt_fields_; }
@@ -105,6 +108,7 @@ public:
         {"diff-threshold", required_argument, 0, '\x02', "Probability diff threshold used in template selection"},
         {"sample-ids", required_argument, 0, '\x02', "Comma-separated list of sample IDs to subset from reference panel"},
         {"sample-ids-file", required_argument, 0, '\x02', "Text file containing sample IDs to subset from reference panel (one ID per line)"},
+        {"temp-prefix", required_argument, 0, '\x02', "Prefix path for temporary output files (default: ${TMPDIR}/m4_)"},
         {"update-m3vcf", no_argument, 0, '\x01', nullptr},
         {"compress-reference", no_argument, 0, '\x01', nullptr},
         // vvvv deprecated vvvv //
@@ -444,6 +448,22 @@ public:
       sites_out_path_ = prefix_ + ".sites." + suffix;
       if (meta_)
         emp_out_path_ = prefix_ + ".empiricalDose." + suffix;
+    }
+
+    if (temp_prefix_.empty())
+    {
+      char* tmpdir = std::getenv("TMPDIR");
+      if (tmpdir && strlen(tmpdir))
+      {
+        std::string p(tmpdir);
+        if (p.back() != '/')
+          p += '/';
+        temp_prefix_ = p + "m4_";
+      }
+      else
+      {
+        temp_prefix_ = "/tmp/m4_";
+      }
     }
 
     if (!emp_out_path_.empty() && std::find(fmt_fields_.begin(), fmt_fields_.end(), "HDS") == fmt_fields_.end())
