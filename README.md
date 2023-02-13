@@ -33,6 +33,15 @@ make
 make CTEST_OUTPUT_ON_FAILURE=1 test
 ```
 
+Since some users have reported issues with installing cget with pip, a cmake-only alternative is available:
+```shell
+cmake -P dependencies.cmake deps/
+mkdir build; cd build
+cmake -DCMAKE_PREFIX_PATH=$(pwd)/../deps/ -DCMAKE_CXX_FLAGS="-I$(pwd)/../deps/include" ..
+make
+make install
+```
+
 
 ## Usage
 See `minimac4 --help` for detailed usage.
