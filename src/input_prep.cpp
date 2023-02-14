@@ -680,8 +680,8 @@ bool convert_old_m3vcf(const std::string& input_path, const std::string& output_
   headers.insert(headers.begin(), {"fileformat","VCFv4.2"});
   if (!phasing_header_present)
     headers.emplace_back("phasing","full");
-  headers.emplace_back("INFO", "<ID=AC,Number=1,Type=Integer,Description=\"Total number of alternate alleles in called genotypes\">");
-  headers.emplace_back("INFO", "<ID=AN,Number=1,Type=Float,Description=\"Total number of alleles in called genotypes\">");
+  headers.emplace_back("INFO", "<ID=AC,Number=A,Type=Integer,Description=\"Total number of alternate alleles in called genotypes\">");
+  headers.emplace_back("INFO", "<ID=AN,Number=1,Type=Integer,Description=\"Total number of alleles in called genotypes\">");
   headers.emplace_back("INFO","<ID=REPS,Number=1,Type=Integer,Description=\"Number of distinct haplotypes in block\">");
   headers.emplace_back("INFO","<ID=VARIANTS,Number=1,Type=Integer,Description=\"Number of variants in block\">");
   headers.emplace_back("INFO","<ID=ERR,Number=1,Type=Float,Description=\"Error parameter for HMM\">");
@@ -760,8 +760,8 @@ bool compress_reference_panel(const std::string& input_path, const std::string& 
     {"subfileformat","MVCFv3.0"},
     {"fileformat","VCFv4.2"},
     {"phasing","full"},
-    {"INFO", "<ID=AC,Number=1,Type=Integer,Description=\"Total number of alternate alleles in called genotypes\">"},
-    {"INFO", "<ID=AN,Number=1,Type=Float,Description=\"Total number of alleles in called genotypes\">"},
+    {"INFO", "<ID=AC,Number=A,Type=Integer,Description=\"Total number of alternate alleles in called genotypes\">"},
+    {"INFO", "<ID=AN,Number=1,Type=Integer,Description=\"Total number of alleles in called genotypes\">"},
     {"INFO","<ID=REPS,Number=1,Type=Integer,Description=\"Number of distinct haplotypes in block\">"},
     {"INFO","<ID=VARIANTS,Number=1,Type=Integer,Description=\"Number of variants in block\">"},
     {"INFO","<ID=ERR,Number=1,Type=Float,Description=\"Error parameter for HMM\">"},

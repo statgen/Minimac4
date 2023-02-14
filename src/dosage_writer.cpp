@@ -58,7 +58,7 @@ std::vector<std::pair<std::string, std::string>> dosage_writer::gen_headers(cons
       {"source", "Minimac v" + std::string(VERSION)},
       {"phasing", "full"},
       {"contig", "<ID=" + std::string(chromosome) + ">"},
-      {"INFO", "<ID=AF,Number=1,Type=Float,Description=\"Estimated Alternate Allele Frequency\">"},
+      {"INFO", "<ID=AF,Number=A,Type=Float,Description=\"Estimated Alternate Allele Frequency\">"},
       {"INFO", "<ID=MAF,Number=1,Type=Float,Description=\"Estimated Minor Allele Frequency\">"},
       {"INFO", "<ID=AVG_CS,Number=1,Type=Float,Description=\"Average Call Score\">"},
       {"INFO", "<ID=R2,Number=1,Type=Float,Description=\"Estimated Imputation Accuracy (R-square)\">"},
@@ -73,11 +73,11 @@ std::vector<std::pair<std::string, std::string>> dosage_writer::gen_headers(cons
     if (f == "GT")
       headers.emplace_back("FORMAT", "<ID=GT,Number=1,Type=String,Description=\"Genotype\">");
     else if (f == "DS")
-      headers.emplace_back("FORMAT", "<ID=DS,Number=1,Type=Float,Description=\"Estimated Alternate Allele Dosage : [P(0/1)+2*P(1/1)]\">");
+      headers.emplace_back("FORMAT", "<ID=DS,Number=A,Type=Float,Description=\"Estimated Alternate Allele Dosage : [P(0/1)+2*P(1/1)]\">");
     else if (f == "HDS")
-      headers.emplace_back("FORMAT", "<ID=HDS,Number=2,Type=Float,Description=\"Estimated Haploid Alternate Allele Dosage \">");
+      headers.emplace_back("FORMAT", "<ID=HDS,Number=.,Type=Float,Description=\"Estimated Haploid Alternate Allele Dosage \">");
     else if (f == "GP")
-      headers.emplace_back("FORMAT", "<ID=GP,Number=3,Type=Float,Description=\"Estimated Posterior Probabilities for Genotypes 0/0, 0/1 and 1/1 \">");
+      headers.emplace_back("FORMAT", "<ID=GP,Number=G,Type=Float,Description=\"Estimated Posterior Probabilities for Genotypes 0/0, 0/1 and 1/1 \">");
     else if (f == "SD")
       headers.emplace_back("FORMAT", "<ID=SD,Number=1,Type=Float,Description=\"Variance of Posterior Genotype Probabilities\">");
   }
@@ -103,7 +103,7 @@ std::vector<std::pair<std::string, std::string>> dosage_writer::gen_emp_headers(
     {"INFO", "<ID=IMPUTED,Number=0,Type=Flag,Description=\"Marker was imputed\">"},
     {"INFO", "<ID=TYPED,Number=0,Type=Flag,Description=\"Marker was genotyped\">"},
     {"FORMAT","<ID=GT,Number=1,Type=String,Description=\"Genotyped alleles from Array\">"},
-    {"FORMAT","<ID=LDS,Number=2,Type=Float,Description=\"Leave-one-out Imputed Dosage : Estimated Haploid Alternate Allele Dosage assuming site was NOT genotyped\">"}};
+    {"FORMAT","<ID=LDS,Number=.,Type=Float,Description=\"Leave-one-out Imputed Dosage : Estimated Haploid Alternate Allele Dosage assuming site was NOT genotyped\">"}};
 
   // TODO: command string
 
