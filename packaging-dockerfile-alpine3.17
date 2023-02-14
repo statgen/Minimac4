@@ -1,0 +1,9 @@
+FROM alpine:3.17
+
+ENV TZ=Etc/UTC
+RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
+
+RUN apk update && apk add --no-cache binutils bash cmake make libgcc musl-dev gcc g++ \
+    curl \
+    git \
+    help2man
