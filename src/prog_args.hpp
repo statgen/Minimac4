@@ -309,6 +309,11 @@ public:
             prob_threshold_s1_ = std::min(1., std::atof(optarg ? optarg : ""));
             break;
           }
+          else if (long_opt_str == "temp-prefix")
+          {
+            temp_prefix_ = optarg ? optarg : "";
+            break;
+          }
           else if (long_opt_str == "diff-threshold")
           {
             diff_threshold_ = std::max(0., std::atof(optarg ? optarg : ""));
