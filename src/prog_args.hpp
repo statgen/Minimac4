@@ -33,6 +33,7 @@ private:
   std::int64_t chunk_size_ = 20000000;
   std::int64_t overlap_ = 3000000;
   std::int16_t threads_ = 1;
+  float decay_ = 0.f;
   float min_r2_ = -1.f;
   float min_ratio_ = 1e-5f;
   float prob_threshold_ = 0.01f;
@@ -68,6 +69,7 @@ public:
   std::int64_t overlap() const { return overlap_; }
   std::int16_t threads() const { return threads_; }
   std::size_t temp_buffer() const { return temp_buffer_ ; }
+  float decay() const { return decay_; }
   float min_r2() const { return min_r2_; }
   float min_ratio() const { return min_ratio_; }
   float prob_threshold() const { return prob_threshold_; }
@@ -99,6 +101,7 @@ public:
         {"threads", required_argument, 0, 't', "Number of threads (default: 1)"},
         {"version", no_argument, 0, 'v', "Print version"},
         {"overlap", required_argument, 0, 'w', "Size (in base pairs) of overlap before and after impute region to use as input to HMM (default: 3000000)"},
+        {"decay", required_argument, 0, '\x02', "Decay rate for dosages in flanking regions (default: disabled with 0)"},
         {"min-r2", required_argument, 0, '\x02', "Minimum estimated r-square for output variants"},
         {"min-ratio", required_argument, 0, '\x02', "Minimum ratio of number of target sites to reference sites (default: 0.00001)"},
         {"match-error", required_argument, 0, '\x02', "Error parameter for HMM match probabilities (default: 0.01)"},
@@ -279,7 +282,12 @@ public:
       case '\x02':
         {
           std::string long_opt_str = std::string(long_options_[long_index].name);
-          if (long_opt_str == "min-r2")
+          if (long_opt_str == "decay")
+          {
+            decay_ = std::atof(optarg ? optarg : "");
+            break;
+          }
+          else if (long_opt_str == "min-r2")
           {
             min_r2_ = std::atof(optarg ? optarg : "");
             break;

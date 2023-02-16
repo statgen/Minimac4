@@ -107,7 +107,7 @@ public:
 
       std::cerr << "Running HMM with " << args.threads() << " threads ..." << std::endl;
       start_time = std::time(nullptr);
-      std::vector<hidden_markov_model> hmms(tpool.thread_count(), {args.prob_threshold(), args.prob_threshold_s1(), args.diff_threshold(), 1e-5f});
+      std::vector<hidden_markov_model> hmms(tpool.thread_count(), {args.prob_threshold(), args.prob_threshold_s1(), args.diff_threshold(), 1e-5f, args.decay()});
 
       std::size_t ploidy = target_sites[0].gt.size() / sample_ids.size();
       std::size_t haplotype_buffer_size = args.temp_buffer() * ploidy;

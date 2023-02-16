@@ -8,11 +8,12 @@
 constexpr float hidden_markov_model::jump_fix;
 constexpr float hidden_markov_model::jump_threshold;
 
-hidden_markov_model::hidden_markov_model(float s3_prob_threshold, float s1_prob_threshold, float diff_threshold, float background_error) :
+hidden_markov_model::hidden_markov_model(float s3_prob_threshold, float s1_prob_threshold, float diff_threshold, float background_error, float decay) :
   prob_threshold_(s3_prob_threshold),
   s1_prob_threshold_(s1_prob_threshold),
   diff_threshold_(diff_threshold),
-  background_error_(background_error)
+  background_error_(background_error),
+  decay_(decay)
 {
 }
 
@@ -466,7 +467,7 @@ void hidden_markov_model::impute(double& prob_sum, std::size_t& prev_best_typed_
   assert(row == 0 || tar_variants[row].pos >= tar_variants[row - 1].pos);
   std::size_t mid_point = row == 0 ? 1 : std::max<std::int32_t>(1, std::int32_t(tar_variants[row].pos) - std::int32_t(tar_variants[row].pos - tar_variants[row - 1].pos) / 2);
   if (full_ref_ritr == full_ref_rend || full_ref_ritr->pos < mid_point) // TODO: stop traverse_backward at beginning of region.
-    return;
+    return; // We are outside the impute region (in the extended region)
 
   float typed_dose = std::numeric_limits<float>::quiet_NaN();
   float typed_loo_dose = std::numeric_limits<float>::quiet_NaN();
@@ -544,19 +545,19 @@ void hidden_markov_model::impute(double& prob_sum, std::size_t& prev_best_typed_
         an += card;
       }
 
-      if (p_alt > 1. || p_alt < 0.)
-      {
-        auto a = 0;
-      }
-
       assert(full_ref_ritr->ac >= ac);
       assert(n_templates >= an);
       if (n_templates - an > 0)
         p_alt += (1. - best_sum) * (double(full_ref_ritr->ac - ac) / double(n_templates - an));
 
-      if (p_alt > 1.0f)
+      if (decay_ > 0. && (row == 0 || row + 1 == tar_variants.size()))
       {
-        auto a = 0;
+        // Either the first or last typed site, so decay.
+
+        // We are estimating cM with physical distance for now. TODO: add tar_variants[row].cm
+        double cm_estimate = std::abs(std::int64_t(full_ref_ritr->pos) - std::int64_t(tar_variants[row].pos)) / 1e6;
+        double decay = recombination::cm_to_switch_prob(cm_estimate, decay_);
+        p_alt = p_alt * (1. - decay) + (full_ref_ritr->ac / double(n_templates)) * decay;
       }
 
       p_alt = std::max(0., std::min(1., p_alt));

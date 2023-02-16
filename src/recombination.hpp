@@ -26,6 +26,7 @@ public:
   static bool parse_map_file(const std::string& map_file_path, std::vector<target_variant>& sites, float recom_min);
   static double haldane(double cm) { return (1. - std::exp(-cm/50.))/2.;}
   static double cm_to_switch_prob(double cm) { return 1. - std::exp(-cm/100.);}
+  static double cm_to_switch_prob(double cm, double decay_rate) { return 1. - std::exp(-decay_rate * cm/100.);}
   static double haldane_inverse(double recom_prob) { return 50. * std::log(1. / (1. - 2. * recom_prob)); }
   static double switch_prob_to_cm(double recom_prob) { return 100. * std::log(1. / (1. - recom_prob)); }
 private:
