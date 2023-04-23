@@ -4,18 +4,19 @@ Minimac4 is a lower memory and more computationally efficient
 implementation of the genotype imputation algorithms in 
 minimac/mininac2/minimac3.
 
-<<< SEE http://genome.sph.umich.edu/wiki/Minimac4 FOR DOCUMENTATION >>>
-
-## Prerequisites
-Automatic installation of Minimac4 requires [cget](http://cget.readthedocs.io/en/latest/src/intro.html#installing-cget) and cmake >= v3.2.
-
 ## Installation
-The easiest way to install Minimac4 and its dependencies is to use cget:
+A prebuilt Linux x86 executable is available at https://github.com/statgen/Minimac4/releases/latest by downloading and running minimac4-{version}-Linux-x86_64.sh. Alternativbely, you can build from source.
+
+## Prerequisites for building from source
+Minimac4 requires GCC >= v5 or a compiler with full C++11 support. Automatic installation of Minimac4 requires [cget](http://cget.readthedocs.io/en/latest/src/intro.html#installing-cget) and CMake >= v3.2.
+
+## Building from source
+The simplest way to build the latest Minimac4 and its dependencies is to use cget:
 ```bash
 cget install --prefix <install_prefix> statgen/Minimac4
 ```
 
-Alternatively, you can install manually:
+Alternatively, you can build manually:
 ```bash
 cd Minimac4
 cget install -f ./requirements.txt                      # Install dependencies locally.
@@ -33,7 +34,7 @@ make
 make CTEST_OUTPUT_ON_FAILURE=1 test
 ```
 
-Since some users have reported issues with installing cget with pip, a cmake-only alternative is available:
+Since some users have reported issues with installing cget with pip, a cmake-only alternative for installing dependencies is available:
 ```shell
 cmake -P dependencies.cmake deps/
 mkdir build; cd build
