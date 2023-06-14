@@ -112,21 +112,30 @@ std::vector<std::pair<std::string, std::string>> dosage_writer::gen_emp_headers(
 
 savvy::file::format dosage_writer::format_from_filename(const std::string& filename, savvy::file::format default_format)
 {
-  if (filename.size() >= 3)
+  if (filename.size() >= 4)
   {
-    const std::string ext = filename.substr(filename.size() - 3);
-    if (ext == "sav")
+    const std::string ext = filename.substr(filename.size() - 4);
+    if (ext == ".sav")
       return savvy::file::format::sav;
-    else if (ext == "bcf")
+    else if (ext == ".bcf")
       return savvy::file::format::bcf;
-    else if (ext == "vcf")
+    else if (ext == ".vcf")
       return savvy::file::format::vcf;
   }
 
-  if (filename.size() >= 6)
+  if (filename.size() >= 5)
   {
-    const std::string ext = filename.substr(filename.size() - 6);
-    if (ext == "vcf.gz")
+    const std::string ext = filename.substr(filename.size() - 5);
+    if (ext == ".usav")
+      return savvy::file::format::sav;
+    else if (ext == ".ubcf")
+      return savvy::file::format::bcf;
+  }
+
+  if (filename.size() >= 7)
+  {
+    const std::string ext = filename.substr(filename.size() - 7);
+    if (ext == ".vcf.gz")
       return savvy::file::format::vcf;
   }
 
@@ -138,10 +147,28 @@ int dosage_writer::clevel_from_filename(const std::string& filename, int default
   if (filename.size() >= 4)
   {
     const std::string ext = filename.substr(filename.size() - 4);
-    if (ext == ".sav" || ext == ".bcf" || ext == "f.gz")
+    if (ext == ".sav")
       return 6;
-    else if (ext == "usav" || ext == "ubcf" || ext == ".vcf")
+    else if (ext == ".bcf")
+      return 6;
+    else if (ext == ".vcf")
       return 0;
+  }
+
+  if (filename.size() >= 5)
+  {
+    const std::string ext = filename.substr(filename.size() - 5);
+    if (ext == ".usav")
+      return 0;
+    else if (ext == ".ubcf")
+      return 0;
+  }
+
+  if (filename.size() >= 7)
+  {
+    const std::string ext = filename.substr(filename.size() - 7);
+    if (ext == ".vcf.gz")
+      return 6;
   }
 
   return default_clevel;
