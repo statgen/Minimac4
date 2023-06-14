@@ -52,7 +52,7 @@ A typical Minimac4 command line for imputation is as follows
 minimac4 reference.msav target.vcf.gz > imputed.sav
 ```
 
-Here reference.msav is a reference panel (e.g. 1000 Genomes) compressed with MVCF encoding, 
+Here reference.msav is a reference panel (e.g. [1000 Genomes download](ftp://share.sph.umich.edu/minimac4/panels/g1k_p3_msav_files_with_estimates.tar.gz)) compressed with MVCF encoding, 
 target.vcf.gz is an indexed VCF containing phased genotype array data, 
 and imputed.sav is the imputed output.
 
