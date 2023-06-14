@@ -84,7 +84,9 @@ public:
 
   prog_args() :
     getopt_wrapper(
-      "Usage: minimac4 [opts ...] <reference.msav> <target.{sav,bcf,vcf.gz}>",
+      "Usage: minimac4 [opts ...] <reference.msav> <target.{sav,bcf,vcf.gz}>\n"
+      "       minimac4 [opts ...] --update-m3vcf <reference.m3vcf.gz>\n"
+      "       minimac4 [opts ...] --compress-reference <reference.{sav,bcf,vcf.gz}>",
       {
         {"all-typed-sites", no_argument, 0, 'a', "Include in the output sites that exist only in target VCF"},
         {"temp-buffer", required_argument, 0, 'b', "Number of samples to impute before writing to temporary files (default: 200)"},
@@ -94,7 +96,7 @@ public:
         {"format", required_argument, 0, 'f', "Comma-separated list of format fields to generate (GT, HDS, DS, GP, or SD; default: HDS)"},
         {"map", required_argument, 0, 'm', "Genetic map file"},
         {"output", required_argument, 0, 'o', "Output path (default: /dev/stdout)"},
-        {"output-format", required_argument, 0, 'O', "Output file format (bcf, sav, vcf.gz, ubcf, usav, or vcf; default: bcf)"},
+        {"output-format", required_argument, 0, 'O', "Default output file format used for ambiguous filenames (bcf, sav, vcf.gz, ubcf, usav, or vcf; default: sav)"},
         //{"pass-only", no_argument, 0, 'p', "Only imports variants with FILTER column set to PASS"},
         {"region", required_argument, 0, 'r', "Genomic region to impute"},
         {"sites", required_argument, 0, 's', "Output path for sites-only file"},
@@ -107,13 +109,13 @@ public:
         {"match-error", required_argument, 0, '\x02', "Error parameter for HMM match probabilities (default: 0.01)"},
         {"min-recom", required_argument, 0, '\x02', "Minimum recombination probability (default: 0.00001)"},
         {"prob-threshold", required_argument, 0, '\x02', "Probability threshold used for template selection"},
-        {"prob-threshold-s1", required_argument, 0, '\x02', ""}, // "Probability threshold used for template selection in original state space"},
+        {"prob-threshold-s1", required_argument, 0, '\x02', "Probability threshold used for template selection in original state space"},
         {"diff-threshold", required_argument, 0, '\x02', "Probability diff threshold used in template selection"},
         {"sample-ids", required_argument, 0, '\x02', "Comma-separated list of sample IDs to subset from reference panel"},
         {"sample-ids-file", required_argument, 0, '\x02', "Text file containing sample IDs to subset from reference panel (one ID per line)"},
         {"temp-prefix", required_argument, 0, '\x02', "Prefix path for temporary output files (default: ${TMPDIR}/m4_)"},
-        {"update-m3vcf", no_argument, 0, '\x01', nullptr},
-        {"compress-reference", no_argument, 0, '\x01', nullptr},
+        {"update-m3vcf", no_argument, 0, '\x01', "Converts M3VCF to MVCF (default output: /dev/stdout)"},
+        {"compress-reference", no_argument, 0, '\x01', "Compresses VCF to MVCF (default output: /dev/stdout)"},
         // vvvv deprecated vvvv //
         {"allTypedSites", no_argument, 0, '\x01', nullptr},
         {"rsid", no_argument, 0, '\x01', nullptr},
