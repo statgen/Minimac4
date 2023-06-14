@@ -71,3 +71,15 @@ Meta-imputation with MetaMinimac2 requires `--empirical-output` (or `-e`) to be 
 ```bash
 minimac4 reference.msav target.bcf -o imputed.dose.sav -e imputed.empirical_dose.sav
 ```
+
+## Reference Panel Creation
+If an M3VCF file is already available, it can be converted to the new MVCF format with:
+```
+minimac4 --update-m3vcf reference.m3vcf.gz > reference.msav
+```
+
+Otherwise, phased VCFs containing the reference haplotypes can be compressed into an MVCF with:
+```
+minimac4 --compress-reference reference.{sav,bcf,vcf.gz} > reference.msav
+``` 
+
