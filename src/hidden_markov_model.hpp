@@ -20,6 +20,15 @@ public:
     loo_dosages_.resize(n_loo_rows, std::vector<float>(n_columns, savvy::typed_value::end_of_vector_value<float>()));
   }
 
+  void fill_eov()
+  {
+    for (auto& v : dosages_)
+      std::fill(v.begin(), v.end(),savvy::typed_value::end_of_vector_value<float>());
+
+    for (auto& v : loo_dosages_)
+      std::fill(v.begin(), v.end(),savvy::typed_value::end_of_vector_value<float>());
+  }
+
   std::array<std::size_t, 2> dimensions() const { return {dosages_.size(), dosages_.empty() ? 0 : dosages_[0].size()}; }
   std::array<std::size_t, 2> dimensions_loo() const { return {dosages_.size(), dosages_.empty() ? 0 : dosages_[0].size()}; }
 

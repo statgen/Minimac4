@@ -18,7 +18,7 @@ bcftools index $ref_vcf
 bcftools view $4 -Oz -o $tar_vcf
 bcftools index $tar_vcf
 $m4 --compress-reference $ref_vcf > $ref_msav
-$m4 $ref_msav $tar_vcf -f GT -O vcf.gz > $imputed_vcf
+$m4 $ref_msav $tar_vcf -f GT -O vcf.gz --temp-buffer 2 > $imputed_vcf
 
 gzip -cd $imputed_vcf | grep -v "^#" | cut -f9- > $d/imputed_gt_matrix.tsv
 gzip -cd $ref_vcf | grep -v "^#" | cut -f9- > $d/ref_gt_matrix.tsv

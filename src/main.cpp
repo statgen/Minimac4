@@ -126,6 +126,9 @@ public:
             hmm_results.loo_dosages_[j].resize(group_size);
         }
 
+        if (i > 0)
+          hmm_results.fill_eov();
+
         start_time = std::time(nullptr);
         omp::parallel_for_exp(
           omp::static_schedule(), omp::sequence_iterator(i), omp::sequence_iterator(i + group_size), [&](int& i, const omp::iteration_context& ctx)

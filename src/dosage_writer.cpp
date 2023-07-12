@@ -208,6 +208,7 @@ bool dosage_writer::merge_temp_files(std::list<savvy::reader>& temp_files, std::
   std::vector<float> partial_lds;
   std::vector<std::int8_t> pasted_gt;
   std::vector<std::int8_t> partial_gt;
+  std::size_t max_ploidy = 0;
 
   int good_count = temp_files.size();
   while (good_count == temp_files.size())
@@ -221,8 +222,16 @@ bool dosage_writer::merge_temp_files(std::list<savvy::reader>& temp_files, std::
     good_count = 0;
     for (auto it = temp_files.begin(); it != temp_files.end(); ++it)
     {
-      good_count += (int)it->read(out_var).good();
+      bool read_succeeded = it->read(out_var).good();
+      good_count += (int)read_succeeded;
       out_var.get_format("HDS", partial_hds);
+
+      // verify max ploidy is consistent across all temp files
+      if (max_ploidy == 0)
+        max_ploidy = partial_hds.size() / it->samples().size();
+      if (read_succeeded && max_ploidy != (partial_hds.size() / it->samples().size()))
+        return std::cerr << "Error: max ploidy is not consistent across temp files. This should never happen. Please report." << std::endl, false;
+
       std::size_t old_size = pasted_hds.size();
       pasted_hds.resize(old_size + partial_hds.size());
       for (auto jt = partial_hds.begin(); jt != partial_hds.end(); ++jt)
@@ -318,6 +327,9 @@ bool dosage_writer::merge_temp_files(std::list<savvy::reader>& temp_files, std::
 
             if (good_count_emp < temp_emp_files.size())
               return std::cerr << "Error: record mismatch in empirical temp files" << std::endl, false;
+
+            if (pasted_hds.size() != pasted_gt.size() || pasted_lds.size() != pasted_gt.size())
+              return std::cerr << "Error: Merged HDS, LDS, and GT are not consistent. This should never happen. Please report." << std::endl, false;
 
             out_var_emp.set_format("GT", pasted_gt);
             out_var_emp.set_format("LDS", pasted_lds);
