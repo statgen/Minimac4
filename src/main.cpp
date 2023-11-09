@@ -80,7 +80,14 @@ public:
       float tar_ref_ratio = float(typed_only_reference_data.variant_size()) / float(full_reference_data.variant_size());
       std::cerr << "Typed sites to imputed sites ratio: " << tar_ref_ratio << " (" << typed_only_reference_data.variant_size() << "/" << full_reference_data.variant_size() << ")\n";
       if (tar_ref_ratio < args.min_ratio())
-        return std::cerr << "Error: not enough target variants are available to impute this chunk. The --min-ratio, --chunk, or --region options may need to be altered.\n", false;
+      {
+        std::cerr << (args.fail_min_ratio() ? "Error" : "Warning")  << ": not enough target variants are available to impute this chunk. The --min-ratio, --chunk, or --region options may need to be altered." << std::endl;
+        if (!args.fail_min_ratio())
+          std::cerr << "Warning: skipping chunk " << impute_region.chromosome() << ":" << impute_region.from() << "-" << impute_region.to() << std::endl;
+        if (args.fail_min_ratio())
+          return false;
+        return true; // skip
+      }
 
       if (target_only_sites.size())
       {

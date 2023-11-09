@@ -46,6 +46,7 @@ private:
   bool compress_reference_ = false;
   bool pass_only_ = false;
   bool meta_ = false; // deprecated
+  bool fail_min_ratio_ = true;
   bool help_ = false;
   bool version_ = false;
 
@@ -81,6 +82,7 @@ public:
   bool update_m3vcf() const { return update_m3vcf_; }
   bool compress_reference() const { return compress_reference_; }
   bool pass_only() const { return pass_only_; }
+  bool fail_min_ratio() const { return fail_min_ratio_; }
 
   prog_args() :
     getopt_wrapper(
@@ -106,6 +108,7 @@ public:
         {"decay", required_argument, 0, '\x02', "Decay rate for dosages in flanking regions (default: disabled with 0)"},
         {"min-r2", required_argument, 0, '\x02', "Minimum estimated r-square for output variants"},
         {"min-ratio", required_argument, 0, '\x02', "Minimum ratio of number of target sites to reference sites (default: 0.00001)"},
+        {"min-ratio-behavior", required_argument, 0, '\x02', "Behavior for when --min-ratio is not met (\"skip\" or \"fail\"; default: fail)"}, // maybe add "warn"
         {"match-error", required_argument, 0, '\x02', "Error parameter for HMM match probabilities (default: 0.01)"},
         {"min-recom", required_argument, 0, '\x02', "Minimum recombination probability (default: 0.00001)"},
         {"prob-threshold", required_argument, 0, '\x02', "Probability threshold used for template selection"},
@@ -297,6 +300,11 @@ public:
           else if (long_opt_str == "min-ratio")
           {
             min_ratio_ = std::min(1., std::max(0., std::atof(optarg ? optarg : "")));
+            break;
+          }
+          else if (long_opt_str == "min-ratio-behavior")
+          {
+            fail_min_ratio_ = std::string(optarg ? optarg : "") == "fail";
             break;
           }
           else if (long_opt_str == "match-error")
