@@ -17,7 +17,19 @@ bool load_reference_haplotypes(const std::string& file_path,
   const std::unordered_set<std::string>& subset_ids,
   std::vector<target_variant>& target_sites,
   reduced_haplotypes& typed_only_reference_data,
-  reduced_haplotypes& full_reference_data);
+  reduced_haplotypes& full_reference_data,
+  genetic_map_file* map_file,
+  float min_recom,
+  float default_match_error);
+
+bool load_reference_haplotypes_old_recom_approach(const std::string& file_path,
+  const savvy::genomic_region& extended_reg,
+  const savvy::genomic_region& impute_reg,
+  const std::unordered_set<std::string>& subset_ids,
+  std::vector<target_variant>& target_sites,
+  reduced_haplotypes& typed_only_reference_data,
+  reduced_haplotypes& full_reference_data,
+  genetic_map_file* map_file);
 
 std::vector<target_variant> separate_target_only_variants(std::vector<target_variant>& target_sites);
 

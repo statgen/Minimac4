@@ -56,7 +56,7 @@ public:
   operator bool() const { return good_; }
 
   // This must be called in order. The pos argument must be >= to pos passed in previous call
-  float interpolate_centimorgan(std::size_t variant_pos);
+  double interpolate_centimorgan(std::size_t variant_pos);
 private:
   bool read_record(record& rec);
 };

@@ -152,14 +152,14 @@ genetic_map_file::genetic_map_file(const std::string& map_file_path, const std::
   }
 }
 
-float genetic_map_file::interpolate_centimorgan(std::size_t variant_pos)
+double genetic_map_file::interpolate_centimorgan(std::size_t variant_pos)
 {
   if (good_)
   {
     if (variant_pos < prev_rec_.pos)
     {
       auto basepair_cm = prev_rec_.map_value / double(prev_rec_.pos);
-      return float(double(variant_pos) * basepair_cm);
+      return double(double(variant_pos) * basepair_cm);
     }
 
     record temp_rec;
@@ -176,13 +176,13 @@ float genetic_map_file::interpolate_centimorgan(std::size_t variant_pos)
     if (variant_pos < cur_rec_.pos)
     {
       assert(variant_pos - prev_rec_.pos < variant_pos); //TODO: handle gracefully
-      return float(prev_rec_.map_value + double(variant_pos - prev_rec_.pos) * basepair_cm);
+      return double(prev_rec_.map_value + double(variant_pos - prev_rec_.pos) * basepair_cm);
     }
 
-    return float(cur_rec_.map_value + double(variant_pos - cur_rec_.pos) * basepair_cm); // Should we assume that basepair_cm is zero?
+    return double(cur_rec_.map_value + double(variant_pos - cur_rec_.pos) * basepair_cm); // Should we assume that basepair_cm is zero?
   }
 
-  return std::numeric_limits<float>::quiet_NaN();;
+  return std::numeric_limits<double>::quiet_NaN();;
 }
 
 bool genetic_map_file::read_record(record& entry)

@@ -54,7 +54,8 @@ public:
     start_time = std::time(nullptr);
     reduced_haplotypes typed_only_reference_data(16, 512);
     reduced_haplotypes full_reference_data;
-    if (!load_reference_haplotypes(args.ref_path(), extended_region, impute_region, args.sample_ids(), target_sites, typed_only_reference_data, full_reference_data))
+    std::unique_ptr<genetic_map_file> mf(args.map_path().empty() ? nullptr : new genetic_map_file(args.map_path(), impute_region.chromosome()));
+    if (!load_reference_haplotypes(args.ref_path(), extended_region, impute_region, args.sample_ids(), target_sites, typed_only_reference_data, full_reference_data, mf.get(), args.min_recom(), args.error_param()))
       return std::cerr << "Error: failed loading reference haplotypes\n", false;
     std::cerr << "Loading reference haplotypes took " << record_input_time(std::difftime(std::time(nullptr), start_time)) << " seconds" << std::endl;
 
@@ -64,8 +65,8 @@ public:
     double impute_time = 0.;
     double temp_write_time = 0.;
 
-      std::list<savvy::reader> temp_files;
-      std::list<savvy::reader> temp_emp_files;
+    std::list<savvy::reader> temp_files;
+    std::list<savvy::reader> temp_emp_files;
 //    std::list<std::string> temp_files;
 //    std::list<std::string> temp_emp_files;
     full_dosages_results hmm_results;
@@ -97,11 +98,11 @@ public:
       if (target_sites.empty())
         return std::cerr << "Error: no target variants\n", false;
 
-      std::cerr << "Loading switch probabilities ..." << std::endl;
-      start_time = std::time(nullptr);
-      if (!load_variant_hmm_params(target_sites, typed_only_reference_data, args.error_param(), args.min_recom(), args.map_path()))
-        return std::cerr << "Error: parsing map file failed\n", false;
-      std::cerr << "Loading switch probabilities took " << record_input_time(std::difftime(std::time(nullptr), start_time)) << " seconds" << std::endl;
+//      std::cerr << "Loading switch probabilities ..." << std::endl;
+//      start_time = std::time(nullptr);
+//      if (!load_variant_hmm_params(target_sites, typed_only_reference_data, args.error_param(), args.min_recom(), args.map_path()))
+//        return std::cerr << "Error: parsing map file failed\n", false;
+//      std::cerr << "Loading switch probabilities took " << record_input_time(std::difftime(std::time(nullptr), start_time)) << " seconds" << std::endl;
 
       auto reverse_maps = generate_reverse_maps(typed_only_reference_data);
 
