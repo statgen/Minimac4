@@ -35,7 +35,7 @@ private:
   std::int16_t threads_ = 1;
   float decay_ = 0.f;
   float min_r2_ = -1.f;
-  float min_ratio_ = 1e-5f;
+  float min_ratio_ = 1e-4f;
   float prob_threshold_ = 0.01f;
   float prob_threshold_s1_ = -1.f;
   float diff_threshold_ = 0.01f;
@@ -107,10 +107,10 @@ public:
         {"overlap", required_argument, 0, 'w', "Size (in base pairs) of overlap before and after impute region to use as input to HMM (default: 3000000)"},
         {"decay", required_argument, 0, '\x02', "Decay rate for dosages in flanking regions (default: disabled with 0)"},
         {"min-r2", required_argument, 0, '\x02', "Minimum estimated r-square for output variants"},
-        {"min-ratio", required_argument, 0, '\x02', "Minimum ratio of number of target sites to reference sites (default: 0.00001)"},
+        {"min-ratio", required_argument, 0, '\x02', "Minimum ratio of number of target sites to reference sites (default: 1e-4)"},
         {"min-ratio-behavior", required_argument, 0, '\x02', "Behavior for when --min-ratio is not met (\"skip\" or \"fail\"; default: fail)"}, // maybe add "warn"
         {"match-error", required_argument, 0, '\x02', "Error parameter for HMM match probabilities (default: 0.01)"},
-        {"min-recom", required_argument, 0, '\x02', "Minimum recombination probability (default: 0.00001)"},
+        {"min-recom", required_argument, 0, '\x02', "Minimum recombination probability (default: 1e-5)"},
         {"prob-threshold", required_argument, 0, '\x02', "Probability threshold used for template selection"},
         {"prob-threshold-s1", required_argument, 0, '\x02', "Probability threshold used for template selection in original state space"},
         {"diff-threshold", required_argument, 0, '\x02', "Probability diff threshold used in template selection"},
