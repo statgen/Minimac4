@@ -30,6 +30,9 @@ private:
   std::unordered_set<std::string> sample_ids_;
   savvy::genomic_region reg_ = {""};
   std::size_t temp_buffer_ = 200;
+  std::size_t min_block_size_ = 10;
+  std::size_t max_block_size_ = 0xFFFF; // max s1r block size minus 1 partition record
+  std::size_t slope_unit_ = 10;
   std::int64_t chunk_size_ = 20000000;
   std::int64_t overlap_ = 3000000;
   std::int16_t threads_ = 1;
@@ -70,6 +73,9 @@ public:
   std::int64_t overlap() const { return overlap_; }
   std::int16_t threads() const { return threads_; }
   std::size_t temp_buffer() const { return temp_buffer_ ; }
+  std::size_t min_block_size() const { return min_block_size_; }
+  std::size_t max_block_size() const { return max_block_size_; }
+  std::size_t slope_unit() const { return slope_unit_; }
   float decay() const { return decay_; }
   float min_r2() const { return min_r2_; }
   float min_ratio() const { return min_ratio_; }
@@ -119,6 +125,9 @@ public:
         {"temp-prefix", required_argument, 0, '\x02', "Prefix path for temporary output files (default: ${TMPDIR}/m4_)"},
         {"update-m3vcf", no_argument, 0, '\x01', "Converts M3VCF to MVCF (default output: /dev/stdout)"},
         {"compress-reference", no_argument, 0, '\x01', "Compresses VCF to MVCF (default output: /dev/stdout)"},
+        {"min-block-size", required_argument, 0, '\x02', "Minimium block size for unique haplotype compression (default: 10)"},
+        {"max-block-size", required_argument, 0, '\x02', "Maximum block size for unique haplotype compression (default: 65535)"},
+        {"slope-unit", required_argument, 0, '\x02', "Parameter for unique haplotype compression heuristic (default: 10)"},
         // vvvv deprecated vvvv //
         {"allTypedSites", no_argument, 0, '\x01', nullptr},
         {"rsid", no_argument, 0, '\x01', nullptr},
@@ -347,6 +356,21 @@ public:
           {
             std::ifstream ifs(optarg ? optarg : "");
             sample_ids_.insert(std::istream_iterator<std::string>(ifs), std::istream_iterator<std::string>());
+            break;
+          }
+          else if (long_opt_str == "min-block-size")
+          {
+            min_ratio_ = std::max(1ll, std::atoll(optarg ? optarg : ""));
+            break;
+          }
+          else if (long_opt_str == "max-block-size")
+          {
+            min_ratio_ = std::max(1ll, std::atoll(optarg ? optarg : ""));
+            break;
+          }
+          else if (long_opt_str == "slope-unit")
+          {
+            min_ratio_ = std::max(1ll, std::atoll(optarg ? optarg : ""));
             break;
           }
           else if (long_opt_str == "haps")

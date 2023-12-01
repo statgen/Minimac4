@@ -38,7 +38,11 @@ bool load_variant_hmm_params(std::vector<target_variant>& tar_variants, reduced_
 std::vector<std::vector<std::vector<std::size_t>>> generate_reverse_maps(const reduced_haplotypes& typed_only_reference_data);
 
 bool convert_old_m3vcf(const std::string& input_path, const std::string& output_path, const std::string& map_file_path = "");
-bool compress_reference_panel(const std::string& input_path, const std::string& output_path, const std::string& map_file_path = "");
+bool compress_reference_panel(const std::string& input_path, const std::string& output_path,
+  std::size_t min_block_size = 10,
+  std::size_t max_block_size = 0xFFFF, // max s1r block size minus 1 partition record
+  std::size_t slope_unit = 10, 
+  const std::string& map_file_path = "");
 
 
 #endif // MINIMAC4_INPUT_PREP_HPP

@@ -705,9 +705,15 @@ bool convert_old_m3vcf(const std::string& input_path, const std::string& output_
   return !input_file.bad() && output_file.good();
 }
 
-bool compress_reference_panel(const std::string& input_path, const std::string& output_path, const std::string& map_file_path)
+bool compress_reference_panel(const std::string& input_path, const std::string& output_path,
+  std::size_t min_block_size,
+  std::size_t max_block_size,
+  std::size_t slope_unit,
+  const std::string& map_file_path)
 {
   savvy::reader input_file(input_path);
+  if (!input_file)
+    return std::cerr << "Error: could not open input file\n", false;
   savvy::variant var;
   std::vector<std::int8_t> gts;
 
@@ -744,35 +750,54 @@ bool compress_reference_panel(const std::string& input_path, const std::string& 
       headers.emplace_back(it->first, it->second);
   }
 
-  if (!input_file.read(var) || !var.get_format("GT", gts))
-    return std::cerr << "Error: could not read GT from first variant record in input file\n", false;
-
-  if (header_contigs.find(var.chrom()) == header_contigs.end())
-    headers.emplace_back("contig", "<ID=" + var.chrom() + ">");
-
-  float flt_nan = std::numeric_limits<float>::quiet_NaN();
-  unique_haplotype_block block;
-  block.compress_variant(reference_site_info(var.chrom(), var.pos(), var.id(), var.ref(), var.alts().size() ? var.alts()[0] : "", flt_nan, flt_nan, std::numeric_limits<double>::quiet_NaN()), gts);
-  std::size_t variant_cnt = 1;
-  std::size_t block_cnt = 0;
-
   std::string last_3;
   if (output_path.size() >= 3)
     last_3 = output_path.substr(output_path.size() - 3);
   savvy::writer output_file(output_path, last_3 == "bcf" ? savvy::file::format::bcf : savvy::file::format::sav, headers, input_file.samples(), 6);
 
+  //if (!input_file.read(var))
+  //  return input_file.bad() ? std::cerr << "Error: read failure on first record\n", false : true;
+
+  //if (!var.get_format("GT", gts))
+  //  return std::cerr << "Error: could not read GT from first variant record in input file\n", false;
+
+  //if (header_contigs.find(var.chrom()) == header_contigs.end())
+  //  headers.emplace_back("contig", "<ID=" + var.chrom() + ">");
+
+  float flt_nan = std::numeric_limits<float>::quiet_NaN();
+  unique_haplotype_block block;
+  //block.compress_variant(reference_site_info(var.chrom(), var.pos(), var.id(), var.ref(), var.alts().size() ? var.alts()[0] : "", flt_nan, flt_nan, std::numeric_limits<double>::quiet_NaN()), gts);
+  std::size_t variant_cnt = 0;
+  std::size_t block_cnt = 0;
+
+  //std::string last_3;
+  //if (output_path.size() >= 3)
+  //  last_3 = output_path.substr(output_path.size() - 3);
+  //savvy::writer output_file(output_path, last_3 == "bcf" ? savvy::file::format::bcf : savvy::file::format::sav, headers, input_file.samples(), 6);
+
   auto comp_ratio = [](const unique_haplotype_block& b)
   {
-    return float(b.expanded_haplotype_size() + b.unique_haplotype_size() * b.variant_size()) / float(b.expanded_haplotype_size() * b.variant_size());
+    return double(b.expanded_haplotype_size() + b.unique_haplotype_size() * b.variant_size()) / double(b.expanded_haplotype_size() * b.variant_size());
   };
 
-  const std::size_t min_block_size = 10;
-  const std::size_t max_block_size = 0xFFFF; // max s1r block size minus 1 partition record
-
-  bool flush_block = false;
+  //const std::size_t min_block_size = 400; //10;
+  //const std::size_t max_block_size = 400; //0xFFFF; // max s1r block size minus 1 partition record
+  std::string prev_chrom;
+  //std::size_t slope_unit = 10;
+  double cr_sum = 0.;
+  double cr_min = 2.;
+  double cr_max = 0.;
+  double prev_cr = 2.;
   while (input_file >> var)
   {
-    float old_cr = comp_ratio(block);
+    if (var.chrom() != prev_chrom && block.variant_size())
+    {
+      if (!block.serialize(output_file))
+        return std::cerr << "Error: serializing block failed\n", false;
+      block.clear();
+      ++block_cnt;
+    }
+
 
     if (!var.get_format("GT", gts))
       return std::cerr << "Error: could not read GT from variant record\n", false;
@@ -786,22 +811,32 @@ bool compress_reference_panel(const std::string& input_path, const std::string& 
 
     ++variant_cnt;
 
+    bool flush_block = false;
     std::size_t cnt = block.variant_size();
+    double new_cr = comp_ratio(block);
     if (cnt >= min_block_size)
     {
-      float new_cr = comp_ratio(block);
-      if (new_cr > old_cr || cnt >= max_block_size)
-      {
-        // CM INFO field would need to be a double in order to have enough precision
-        // if (map_file)
-        //  block.fill_cm(*map_file);
-
-        if (!block.serialize(output_file))
-          return std::cerr << "Error: serializing block failed\n", false;
-        block.clear();
-        ++block_cnt;
-      }
+      if ((cnt % slope_unit == 0 && new_cr > prev_cr) || cnt >= max_block_size)
+        flush_block = true;
     }
+   
+    if (flush_block)
+    {
+      if (!block.serialize(output_file))
+        return std::cerr << "Error: serializing block failed\n", false;
+      block.clear();
+      ++block_cnt;
+      if (new_cr < cr_min) cr_min = new_cr;
+      if (new_cr > cr_max) cr_max = new_cr;
+      cr_sum += new_cr;
+      prev_cr=2.;
+    }
+    else if (cnt % slope_unit == 0)
+    {
+      prev_cr = new_cr;
+    }
+
+    prev_chrom = var.chrom();
   }
 
   // CM INFO field would need to be a double in order to have enough precision
@@ -810,10 +845,18 @@ bool compress_reference_panel(const std::string& input_path, const std::string& 
 
   if (block.variants().size())
   {
+    double cr = comp_ratio(block);
+    if (cr < cr_min) cr_min = cr;
+    if (cr > cr_max) cr_max = cr;
+    cr_sum += comp_ratio(block);
     if (!block.serialize(output_file))
       return std::cerr << "Error: serializing final block failed\n", false;
     ++block_cnt;
   }
+
+  std::cerr << "Mean Compression Ratio: " << cr_sum / block_cnt << std::endl;
+  std::cerr << "Min Compression Ratio: " << cr_min << std::endl;
+  std::cerr << "Max Compression Ratio: " << cr_max << std::endl;
 
   return !input_file.bad() && output_file.good();
 }
