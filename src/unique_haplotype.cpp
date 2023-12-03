@@ -282,13 +282,19 @@ int unique_haplotype_block::deserialize(savvy::reader& input_file, savvy::varian
 
 void unique_haplotype_block::remove_eov()
 {
-  for (auto it = unique_map_.begin(); it != unique_map_.end(); )
+  std::size_t eov_cnt = 0;
+  auto it = unique_map_.begin();
+  auto dest_it = it;
+  for ( ; it != unique_map_.end(); ++it)
   {
     if (savvy::typed_value::is_end_of_vector(*it))
-      it = unique_map_.erase(it);
+      ++eov_cnt;
     else
-      ++it;
+      *(dest_it++) = *it;
   }
+
+  if (eov_cnt)
+    unique_map_.resize(unique_map_.size() - eov_cnt);
 }
 
 bool unique_haplotype_block::deserialize(std::istream& is, int m3vcf_version, std::size_t n_haplotypes)
