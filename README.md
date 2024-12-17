@@ -5,7 +5,7 @@ implementation of the genotype imputation algorithms in
 minimac/mininac2/minimac3.
 
 ## Installation
-A prebuilt Linux x86 executable is available at https://github.com/statgen/Minimac4/releases/latest by downloading and running minimac4-{version}-Linux-x86_64.sh. Alternativbely, you can build from source.
+A prebuilt Linux x86 executable is available at https://github.com/statgen/Minimac4/releases/latest by downloading and running minimac4-{version}-Linux-x86_64.sh. Alternatively, you can build from source.
 
 ## Prerequisites for building from source
 Minimac4 requires GCC >= v5 or a compiler with full C++11 support. Automatic installation of Minimac4 requires [cget](http://cget.readthedocs.io/en/latest/src/intro.html#installing-cget) and CMake >= v3.2.
