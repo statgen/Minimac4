@@ -14,7 +14,7 @@ jobs:
       run: |
         set -euo pipefail
         sudo apt update
-        sudo apt install -y build-essential bcftools cmake git gzip python3-dev python3-pip python3-setuptools
+        sudo apt install -y build-essential bcftools cmake git gzip liblzma-dev libzstd-dev python3-dev python3-pip python3-setuptools zlib1g-dev
         pip3 --version
         pip3 install wheel
         pip3 install cget
