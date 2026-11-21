@@ -1,8 +1,11 @@
 #!/bin/bash
 # Usage: docker build -t packaging-alpine3.17 -f packaging-dockerfile-alpine3.17 . 
 #        docker run -v `pwd`:/app -w /app packaging-alpine3.17 ./package-linux.sh
+# Or: sudo apptainer build packaging.sif packaging-singularity-alpine3.17.def
+#     apptainer exec -B `pwd`:/app packaging.sif ./package-linux.sh
 set -euo pipefail
 
+cd /app
 src_dir=`pwd`
 build_dir=${src_dir}/pkg-build-alpine
 

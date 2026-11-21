@@ -1,0 +1,14 @@
+Bootstrap: docker
+From: alpine:3.17
+
+%environment
+  export LC_ALL=C
+  export TZ=Etc/UTC
+
+%post
+  ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
+
+  apk update && apk add --no-cache binutils bash cmake make libgcc musl-dev gcc g++ \
+    curl \
+    git \
+    help2man

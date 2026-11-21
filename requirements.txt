@@ -1,2 +1,2 @@
-statgen/savvy@v2.1.0
+statgen/savvy@v2.2.1
 jonathonl/omp@v1.0.0
